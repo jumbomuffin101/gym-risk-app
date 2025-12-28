@@ -1,18 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import Link from "next/link";
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 export default function SigninPage() {
   const router = useRouter();
-  const search = useSearchParams();
-  const callbackUrl = search.get("callbackUrl") ?? "/dashboard";
+  const params = useSearchParams();
+  const callbackUrl = params.get("callbackUrl") ?? "/dashboard";
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +26,7 @@ export default function SigninPage() {
       email,
       password,
       redirect: false,
-      callbackUrl,
+      callbackUrl
     });
 
     setLoading(false);
@@ -45,30 +41,24 @@ export default function SigninPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Sign in</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <Input name="email" placeholder="Email" type="email" required />
-            <Input name="password" placeholder="Password" type="password" required />
+      <div className="w-full max-w-md rounded-xl border p-6 space-y-4">
+        <h1 className="text-2xl font-semibold">Sign in</h1>
 
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        <form onSubmit={onSubmit} className="space-y-3">
+          <input className="w-full border rounded-md p-2" name="email" placeholder="Email" type="email" required />
+          <input className="w-full border rounded-md p-2" name="password" placeholder="Password" type="password" required />
 
-            <Button className="w-full" type="submit" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-            <p className="text-sm text-muted-foreground">
-              New here?{" "}
-              <Link className="underline" href="/signup">
-                Create an account
-              </Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+          <button className="w-full rounded-md bg-black text-white p-2" disabled={loading} type="submit">
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+
+        <p className="text-sm text-gray-600">
+          New here? <Link className="underline" href="/signup">Create an account</Link>
+        </p>
+      </div>
     </div>
   );
 }

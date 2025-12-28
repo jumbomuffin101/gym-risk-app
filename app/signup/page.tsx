@@ -1,12 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import Link from "next/link";
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -26,7 +22,7 @@ export default function SignupPage() {
     const res = await fetch("/api/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password })
     });
 
     setLoading(false);
@@ -42,31 +38,25 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Create account</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <Input name="name" placeholder="Name (optional)" />
-            <Input name="email" placeholder="Email" type="email" required />
-            <Input name="password" placeholder="Password" type="password" required />
+      <div className="w-full max-w-md rounded-xl border p-6 space-y-4">
+        <h1 className="text-2xl font-semibold">Create account</h1>
 
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        <form onSubmit={onSubmit} className="space-y-3">
+          <input className="w-full border rounded-md p-2" name="name" placeholder="Name (optional)" />
+          <input className="w-full border rounded-md p-2" name="email" placeholder="Email" type="email" required />
+          <input className="w-full border rounded-md p-2" name="password" placeholder="Password (min 8 chars)" type="password" required />
 
-            <Button className="w-full" type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Sign up"}
-            </Button>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-            <p className="text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link className="underline" href="/signin">
-                Sign in
-              </Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+          <button className="w-full rounded-md bg-black text-white p-2" disabled={loading} type="submit">
+            {loading ? "Creating..." : "Sign up"}
+          </button>
+        </form>
+
+        <p className="text-sm text-gray-600">
+          Already have an account? <Link className="underline" href="/signin">Sign in</Link>
+        </p>
+      </div>
     </div>
   );
 }
