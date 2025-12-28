@@ -1,14 +1,56 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../lib/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  password  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions  WorkoutSession[]
+}
+
+model Exercise {
+  id        String   @id @default(cuid())
+  name      String
+  category  String   // e.g. squat, hinge, push, pull
+  createdAt DateTime @default(now())
+
+  sets      SetEntry[]
+}
+
+model WorkoutSession {
+  id        String   @id @default(cuid())
+  userId    String
+  startedAt DateTime @default(now())
+  note      String?
+
+  user      User     @relation(fields: [userId], references: [id])
+  sets      SetEntry[]
+}
+
+model SetEntry {
+  id          String   @id @default(cuid())
+  sessionId   String
+  exerciseId  String
+  performedAt DateTime @default(now())
+
+  weight      Float
+  reps        Int
+  rpe         Float?
+  pain        Int?
+
+  session     WorkoutSession @relation(fields: [sessionId], references: [id])
+  exercise    Exercise       @relation(fields: [exerciseId], references: [id])
+
+  @@index([sessionId])
+  @@index([exerciseId])
+  @@index([performedAt])
 }
