@@ -4,53 +4,62 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
   id        String   @id @default(cuid())
-  name      String?
   email     String   @unique
+  name      String?
   password  String?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  sessions  WorkoutSession[]
+  workoutSessions WorkoutSession[]
+  sets            SetEntry[]
 }
 
 model Exercise {
   id        String   @id @default(cuid())
-  name      String
-  category  String   // e.g. squat, hinge, push, pull
+  name      String   @unique
+  category  String?
   createdAt DateTime @default(now())
 
-  sets      SetEntry[]
+  sets SetEntry[]
 }
 
 model WorkoutSession {
-  id        String   @id @default(cuid())
-  userId    String
-  startedAt DateTime @default(now())
-  note      String?
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user      User     @relation(fields: [userId], references: [id])
-  sets      SetEntry[]
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  note String?
+
+  sets SetEntry[]
+
+  @@index([userId, startedAt])
 }
 
 model SetEntry {
-  id          String   @id @default(cuid())
-  sessionId   String
-  exerciseId  String
-  performedAt DateTime @default(now())
+  id String @id @default(cuid())
 
-  weight      Float
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sessionId String
+  session   WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  performedAt DateTime @default(now())
   reps        Int
+  weight      Float
   rpe         Float?
   pain        Int?
 
-  session     WorkoutSession @relation(fields: [sessionId], references: [id])
-  exercise    Exercise       @relation(fields: [exerciseId], references: [id])
-
+  @@index([exerciseId, performedAt])
   @@index([sessionId])
-  @@index([exerciseId])
-  @@index([performedAt])
 }

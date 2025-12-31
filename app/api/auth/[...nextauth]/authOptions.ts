@@ -3,6 +3,10 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/db";
 
+type TokenWithSub = {
+  sub?: string;
+};
+
 export const authOptions: NextAuthOptions = {
   providers: [
     Credentials({
@@ -28,5 +32,23 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   session: { strategy: "jwt" },
-  pages: { signIn: "/signin" }
+  pages: { signIn: "/signin" },
+  callbacks: {
+  async jwt({ token, user }) {
+    if (user?.id) token.sub = String(user.id);
+    return token;
+  },
+
+  async session({ session, token }) {
+    if (session.user) {
+      const t = token as TokenWithSub;
+      if (!session.user.id && t.sub) session.user.id = t.sub;
+    }
+    return session;
+  },
+},
+
 };
+
+  
+
