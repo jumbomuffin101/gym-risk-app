@@ -187,16 +187,20 @@ body {
 .app-shell {
   isolation: isolate;
   min-height: 100vh;
-  position: relative;
-  overflow-x: clip;
-  overflow-y: clip; /* ADD */
+  color: var(--lab-text);
   background:
     radial-gradient(900px 450px at 15% 10%, var(--lab-glow-a), transparent 55%),
     radial-gradient(900px 450px at 85% 0%, var(--lab-glow-b), transparent 50%),
     radial-gradient(900px 450px at 50% 100%, var(--lab-glow-c), transparent 55%),
     radial-gradient(1200px 700px at 50% 40%, var(--lab-glow-d), transparent 60%),
     var(--lab-bg);
+  position: relative;
+
+  /* ✅ correct scrolling behavior */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
+
 
 
 /* Animated ambient layer (subtle, not flashy) */
