@@ -1,12 +1,10 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 
-export default function ResetPasswordConfirmPage() {
+function ResetPasswordConfirmInner() {
   const sp = useSearchParams();
   const router = useRouter();
   const token = useMemo(() => sp.get("token") ?? "", [sp]);
@@ -50,9 +48,7 @@ export default function ResetPasswordConfirmPage() {
           <div className="mb-5 space-y-2">
             <div className="text-xs uppercase tracking-wide lab-muted">Reset password</div>
             <h1 className="text-2xl font-semibold tracking-tight">Set a new password</h1>
-            <p className="text-sm lab-muted">
-              Choose a strong password. This link expires soon.
-            </p>
+            <p className="text-sm lab-muted">Choose a strong password. This link expires soon.</p>
           </div>
 
           {!token && (
@@ -102,5 +98,23 @@ export default function ResetPasswordConfirmPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordConfirmPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto flex min-h-[calc(100vh-64px)] max-w-6xl items-center justify-center px-6 py-10">
+          <div className="w-full max-w-md">
+            <div className="lab-card rounded-3xl p-6 md:p-7">
+              <div className="text-sm lab-muted">Loading reset link…</div>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <ResetPasswordConfirmInner />
+    </Suspense>
   );
 }
