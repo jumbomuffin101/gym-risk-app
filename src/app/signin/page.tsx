@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 
-export default function SigninPage() {
+function SigninInner() {
   const router = useRouter();
   const sp = useSearchParams();
-  const callbackUrl = sp.get("callbackUrl") ?? "/dashboard";
+
+  // memoize to avoid recomputing, but still fine without
+  const callbackUrl = useMemo(() => sp.get("callbackUrl") ?? "/dashboard", [sp]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,10 +100,26 @@ export default function SigninPage() {
           </div>
         </div>
 
-        <p className="mt-4 text-center text-xs lab-muted">
-          Same vibe. Same flow. No weird UI mismatches.
-        </p>
+        <p className="mt-4 text-center text-xs lab-muted">Same vibe. Same flow. No weird UI mismatches.</p>
       </div>
     </div>
+  );
+}
+
+export default function SigninPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto flex min-h-[calc(100vh-64px)] max-w-6xl items-center justify-center px-6 py-10">
+          <div className="w-full max-w-md">
+            <div className="lab-card rounded-3xl p-6 md:p-7">
+              <div className="text-sm lab-muted">Loading…</div>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <SigninInner />
+    </Suspense>
   );
 }
