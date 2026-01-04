@@ -206,8 +206,8 @@ body {
 /* Animated ambient layer (subtle, not flashy) */
 .app-shell::before {
   content: "";
-  position: absolute; /* CHANGED from fixed */
-  inset: -200px;
+  position: fixed;
+  inset: 0;                 /* ✅ avoid edge seams */
   pointer-events: none;
   z-index: 0;
 
@@ -219,10 +219,10 @@ body {
   animation: lab-ambient-drift 48s ease-in-out infinite;
   opacity: 0.65;
 
-  /* important: keep it crisp + avoid GPU seams */
-  transform: translate3d(0,0,0);
-  will-change: transform;
+  transform: translateZ(0);
+  will-change: transform, opacity;
 }
+
 
 
 /* Keep content above ambient layer */
@@ -413,6 +413,8 @@ body {
 
 html, body {
   font-family: var(--lab-font);
+  height: 100%;
+  background: var(--lab-bg); /* prevents any body/html bleed seam */
 }
 
 .lab-num,

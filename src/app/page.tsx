@@ -10,15 +10,14 @@ export default function WelcomePage() {
           <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
             {/* Logo */}
             <div className="mb-6 flex items-center justify-center">
-              <div className="logo-wrap relative">
-                <Image
-                  src="/brand/gym-risk-logo.png"
-                  alt="gym-risk"
-                  fill
-                  priority
-                  className="object-contain"
-                />
-              </div>
+              <Image
+                src="/brand/gym-risk-logo.jpg"
+                alt="gym-risk"
+                width={520}
+                height={200}
+                priority
+                className="mx-auto h-[56px] w-auto md:h-[64px] opacity-95 object-contain"
+              />
             </div>
 
             {/* Headline */}
@@ -49,64 +48,95 @@ export default function WelcomePage() {
             </div>
           </div>
 
-          {/* subtle divider to reduce “empty void” */}
-          <div className="mt-10 lab-divider opacity-60" />
-
-          {/* Alive mini-panels */}
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {/* Intro tiles */}
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {/* Card 1 */}
             <div className="lab-card lab-hover rounded-2xl p-5">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-white/90">Session flow</div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
+                      📝
+                    </span>
+                    <div className="text-sm font-semibold text-white/90">
+                      Log a session
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm lab-muted">
+                    Track sets, reps, RPE, and pain in under a minute.
+                  </div>
+                </div>
                 <span className="status-chip">
-                  <span className="dot dot-idle lab-pulse-dot" />
-                  Idle
+                  <span className="dot dot-idle" />
+                  Quick
                 </span>
               </div>
-              <div className="mt-2 text-sm lab-muted">
-                A guided pipeline for what to do next.
+
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-left">
+                <div className="text-xs text-white/70">Example</div>
+                <div className="mt-1 text-xs lab-muted">
+                  Bench Press · 185 × 5 · RPE 8 · Pain 0
+                </div>
               </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
-                <div className="h-full w-[24%] rounded-full bg-[rgba(34,197,94,0.30)]" />
-              </div>
-              <div className="mt-2 text-xs lab-muted">live indicator (placeholder)</div>
             </div>
 
+            {/* Card 2 */}
             <div className="lab-card lab-hover rounded-2xl p-5">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-white/90">Muscle heatmap</div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
+                      📈
+                    </span>
+                    <div className="text-sm font-semibold text-white/90">
+                      See load trends
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm lab-muted">
+                    We summarize volume & intensity so you don’t have to.
+                  </div>
+                </div>
                 <span className="status-chip">
-                  <span className="dot dot-watch" />
-                  2 elevated
+                  <span className="dot dot-idle" />
+                  Clear
                 </span>
               </div>
-              <div className="mt-2 text-sm lab-muted">
-                Spot hot zones and trend changes fast.
+
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-left">
+                <div className="text-xs text-white/70">Example</div>
+                <div className="mt-1 text-xs lab-muted">
+                  7-day load: +14% · Intensity steady · Recovery good
+                </div>
               </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
-                <div className="h-full w-[62%] rounded-full bg-[rgba(245,158,11,0.35)]" />
-              </div>
-              <div className="mt-2 text-xs lab-muted">subtle bar indicator</div>
             </div>
 
+            {/* Card 3 */}
             <div className="lab-card lab-hover rounded-2xl p-5">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-white/90">Risk feed</div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
+                      🛡️
+                    </span>
+                    <div className="text-sm font-semibold text-white/90">
+                      Get explainable signals
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm lab-muted">
+                    If something spikes, you’ll see exactly why.
+                  </div>
+                </div>
                 <span className="status-chip">
-                  <span className="dot dot-neutral" />
-                  Last spike: 3d
+                  <span className="dot dot-idle" />
+                  Smart
                 </span>
               </div>
-              <div className="mt-2 text-sm lab-muted">
-                Events that explain why risk spiked.
-              </div>
 
-              {/* faint animated signal line */}
-              <div className="mt-4 h-8 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2">
-                <div className="signal-line" />
-              </div>
-
-              <div className="mt-2 text-xs lab-muted">
-                faint signal line indicates activity
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-left">
+                <div className="text-xs text-white/75">Example signal</div>
+                <div className="mt-1 text-xs lab-muted">
+                  Volume spike in Legs (+62% vs 7-day avg)
+                </div>
               </div>
             </div>
           </div>
