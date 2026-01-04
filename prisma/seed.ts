@@ -1,18 +1,14 @@
+// prisma/seed.ts
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-
-const prisma = new PrismaClient();
 
 if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is missing. Make sure it exists in your .env file.");
+  throw new Error(
+    "DATABASE_URL is missing. Create a .env file with DATABASE_URL=... (Neon connection string)."
+  );
 }
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({
-    connectionString: process.env.DATABASE_URL,
-  }),
-});
+const prisma = new PrismaClient();
 
 const exercises = [
   // Squat / legs
@@ -72,15 +68,16 @@ async function main() {
     await prisma.exercise.upsert({
       where: { name: ex.name },
       update: { category: ex.category },
-      create: ex,
+      create: { name: ex.name, category: ex.category },
     });
   }
+
   console.log(`Seeded ${exercises.length} exercises`);
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error("Seed failed:", e);
     process.exit(1);
   })
   .finally(async () => {
