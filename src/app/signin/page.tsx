@@ -99,8 +99,6 @@ function SigninInner() {
             </Link>
           </div>
         </div>
-
-        <p className="mt-4 text-center text-xs lab-muted">Same vibe. Same flow. No weird UI mismatches.</p>
       </div>
     </div>
   );
