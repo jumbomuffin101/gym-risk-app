@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prisma } from "src/app/lib/prisma";
 
 type RiskReason = {
   kind: string;
@@ -87,15 +87,14 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
   }
 
   // Rule 3: Volume spike by category (tonnage baseline)
-  // Compute session tonnage per category
   const sessionByCat: Record<string, number> = {};
   for (const s of sets) {
     const cat = s.exercise.category;
-    sessionByCat[cat] = (sessionByCat[cat] ?? 0) + tonnage(s.weight, s.reps);
+    if (cat) {
+      sessionByCat[cat] = (sessionByCat[cat] ?? 0) + tonnage(s.weight, s.reps);
+    }
   }
 
-  // For each category, compare to last 7 days baseline (excluding this session)
-  // Baseline: average tonnage per session for that category.
   const sessionStart = await prisma.workoutSession.findUnique({
     where: { id: sessionId },
     select: { startedAt: true },
@@ -111,9 +110,8 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
       select: { weight: true, reps: true, sessionId: true },
     });
 
-    if (recentSets.length < 6) continue; // not enough baseline data yet
+    if (recentSets.length < 6) continue;
 
-    // group by sessionId
     const bySession: Record<string, number> = {};
     for (const rs of recentSets) {
       bySession[rs.sessionId] = (bySession[rs.sessionId] ?? 0) + tonnage(rs.weight, rs.reps);
@@ -121,10 +119,9 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
 
     const baselines = Object.values(bySession);
     const avg = baselines.reduce((a, b) => a + b, 0) / baselines.length;
-
     if (avg <= 0) continue;
 
-    const ratio = sessionTonnage / avg; // e.g. 1.5 = +50%
+    const ratio = sessionTonnage / avg;
     if (ratio >= 1.5) {
       const pct = Math.round((ratio - 1) * 100);
       reasons.push({
@@ -142,31 +139,17 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
     }
   }
 
-  // Sort high score first
   reasons.sort((a, b) => b.score - a.score);
-  return reasons.slice(0, 5); // top 5 reasons max
+  return reasons.slice(0, 5);
 }
 
+/**
+ * For now, we do NOT persist risk events because the Prisma schema
+ * doesn't include a RiskEvent model yet.
+ *
+ * This keeps the feature usable (reasons computed) without breaking builds.
+ */
 export async function writeRiskEventsForSession(userId: string, sessionId: string) {
   const reasons = await computeSessionRisk(userId, sessionId);
-
-  // Clear old risk events for this session so it's always "latest truth"
-  await prisma.riskEvent.deleteMany({
-    where: { userId, sessionId },
-  });
-
-  if (reasons.length === 0) return { reasons: [] };
-
-  await prisma.riskEvent.createMany({
-    data: reasons.map((r) => ({
-      userId,
-      sessionId,
-      riskScore: Math.round(r.score),
-      kind: r.kind,
-      title: r.title,
-      detailsJson: JSON.stringify(r.details),
-    })),
-  });
-
   return { reasons };
 }
