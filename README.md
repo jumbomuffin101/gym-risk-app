@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+**Live:** https://gym-risk-app.vercel.app/
 
-## Getting Started
+# Gym Risk
 
-First, run the development server:
+Gym Risk is a training load monitoring web app designed for serious lifters and athletes who want clearer feedback on how their training stress accumulates over time.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Rather than generic fitness tracking, Gym Risk focuses on measurable inputs such as volume, intensity, RPE, and pain. These metrics are compared across short and long time windows to help identify patterns that may increase injury risk.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The project is informed by established load management concepts commonly used in sports medicine and performance coaching.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## What it does
 
-## Learn More
+- Log training sessions with sets, reps, RPE, and pain
+- Track training volume and intensity trends over time
+- Compare 7 day vs 28 day load to detect rapid changes
+- Surface explainable signals when risk increases, such as volume spikes in specific muscle groups
+- Provide a calm, focused interface designed for decision support rather than motivation or gamification
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## What it is not
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Not a medical device
+- Not a diagnostic system
+- Not a replacement for a coach, physical therapist, or clinician
+- Gym Risk is intended to support better training decisions, not to replace professional judgment.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Tech stack
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js (App Router)
+- TypeScript
+- Prisma with PostgreSQL
+- NextAuth
+- Tailwind CSS
+- Resend for email workflows
+- Deployed on Vercel.
+
+---
+
+## Project status
+
+Gym Risk is under active development. Core logging, authentication, and trend analysis are in place, with continued refinement of risk modeling, onboarding, and UI clarity.
