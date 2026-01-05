@@ -10,20 +10,20 @@ export default function WelcomePage() {
           <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
             {/* Logo */}
             <div className="mb-6 flex items-center justify-center">
-              <Image
-                src="/brand/gym-risk-logo.jpg"
-                alt="gym-risk"
-                width={520}
-                height={200}
-                priority
-                className="mx-auto h-[56px] w-auto md:h-[64px] opacity-95 object-contain"
-              />
+              <div className="relative flex items-center">
+                <Image
+                  src="/brand/logo.jpg"
+                  alt="gym-risk"
+                  width={520}
+                  height={200}
+                  priority
+                  className="mx-auto h-auto w-[240px] md:w-[280px] opacity-95 object-contain"
+                />
+              </div>
             </div>
 
             {/* Headline */}
-            <h1 className="hero-title">
-              Train harder without guessing your injury risk.
-            </h1>
+            <h1 className="hero-title">Train harder without guessing your injury risk.</h1>
 
             {/* Subtext */}
             <p className="hero-sub mt-4">
@@ -50,17 +50,14 @@ export default function WelcomePage() {
 
           {/* Intro tiles */}
           <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {/* Card 1 */}
             <div className="lab-card lab-hover rounded-2xl p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="text-left">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/90">
                       📝
                     </span>
-                    <div className="text-sm font-semibold text-white/90">
-                      Log a session
-                    </div>
+                    <div className="text-sm font-semibold text-white/90">Log a session</div>
                   </div>
                   <div className="mt-2 text-sm lab-muted">
                     Track sets, reps, RPE, and pain in under a minute.
@@ -80,17 +77,14 @@ export default function WelcomePage() {
               </div>
             </div>
 
-            {/* Card 2 */}
             <div className="lab-card lab-hover rounded-2xl p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="text-left">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/90">
                       📈
                     </span>
-                    <div className="text-sm font-semibold text-white/90">
-                      See load trends
-                    </div>
+                    <div className="text-sm font-semibold text-white/90">See load trends</div>
                   </div>
                   <div className="mt-2 text-sm lab-muted">
                     We summarize volume & intensity so you don’t have to.
@@ -102,25 +96,20 @@ export default function WelcomePage() {
                 </span>
               </div>
 
-              <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-left">
-                <div className="text-xs text-white/70">Example</div>
-                <div className="mt-1 text-xs lab-muted">
-                  7-day load: +14% · Intensity steady · Recovery good
-                </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
+                <div className="h-full w-[58%] rounded-full bg-[rgba(56,189,248,0.22)]" />
               </div>
+              <div className="mt-2 text-xs lab-muted">7-day load snapshot (example)</div>
             </div>
 
-            {/* Card 3 */}
             <div className="lab-card lab-hover rounded-2xl p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="text-left">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/90">
                       🛡️
                     </span>
-                    <div className="text-sm font-semibold text-white/90">
-                      Get explainable signals
-                    </div>
+                    <div className="text-sm font-semibold text-white/90">Get explainable signals</div>
                   </div>
                   <div className="mt-2 text-sm lab-muted">
                     If something spikes, you’ll see exactly why.
@@ -132,7 +121,7 @@ export default function WelcomePage() {
                 </span>
               </div>
 
-              <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-left">
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-left">
                 <div className="text-xs text-white/75">Example signal</div>
                 <div className="mt-1 text-xs lab-muted">
                   Volume spike in Legs (+62% vs 7-day avg)
