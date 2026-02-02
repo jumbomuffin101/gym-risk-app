@@ -47,6 +47,10 @@ export default function Nav() {
     return null;
   }
 
+  if (pathname === "/") {
+    return null;
+  }
+
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-black/10 backdrop-blur-md">
       <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">

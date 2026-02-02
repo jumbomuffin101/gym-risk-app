@@ -307,7 +307,7 @@ export default function WelcomePage() {
         }
       `}</style>
 
-      <header className="sticky top-0 z-40 -mx-6 mb-10 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] px-6 py-3 backdrop-blur-md">
+      <header className="sticky top-0 z-40 -mx-6 mb-10 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] px-6 py-3">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90">
             Gym-Risk
@@ -343,10 +343,6 @@ export default function WelcomePage() {
       </header>
 
       <section className="relative">
-        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,_rgba(255,255,255,0.02)_0,_transparent_40%,_transparent_60%,_rgba(255,255,255,0.02)_100%)] opacity-60" />
-        </div>
-
         <div className="hero-card lab-card rounded-[28px] p-8 md:p-12">
           <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
             <div className="space-y-8">
@@ -360,7 +356,7 @@ export default function WelcomePage() {
                     priority
                     className="h-auto w-[200px] md:w-[240px] opacity-95 object-contain"
                   />
-                  <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+                  <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
                     Athlete-grade
                   </span>
                 </div>
@@ -418,12 +414,12 @@ export default function WelcomePage() {
                   <div className="text-xs uppercase tracking-wide text-white/60">Dashboard preview</div>
                   <div className="mt-1 text-sm font-semibold text-white/90">Strength cycle · Week 6</div>
                 </div>
-                <div className="flex items-center gap-2 rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.02] px-2 py-1 text-[11px] text-white/70">
+                <div className="flex items-center gap-2 rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-2 py-1 text-[11px] text-white/70">
                   <span className="text-[10px] uppercase tracking-[0.2em]">Sample week</span>
                   <div
                     role="radiogroup"
                     aria-label="Sample week"
-                    className="flex rounded-full border border-[color:var(--lab-accent-border)] bg-black/30 p-1"
+                    className="flex rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] p-1"
                   >
                     <button
                       type="button"
@@ -464,7 +460,7 @@ export default function WelcomePage() {
                   <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4 transition motion-reduce:transition-none">
                     <div className="flex items-center justify-between text-xs text-white/60">
                       <span>Risk score</span>
-                      <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]">
+                      <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]">
                         Weekly
                       </span>
                     </div>
@@ -473,7 +469,7 @@ export default function WelcomePage() {
                         {animatedRisk}
                         <span className="text-sm font-medium text-white/50">/100</span>
                       </div>
-                      <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-3 py-1 text-xs text-white/70">
+                      <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs text-white/70">
                         {activeData.status}
                       </span>
                     </div>
@@ -502,7 +498,7 @@ export default function WelcomePage() {
                       </div>
                       <span className="text-xs text-white/70">{activeData.loadDelta}</span>
                     </div>
-                    <div className="mt-4 rounded-xl border border-[color:var(--lab-accent-border)] bg-[rgba(12,18,28,0.75)] p-3">
+                    <div className="mt-4 rounded-xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] p-3">
                       <div className="flex items-center justify-between text-[11px] text-white/60">
                         <span>Weekly load graph</span>
                         <span>Mon → Sun</span>
@@ -535,7 +531,7 @@ export default function WelcomePage() {
                     {activeData.log.map((row) => (
                       <div
                         key={`${row.date}-${row.session}`}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--lab-accent-border)] bg-[rgba(12,18,28,0.75)] px-3 py-2 text-xs text-white/80 transition motion-reduce:transition-none"
+                        className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-2 text-xs text-white/80 transition motion-reduce:transition-none"
                       >
                         <div>
                           <div className="text-white/90">{row.session}</div>
@@ -566,11 +562,11 @@ export default function WelcomePage() {
           {features.map((feature) => (
             <div
               key={feature.title}
-              className="group lab-card rounded-2xl p-5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(15,23,42,0.35)]"
+              className="group lab-card rounded-2xl p-5 transition duration-300 hover:-translate-y-0.5 hover:border-[color:var(--lab-accent-border-strong)]"
             >
               <div className="flex items-center justify-between">
                 <feature.icon className="h-9 w-9 text-[var(--lab-accent)]" />
-                <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-3 py-1 text-xs text-white/70">
+                <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs text-white/70">
                   {feature.chip}
                 </span>
               </div>
@@ -594,7 +590,7 @@ export default function WelcomePage() {
             <div key={step.title} className="lab-card rounded-2xl p-5">
               <div className="flex items-center justify-between">
                 <step.icon className="h-8 w-8 text-[var(--lab-accent)]" />
-                <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-3 py-1 text-xs text-white/60">
+                <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs text-white/60">
                   Step {index + 1}
                 </span>
               </div>
@@ -642,7 +638,7 @@ export default function WelcomePage() {
               ].map((tech) => (
                 <span
                   key={tech}
-                  className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-3 py-1 text-xs text-white/70"
+                  className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs text-white/70"
                 >
                   {tech}
                 </span>
