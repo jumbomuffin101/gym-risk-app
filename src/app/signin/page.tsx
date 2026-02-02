@@ -48,7 +48,7 @@ function SigninInner() {
   }
 
   return (
-    <AuthShell title="Sign in" description="Keep tracking training load and recovery.">
+    <AuthShell title="Sign in" description="Track training load and recovery.">
       <form onSubmit={onSubmit} className="space-y-4">
         <AuthInput
           autoComplete="email"
@@ -76,7 +76,7 @@ function SigninInner() {
         ) : null}
 
         <button
-          className="lab-hover w-full rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2.5 text-sm font-semibold text-black shadow-[0_0_0_1px_rgba(34,197,94,0.25),0_18px_55px_rgba(34,197,94,0.12)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(34,197,94,0.35)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="lab-hover w-full rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2.5 text-sm font-semibold text-black shadow-[0_0_0_1px_rgba(34,197,94,0.25),0_22px_55px_rgba(34,197,94,0.2)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(34,197,94,0.35)] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
           disabled={loading}
           type="submit"
         >
@@ -84,18 +84,18 @@ function SigninInner() {
         </button>
       </form>
 
-      <div className="flex items-center justify-between text-sm text-white/70">
+      <div className="flex items-center justify-between text-sm text-white/65">
         <p>
           New here?{" "}
           <Link
-            className="text-[rgba(56,189,248,0.9)] transition hover:text-[rgba(56,189,248,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(56,189,248,0.35)]"
+            className="text-[rgba(56,189,248,0.9)] transition hover:text-[rgba(56,189,248,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(56,189,248,0.35)] motion-reduce:transition-none"
             href="/signup"
           >
             Create account
           </Link>
         </p>
         <Link
-          className="transition hover:text-[rgba(56,189,248,0.9)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(56,189,248,0.35)]"
+          className="transition hover:text-[rgba(56,189,248,0.9)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(56,189,248,0.35)] motion-reduce:transition-none"
           href="/reset-password"
         >
           Forgot password?

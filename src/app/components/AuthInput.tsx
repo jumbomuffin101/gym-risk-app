@@ -14,11 +14,11 @@ export function AuthInput({ label, id, className, ...props }: AuthInputProps) {
       <input
         id={id}
         className={[
-          "h-11 w-full rounded-xl border border-[rgba(56,189,248,0.28)]",
-          "bg-[rgba(10,14,22,0.7)] px-3 text-sm text-white/90",
+          "h-11 w-full rounded-xl border border-[rgba(148,163,184,0.18)]",
+          "bg-[rgba(8,12,20,0.72)] px-3 text-sm text-white/90",
           "placeholder:text-white/35 outline-none transition",
-          "focus-visible:border-[rgba(56,189,248,0.65)] focus-visible:ring-2",
-          "focus-visible:ring-[rgba(56,189,248,0.35)]",
+          "focus-visible:border-[rgba(56,189,248,0.6)] focus-visible:ring-2",
+          "focus-visible:ring-[rgba(56,189,248,0.3)] motion-reduce:transition-none",
           "disabled:cursor-not-allowed disabled:opacity-60",
           className ?? "",
         ].join(" ")}
