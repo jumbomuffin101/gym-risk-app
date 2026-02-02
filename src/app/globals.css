@@ -119,8 +119,8 @@
   --lab-accent-border-strong: rgba(125, 211, 252, 0.28);
   --lab-analytics: #7aa2ff;
 
-  --lab-surface: rgba(16, 23, 36, 0.75);
-  --lab-surface-2: rgba(20, 28, 44, 0.8);
+  --lab-surface: #111827;
+  --lab-surface-2: #151e2d;
 
   --lab-border: var(--lab-accent-border);
   --lab-border-2: var(--lab-accent-border-strong);
@@ -204,9 +204,9 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background: radial-gradient(1200px 600px at 50% 0%, var(--lab-glow-a), transparent 65%);
+  background: radial-gradient(1200px 600px at 50% 0%, rgba(255, 255, 255, 0.02), transparent 70%);
   animation: lab-ambient-drift 48s ease-in-out infinite;
-  opacity: 0.25;
+  opacity: 0.12;
 
   transform: translateZ(0);
   will-change: transform, opacity;
@@ -232,7 +232,7 @@ body {
 .lab-card {
   background: var(--lab-surface);
   border: 1px solid var(--lab-border);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.38);
   position: relative;
 }
 
