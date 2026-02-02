@@ -164,15 +164,15 @@ export default function WelcomePage() {
     () => [
       {
         icon: ShieldCheck,
-        text: "Based on sports science load metrics",
+        text: "Sports science load metrics",
       },
       {
         icon: Trophy,
-        text: "Built by athletes for athletes",
+        text: "Built by athletes",
       },
       {
         icon: Activity,
-        text: "Tracks load, fatigue, and pain signals",
+        text: "Tracks load + recovery",
       },
     ],
     []
@@ -184,22 +184,22 @@ export default function WelcomePage() {
         icon: ClipboardList,
         title: "Log fast",
         highlight: "Log",
-        description: "Capture sets, RPE, and pain in seconds with a focused workflow.",
-        chip: "Fast inputs",
+        description: "Capture sets, RPE, and pain in seconds.",
+        chip: "Fast",
       },
       {
         icon: LineChart,
         title: "Spot trends",
         highlight: "Trends",
-        description: "Weekly load, spikes, and recovery signals stay visible at a glance.",
-        chip: "Trend lines",
+        description: "See weekly load and spikes without digging.",
+        chip: "Trends",
       },
       {
         icon: Gauge,
         title: "Train smarter",
         highlight: "Smarter",
-        description: "See risk signals before they become setbacks so you can adjust.",
-        chip: "Risk signals",
+        description: "Act on risk signals before they become setbacks.",
+        chip: "Signals",
       },
     ],
     []
@@ -210,17 +210,17 @@ export default function WelcomePage() {
       {
         icon: ClipboardList,
         title: "Log sessions",
-        description: "Record sets, RPE, and pain in under a minute after training.",
+        description: "Log sets, RPE, and pain in under a minute.",
       },
       {
         icon: BarChart3,
         title: "See weekly load",
-        description: "Your dashboard aggregates volume + intensity into clear trends.",
+        description: "Trends reveal weekly volume and intensity shifts.",
       },
       {
         icon: Sparkles,
         title: "Act on signals",
-        description: "Recovery flags call attention to spikes so you can adjust early.",
+        description: "Recovery flags highlight spikes so you adjust early.",
       },
     ],
     []
@@ -230,19 +230,19 @@ export default function WelcomePage() {
     () => [
       {
         title: "Session load",
-        description: "Calculated from RPE × duration for every session.",
+        description: "RPE × duration for every session.",
       },
       {
         title: "Weekly load trend",
-        description: "Tracks baseline vs. weekly total to highlight spikes.",
+        description: "Baseline vs. weekly total to spot spikes.",
       },
       {
         title: "Fatigue indicators",
-        description: "Looks for elevated effort and reduced recovery signals.",
+        description: "Elevated effort plus reduced recovery signals.",
       },
       {
         title: "Pain & recovery flags",
-        description: "Surface rising pain notes so you can adjust your plan.",
+        description: "Rising pain notes surfaced early.",
       },
     ],
     []
@@ -253,32 +253,32 @@ export default function WelcomePage() {
       {
         question: "Is Gym-Risk medical advice?",
         answer:
-          "No. Gym-Risk provides informational signals based on training load and logs, not clinical guidance.",
+          "No. It provides informational signals, not clinical guidance.",
       },
       {
         question: "Can I export my data?",
         answer:
-          "Yes. You can export your training logs and metrics from the dashboard when needed.",
+          "Yes. Export training logs and metrics from the dashboard.",
       },
       {
         question: "Is this for coaches or clinicians?",
         answer:
-          "It can support coach collaboration, but it is not a substitute for professional medical advice.",
+          "It can support coaches, but it is not medical advice.",
       },
       {
         question: "What training styles are supported?",
         answer:
-          "Strength, conditioning, hybrid, and endurance sessions are supported as long as you log RPE and duration.",
+          "Strength, conditioning, hybrid, and endurance with RPE + duration.",
       },
       {
         question: "How long does logging take?",
         answer:
-          "Most athletes log a session in under a minute thanks to focused inputs.",
+          "Most athletes log a session in under a minute.",
       },
       {
         question: "Is it mobile friendly?",
         answer:
-          "Yes. The UI is responsive so you can log on the go.",
+          "Yes. The UI is responsive for on-the-go logging.",
       },
     ],
     []
@@ -307,41 +307,46 @@ export default function WelcomePage() {
         }
       `}</style>
 
-      <header className="sticky top-0 z-40 -mx-6 mb-10 border-b border-white/10 bg-[rgba(8,12,20,0.75)] px-6 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
+      <header className="sticky top-0 z-40 -mx-6 mb-10 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] px-6 py-3 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90">
             Gym-Risk
           </Link>
-          <nav className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] p-1 text-xs text-white/80 md:flex">
-            {sections.map((section) => (
-              <a
-                key={section.id}
-                href={`#${section.id}`}
-                className={`rounded-full px-3 py-1 transition ${
-                  activeSection === section.id
-                    ? "bg-white/10 text-white"
-                    : "text-white/70 hover:text-white"
-                }`}
-                aria-current={activeSection === section.id ? "page" : undefined}
-              >
-                {section.label}
-              </a>
-            ))}
+          <nav className="hidden flex-1 items-center justify-center md:flex">
+            <div className="flex items-center gap-1 rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] p-1 text-xs text-white/80">
+              {sections.map((section) => (
+                <a
+                  key={section.id}
+                  href={`#${section.id}`}
+                  className={`rounded-full px-3 py-1 transition ${
+                    activeSection === section.id
+                      ? "bg-white/10 text-white"
+                      : "text-white/70 hover:text-white"
+                  }`}
+                  aria-current={activeSection === section.id ? "page" : undefined}
+                >
+                  {section.label}
+                </a>
+              ))}
+            </div>
           </nav>
-          <Link
-            href="/signin"
-            className="text-xs font-medium uppercase tracking-[0.2em] text-white/60 transition hover:text-white"
-          >
-            Sign in
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/signin"
+              className="rounded-full border border-[color:var(--lab-accent-border)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/70 transition hover:text-white"
+            >
+              Sign in
+            </Link>
+            <Link href="/signup" className="rounded-full bg-[var(--lab-safe)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-black/90 shadow-[0_0_0_1px_rgba(34,197,94,0.4),0_12px_30px_rgba(34,197,94,0.18)] transition hover:brightness-105">
+              Create account
+            </Link>
+          </div>
         </div>
       </header>
 
       <section className="relative">
         <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute left-1/2 top-0 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(56,189,248,0.25),_transparent_65%)] blur-3xl opacity-70 motion-safe:animate-pulse motion-reduce:animate-none" />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,_rgba(255,255,255,0.04)_0,_transparent_35%,_transparent_65%,_rgba(255,255,255,0.04)_100%)] opacity-70" />
-          <div className="absolute inset-0 bg-[repeating-linear-gradient(120deg,_rgba(255,255,255,0.05)_0,_rgba(255,255,255,0.05)_1px,_transparent_1px,_transparent_10px)] opacity-[0.18]" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,_rgba(255,255,255,0.02)_0,_transparent_40%,_transparent_60%,_rgba(255,255,255,0.02)_100%)] opacity-60" />
         </div>
 
         <div className="hero-card lab-card rounded-[28px] p-8 md:p-12">
@@ -357,7 +362,7 @@ export default function WelcomePage() {
                     priority
                     className="h-auto w-[200px] md:w-[240px] opacity-95 object-contain"
                   />
-                  <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+                  <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
                     Athlete-grade
                   </span>
                 </div>
@@ -365,8 +370,7 @@ export default function WelcomePage() {
                   Train harder without guessing your injury risk.
                 </h1>
                 <p className="hero-sub mt-4 text-left text-base text-white/75 md:text-lg">
-                  Gym-Risk turns your training logs into load trends, recovery flags, and a clear risk score—so you can
-                  stay consistent and proactive.
+                  Gym-Risk turns training logs into clear load and risk signals.
                 </p>
               </div>
 
@@ -383,45 +387,45 @@ export default function WelcomePage() {
                 {heroChips.map((chip) => (
                   <div
                     key={chip.text}
-                    className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/80"
+                    className="flex items-center gap-2 rounded-xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] px-3 py-2 text-xs text-white/80"
                   >
-                    <chip.icon className="h-4 w-4 text-[rgba(56,189,248,0.9)]" />
+                    <chip.icon className="h-4 w-4 text-[var(--lab-accent)]" />
                     <span>{chip.text}</span>
                   </div>
                 ))}
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+              <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
                 <div className="text-xs uppercase tracking-wide text-white/60">Your dashboard shows</div>
                 <ul className="mt-3 grid gap-2 text-sm text-white/80">
                   <li className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-[var(--lab-safe)]" />
-                    Risk score + status based on weekly load and pain notes.
+                    Risk score + status.
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-[var(--lab-watch)]" />
-                    Load trendline with spikes called out before they stick.
+                    Weekly load trendlines.
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-[var(--lab-danger)]" />
-                    Session logs with RPE and recovery context for every lift.
+                    Session logs + RPE.
                   </li>
                 </ul>
               </div>
             </div>
 
-            <div className="lab-card relative overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(11,16,26,0.7)] p-5 shadow-[0_0_30px_rgba(56,189,248,0.08)]">
+            <div className="lab-card relative overflow-hidden rounded-[24px] p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-xs uppercase tracking-wide text-white/60">Dashboard preview</div>
                   <div className="mt-1 text-sm font-semibold text-white/90">Strength cycle · Week 6</div>
                 </div>
-                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] text-white/70">
+                <div className="flex items-center gap-2 rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.02] px-2 py-1 text-[11px] text-white/70">
                   <span className="text-[10px] uppercase tracking-[0.2em]">Sample week</span>
                   <div
                     role="radiogroup"
                     aria-label="Sample week"
-                    className="flex rounded-full border border-white/10 bg-black/30 p-1"
+                    className="flex rounded-full border border-[color:var(--lab-accent-border)] bg-black/30 p-1"
                   >
                     <button
                       type="button"
@@ -430,9 +434,9 @@ export default function WelcomePage() {
                       tabIndex={mode === "balanced" ? 0 : -1}
                       onClick={() => setMode("balanced")}
                       onKeyDown={(event) => handleModeKeyDown(event, "overload")}
-                      className={`rounded-full px-3 py-1 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(56,189,248,0.6)] motion-reduce:transition-none ${
+                      className={`rounded-full px-3 py-1 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)] motion-reduce:transition-none ${
                         mode === "balanced"
-                          ? "bg-white/15 text-white"
+                          ? "bg-white/15 text-white shadow-[0_0_0_1px_var(--lab-accent-strong),0_0_18px_rgba(125,211,252,0.25)]"
                           : "text-white/60 hover:text-white"
                       }`}
                     >
@@ -445,9 +449,9 @@ export default function WelcomePage() {
                       tabIndex={mode === "overload" ? 0 : -1}
                       onClick={() => setMode("overload")}
                       onKeyDown={(event) => handleModeKeyDown(event, "balanced")}
-                      className={`rounded-full px-3 py-1 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(56,189,248,0.6)] motion-reduce:transition-none ${
+                      className={`rounded-full px-3 py-1 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)] motion-reduce:transition-none ${
                         mode === "overload"
-                          ? "bg-white/15 text-white"
+                          ? "bg-white/15 text-white shadow-[0_0_0_1px_var(--lab-accent-strong),0_0_18px_rgba(125,211,252,0.25)]"
                           : "text-white/60 hover:text-white"
                       }`}
                     >
@@ -459,10 +463,10 @@ export default function WelcomePage() {
 
               <div className="mt-5 grid gap-4">
                 <div className="grid gap-4 md:grid-cols-[1.1fr_1fr]">
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition motion-reduce:transition-none">
+                  <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4 transition motion-reduce:transition-none">
                     <div className="flex items-center justify-between text-xs text-white/60">
                       <span>Risk score</span>
-                      <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]">
+                      <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]">
                         Weekly
                       </span>
                     </div>
@@ -471,13 +475,13 @@ export default function WelcomePage() {
                         {animatedRisk}
                         <span className="text-sm font-medium text-white/50">/100</span>
                       </div>
-                      <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/70">
+                      <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-3 py-1 text-xs text-white/70">
                         {activeData.status}
                       </span>
                     </div>
                     <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
                       <div
-                        className="h-full rounded-full bg-[rgba(56,189,248,0.45)] transition-all duration-500 motion-reduce:transition-none"
+                        className="h-full rounded-full bg-[rgba(125,211,252,0.45)] transition-all duration-500 motion-reduce:transition-none"
                         style={{ width: `${activeData.risk}%` }}
                       />
                     </div>
@@ -488,7 +492,7 @@ export default function WelcomePage() {
                     ) : null}
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
                     <div className="flex items-center justify-between text-xs text-white/60">
                       <span>Weekly load</span>
                       <span className="text-[10px] uppercase tracking-[0.2em] text-white/50">AU</span>
@@ -500,7 +504,7 @@ export default function WelcomePage() {
                       </div>
                       <span className="text-xs text-white/70">{activeData.loadDelta}</span>
                     </div>
-                    <div className="mt-4 rounded-xl border border-white/10 bg-[rgba(10,14,22,0.7)] p-3">
+                    <div className="mt-4 rounded-xl border border-[color:var(--lab-accent-border)] bg-[rgba(12,18,28,0.75)] p-3">
                       <div className="flex items-center justify-between text-[11px] text-white/60">
                         <span>Weekly load graph</span>
                         <span>Mon → Sun</span>
@@ -514,7 +518,7 @@ export default function WelcomePage() {
                         />
                         <path
                           d={activeData.graph}
-                          stroke="rgba(56,189,248,0.85)"
+                          stroke="var(--lab-analytics)"
                           strokeWidth="3"
                           fill="none"
                           className="transition-all duration-500 motion-reduce:transition-none"
@@ -524,7 +528,7 @@ export default function WelcomePage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
                   <div className="flex items-center justify-between text-xs text-white/60">
                     <span>Training log</span>
                     <span className="text-[10px] uppercase tracking-[0.2em] text-white/50">3 sessions</span>
@@ -533,7 +537,7 @@ export default function WelcomePage() {
                     {activeData.log.map((row) => (
                       <div
                         key={`${row.date}-${row.session}`}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-[rgba(10,14,22,0.65)] px-3 py-2 text-xs text-white/80 transition motion-reduce:transition-none"
+                        className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--lab-accent-border)] bg-[rgba(12,18,28,0.75)] px-3 py-2 text-xs text-white/80 transition motion-reduce:transition-none"
                       >
                         <div>
                           <div className="text-white/90">{row.session}</div>
@@ -553,27 +557,28 @@ export default function WelcomePage() {
       <section id="features" className="mt-16">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Features</div>
+            <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">Features</div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
               Train with clarity, not guesswork.
             </h2>
           </div>
-          <Flame className="hidden h-8 w-8 text-[rgba(56,189,248,0.8)] md:block" />
+          <Flame className="hidden h-8 w-8 text-[var(--lab-accent)] md:block" />
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {features.map((feature) => (
             <div
               key={feature.title}
-              className="group lab-card rounded-2xl border border-white/10 bg-[rgba(15,21,32,0.6)] p-5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(15,23,42,0.35)]"
+              className="group lab-card rounded-2xl p-5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(15,23,42,0.35)]"
             >
               <div className="flex items-center justify-between">
-                <feature.icon className="h-9 w-9 text-[rgba(56,189,248,0.85)]" />
-                <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-white/70">
+                <feature.icon className="h-9 w-9 text-[var(--lab-accent)]" />
+                <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-3 py-1 text-xs text-white/70">
                   {feature.chip}
                 </span>
               </div>
               <h3 className="mt-4 text-lg font-semibold text-white/95">
-                <span className="text-white">{feature.highlight}</span> {feature.title.replace(feature.highlight, "")}
+                <span className="text-[var(--lab-accent)]">{feature.highlight}</span>{" "}
+                {feature.title.replace(feature.highlight, "")}
               </h3>
               <p className="mt-2 text-sm text-white/70">{feature.description}</p>
             </div>
@@ -582,16 +587,16 @@ export default function WelcomePage() {
       </section>
 
       <section id="how-it-works" className="mt-16">
-        <div className="text-xs uppercase tracking-[0.2em] text-white/50">How it works</div>
+        <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">How it works</div>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
           A tight loop from log → load → action.
         </h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {howItWorks.map((step, index) => (
-            <div key={step.title} className="lab-card rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+            <div key={step.title} className="lab-card rounded-2xl p-5">
               <div className="flex items-center justify-between">
-                <step.icon className="h-8 w-8 text-[rgba(56,189,248,0.85)]" />
-                <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/60">
+                <step.icon className="h-8 w-8 text-[var(--lab-accent)]" />
+                <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-3 py-1 text-xs text-white/60">
                   Step {index + 1}
                 </span>
               </div>
@@ -603,27 +608,25 @@ export default function WelcomePage() {
       </section>
 
       <section id="metrics" className="mt-16">
-        <div className="text-xs uppercase tracking-[0.2em] text-white/50">Metrics Gym-Risk uses</div>
+        <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">Metrics Gym-Risk uses</div>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
           Signals built for training load context.
         </h2>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {metrics.map((metric) => (
-            <div key={metric.title} className="lab-card rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+            <div key={metric.title} className="lab-card rounded-2xl p-5">
               <div className="text-lg font-semibold text-white/90">{metric.title}</div>
               <p className="mt-2 text-sm text-white/70">{metric.description}</p>
             </div>
           ))}
         </div>
-        <p className="mt-4 text-xs uppercase tracking-[0.2em] text-white/40">
-          Not medical advice. Signals are informational.
-        </p>
+        <p className="mt-4 text-xs uppercase tracking-[0.2em] text-white/40">Informational only, not medical advice.</p>
       </section>
 
       <section id="built-with" className="mt-16">
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Built with</div>
+            <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">Built with</div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
               Product-grade foundation and engineering craft.
             </h2>
@@ -641,33 +644,33 @@ export default function WelcomePage() {
               ].map((tech) => (
                 <span
                   key={tech}
-                  className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-white/70"
+                  className="rounded-full border border-[color:var(--lab-accent-border)] bg-white/[0.04] px-3 py-1 text-xs text-white/70"
                 >
                   {tech}
                 </span>
               ))}
             </div>
           </div>
-          <div className="lab-card rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+          <div className="lab-card rounded-2xl p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
-              <BarChart3 className="h-4 w-4 text-[rgba(56,189,248,0.8)]" /> Engineering highlights
+              <BarChart3 className="h-4 w-4 text-[var(--lab-accent)]" /> Engineering highlights
             </div>
             <ul className="mt-3 space-y-2 text-sm text-white/70">
               <li className="flex gap-2">
-                <ChevronRight className="mt-1 h-3 w-3 text-white/50" />
-                Component-driven UI with reusable landing sections.
+                <ChevronRight className="mt-1 h-3 w-3 text-[var(--lab-accent)]" />
+                Reusable landing sections with consistent spacing.
               </li>
               <li className="flex gap-2">
-                <ChevronRight className="mt-1 h-3 w-3 text-white/50" />
-                Accessible patterns with clear focus states and semantic headings.
+                <ChevronRight className="mt-1 h-3 w-3 text-[var(--lab-accent)]" />
+                Accessible focus states with semantic headings.
               </li>
               <li className="flex gap-2">
-                <ChevronRight className="mt-1 h-3 w-3 text-white/50" />
-                Lightweight landing experience (no chart or animation libraries).
+                <ChevronRight className="mt-1 h-3 w-3 text-[var(--lab-accent)]" />
+                No chart libraries, charts drawn with SVG.
               </li>
               <li className="flex gap-2">
-                <ChevronRight className="mt-1 h-3 w-3 text-white/50" />
-                Type-safe validation and auth flows powered by Zod + NextAuth.
+                <ChevronRight className="mt-1 h-3 w-3 text-[var(--lab-accent)]" />
+                Type-safe forms with Zod + NextAuth.
               </li>
             </ul>
           </div>
@@ -675,7 +678,7 @@ export default function WelcomePage() {
       </section>
 
       <section id="faq" className="mt-16">
-        <div className="text-xs uppercase tracking-[0.2em] text-white/50">FAQ</div>
+        <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">FAQ</div>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
           Your questions, answered clearly.
         </h2>
@@ -683,10 +686,10 @@ export default function WelcomePage() {
           {faqItems.map((item, index) => {
             const isOpen = openFaq === index;
             return (
-              <div key={item.question} className="rounded-2xl border border-white/10 bg-white/[0.02]">
+              <div key={item.question} className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)]">
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left text-sm font-semibold text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(56,189,248,0.6)]"
+                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left text-sm font-semibold text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
                   aria-expanded={isOpen}
                   aria-controls={`faq-panel-${index}`}
                   onClick={() => setOpenFaq(isOpen ? null : index)}
@@ -712,15 +715,17 @@ export default function WelcomePage() {
       </section>
 
       <section className="mt-16">
-        <div className="lab-card rounded-[24px] border border-white/10 bg-[rgba(15,21,32,0.7)] p-8">
+        <div className="lab-card rounded-[24px] p-8">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-white/50">Ready to train smarter?</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">
+                Ready to train smarter?
+              </div>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
                 Get clarity on load, fatigue, and risk signals.
               </h2>
               <p className="mt-2 text-sm text-white/70">
-                Signals are informational and help you stay proactive—never a replacement for medical advice.
+                Signals are informational, not a replacement for medical advice.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -735,7 +740,7 @@ export default function WelcomePage() {
         </div>
       </section>
 
-      <footer className="mt-16 border-t border-white/10 pt-8">
+      <footer className="mt-16 border-t border-[color:var(--lab-accent-border)] pt-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="text-sm font-semibold uppercase tracking-[0.2em] text-white/80">Gym-Risk</div>
