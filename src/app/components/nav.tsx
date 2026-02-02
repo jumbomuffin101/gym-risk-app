@@ -41,6 +41,11 @@ export default function Nav() {
   const pathname = usePathname();
   const { status } = useSession();
   const isAuthed = status === "authenticated";
+  const hideNav = pathname === "/signin" || pathname === "/signup";
+
+  if (hideNav) {
+    return null;
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-black/10 backdrop-blur-md">
