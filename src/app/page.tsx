@@ -308,27 +308,25 @@ export default function WelcomePage() {
       `}</style>
 
       <header className="sticky top-0 z-40 -mx-6 mb-10 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] px-6 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90">
             Gym-Risk
           </Link>
-          <nav className="hidden flex-1 items-center justify-center md:flex">
-            <div className="flex items-center gap-1 rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] p-1 text-xs text-white/80">
-              {sections.map((section) => (
-                <a
-                  key={section.id}
-                  href={`#${section.id}`}
-                  className={`rounded-full px-3 py-1 transition ${
-                    activeSection === section.id
-                      ? "bg-white/10 text-white"
-                      : "text-white/70 hover:text-white"
-                  }`}
-                  aria-current={activeSection === section.id ? "page" : undefined}
-                >
-                  {section.label}
-                </a>
-              ))}
-            </div>
+          <nav className="hidden items-center gap-1 rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] p-1 text-xs text-white/80 md:flex">
+            {sections.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                className={`rounded-full px-3 py-1 transition ${
+                  activeSection === section.id
+                    ? "bg-white/10 text-white"
+                    : "text-white/70 hover:text-white"
+                }`}
+                aria-current={activeSection === section.id ? "page" : undefined}
+              >
+                {section.label}
+              </a>
+            ))}
           </nav>
           <div className="flex items-center gap-2">
             <Link
