@@ -328,12 +328,17 @@ export default function WelcomePage() {
               </a>
             ))}
           </nav>
-          <Link
-            href="/signin"
-            className="text-xs font-medium uppercase tracking-[0.2em] text-white/60 transition hover:text-white"
-          >
-            Sign in
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/signin"
+              className="rounded-full border border-[color:var(--lab-accent-border)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/70 transition hover:text-white"
+            >
+              Sign in
+            </Link>
+            <Link href="/signup" className="rounded-full bg-[var(--lab-safe)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-black/90 shadow-[0_0_0_1px_rgba(34,197,94,0.4),0_12px_30px_rgba(34,197,94,0.18)] transition hover:brightness-105">
+              Create account
+            </Link>
+          </div>
         </div>
       </header>
 
