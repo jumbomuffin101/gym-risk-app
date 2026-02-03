@@ -360,7 +360,7 @@ export default function WelcomePage() {
               <div>
                 <div className="mb-6 flex items-center gap-4">
                   <Image
-                    src="/brand/gym-risk-icon-v2.svg"
+                    src="/brand/gym-risk-icon.png"
                     alt="Gym-Risk logo"
                     width={48}
                     height={48}

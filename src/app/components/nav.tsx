@@ -42,6 +42,11 @@ export default function Nav() {
   const pathname = usePathname();
   const { status } = useSession();
   const isAuthed = status === "authenticated";
+  const hideNav = pathname === "/signin" || pathname === "/signup";
+
+  if (hideNav) {
+    return null;
+  }
 
   if (pathname === "/") {
     return null;
