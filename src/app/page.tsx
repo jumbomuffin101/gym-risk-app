@@ -88,19 +88,27 @@ function useAnimatedNumber(value: number, reducedMotion: boolean) {
   const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // If reduced motion is on, skip animation work.
+    // We still keep "previous" updated so that when reducedMotion flips off,
+    // we animate from the correct starting point.
+    if (reducedMotion) {
+      previous.current = value;
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      return;
+    }
+
+    // Cancel any in-flight animation
     if (frameRef.current !== null) {
       cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
     }
-    if (reducedMotion) {
-      setDisplay(value);
-      previous.current = value;
-      return;
-    }
-    if (previous.current === value) {
-      return;
-    }
+
     const start = previous.current;
+    if (start === value) return;
+
     const diff = value - start;
     const duration = 420;
     let startTime: number | null = null;
@@ -109,7 +117,9 @@ function useAnimatedNumber(value: number, reducedMotion: boolean) {
       if (startTime === null) startTime = time;
       const progress = Math.min((time - startTime) / duration, 1);
       const next = Math.round(start + diff * progress);
+
       setDisplay((current) => (current === next ? current : next));
+
       if (progress < 1) {
         frameRef.current = requestAnimationFrame(tick);
       } else {
@@ -119,6 +129,7 @@ function useAnimatedNumber(value: number, reducedMotion: boolean) {
     };
 
     frameRef.current = requestAnimationFrame(tick);
+
     return () => {
       if (frameRef.current !== null) {
         cancelAnimationFrame(frameRef.current);
@@ -127,8 +138,10 @@ function useAnimatedNumber(value: number, reducedMotion: boolean) {
     };
   }, [value, reducedMotion]);
 
-  return display;
+  // If reduced motion, render the raw value (no setState needed)
+  return reducedMotion ? value : display;
 }
+
 
 export default function WelcomePage() {
   const [mode, setMode] = useState<PreviewMode>("balanced");
