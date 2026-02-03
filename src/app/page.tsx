@@ -137,6 +137,8 @@ export default function WelcomePage() {
   const animatedRisk = useAnimatedNumber(activeData.risk, reducedMotion);
   const animatedLoad = useAnimatedNumber(activeData.weeklyLoad, reducedMotion);
   const [activeSection, setActiveSection] = useState("features");
+  const chipClass =
+    "rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs font-medium text-white/70";
 
   useEffect(() => {
     if (reducedMotion) {
@@ -178,7 +180,7 @@ export default function WelcomePage() {
     () => [
       {
         icon: ShieldCheck,
-        text: "Sports science load metrics",
+        text: "Science-backed metrics",
       },
       {
         icon: Trophy,
@@ -186,7 +188,7 @@ export default function WelcomePage() {
       },
       {
         icon: Activity,
-        text: "Tracks load + recovery",
+        text: "Recovery-aware signals",
       },
     ],
     []
@@ -198,22 +200,19 @@ export default function WelcomePage() {
         icon: ClipboardList,
         title: "Log fast",
         highlight: "Log",
-        description: "Capture sets, RPE, and pain in seconds.",
-        chip: "Fast",
+        description: "Capture sets, RPE, and pain in under a minute today.",
       },
       {
         icon: LineChart,
         title: "Spot trends",
         highlight: "Trends",
-        description: "See weekly load and spikes without digging.",
-        chip: "Trends",
+        description: "See weekly load shifts without digging through logs or spreadsheets.",
       },
       {
         icon: Gauge,
         title: "Train smarter",
         highlight: "Smarter",
-        description: "Act on risk signals before they become setbacks.",
-        chip: "Signals",
+        description: "Adjust intensity before fatigue compounds into avoidable in-season setbacks.",
       },
     ],
     []
@@ -224,17 +223,17 @@ export default function WelcomePage() {
       {
         icon: ClipboardList,
         title: "Log sessions",
-        description: "Log sets, RPE, and pain in under a minute.",
+        description: "Record sets, RPE, and pain in minutes, not hours.",
       },
       {
         icon: BarChart3,
         title: "See weekly load",
-        description: "Trends reveal weekly volume and intensity shifts.",
+        description: "Trends surface weekly volume and intensity shifts quickly.",
       },
       {
         icon: Sparkles,
         title: "Act on signals",
-        description: "Recovery flags highlight spikes so you adjust early.",
+        description: "Flags highlight spikes so you adjust before fatigue builds.",
       },
     ],
     []
@@ -244,19 +243,19 @@ export default function WelcomePage() {
     () => [
       {
         title: "Session load",
-        description: "RPE × duration for every session.",
+        description: "RPE × duration gives a simple, comparable load score.",
       },
       {
         title: "Weekly load trend",
-        description: "Baseline vs. weekly total to spot spikes.",
+        description: "Compare weekly totals to baseline to spot spikes.",
       },
       {
         title: "Fatigue indicators",
-        description: "Elevated effort plus reduced recovery signals.",
+        description: "Effort plus recovery trends surface fatigue early consistently.",
       },
       {
-        title: "Pain & recovery flags",
-        description: "Rising pain notes surfaced early.",
+        title: "Pain notes",
+        description: "Track discomfort patterns without losing training context over time.",
       },
     ],
     []
@@ -266,33 +265,23 @@ export default function WelcomePage() {
     () => [
       {
         question: "Is Gym-Risk medical advice?",
-        answer:
-          "No. It provides informational signals, not clinical guidance.",
+        answer: "No. It provides training signals, not clinical guidance.",
       },
       {
         question: "Can I export my data?",
-        answer:
-          "Yes. Export training logs and metrics from the dashboard.",
-      },
-      {
-        question: "Is this for coaches or clinicians?",
-        answer:
-          "It can support coaches, but it is not medical advice.",
+        answer: "Yes. Export logs and metrics from the dashboard.",
       },
       {
         question: "What training styles are supported?",
-        answer:
-          "Strength, conditioning, hybrid, and endurance with RPE + duration.",
+        answer: "Strength, conditioning, hybrid, and endurance with RPE + duration.",
       },
       {
         question: "How long does logging take?",
-        answer:
-          "Most athletes log a session in under a minute.",
+        answer: "Most athletes log a session in under a minute.",
       },
       {
         question: "Is it mobile friendly?",
-        answer:
-          "Yes. The UI is responsive for on-the-go logging.",
+        answer: "Yes. The UI is responsive for on-the-go logging.",
       },
     ],
     []
@@ -321,19 +310,26 @@ export default function WelcomePage() {
         }
       `}</style>
 
-      <header className="sticky top-0 z-40 -mx-6 mb-10 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] px-6 py-3">
+      <header className="sticky top-0 z-40 -mx-6 mb-10 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] px-6 py-3 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90">
+          <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-white/90">
+            <Image
+              src="/brand/gym-risk-icon-v2.svg"
+              alt="Gym-Risk logo"
+              width={32}
+              height={32}
+              className="h-8 w-8 object-contain"
+            />
             Gym-Risk
           </Link>
-          <nav className="hidden items-center gap-1 rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] p-1 text-xs text-white/80 md:flex">
+          <nav className="hidden items-center gap-1 rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] p-1 text-xs font-medium text-white/80 md:flex">
             {sections.map((section) => (
               <a
                 key={section.id}
                 href={`#${section.id}`}
                 className={`rounded-full px-3 py-1 transition ${
                   activeSection === section.id
-                    ? "bg-white/10 text-white"
+                    ? "bg-[var(--lab-surface-2)] text-white"
                     : "text-white/70 hover:text-white"
                 }`}
                 aria-current={activeSection === section.id ? "page" : undefined}
@@ -345,11 +341,11 @@ export default function WelcomePage() {
           <div className="flex items-center gap-2">
             <Link
               href="/signin"
-              className="rounded-full border border-[color:var(--lab-accent-border)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/70 transition hover:text-white"
+              className="rounded-full border border-[color:var(--lab-accent-border)] px-4 py-2 text-xs font-semibold text-white/70 transition hover:text-white"
             >
               Sign in
             </Link>
-            <Link href="/signup" className="rounded-full bg-[var(--lab-safe)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-black/90 shadow-[0_0_0_1px_rgba(34,197,94,0.4),0_12px_30px_rgba(34,197,94,0.18)] transition hover:brightness-105">
+            <Link href="/signup" className="rounded-full bg-[var(--lab-safe)] px-4 py-2 text-xs font-semibold text-black/90 shadow-[0_0_0_1px_rgba(34,197,94,0.4),0_8px_20px_rgba(34,197,94,0.12)] transition hover:brightness-105">
               Create account
             </Link>
           </div>
@@ -363,22 +359,22 @@ export default function WelcomePage() {
               <div>
                 <div className="mb-6 flex items-center gap-4">
                   <Image
-                    src="/brand/logo.jpg"
-                    alt="gym-risk"
-                    width={520}
-                    height={200}
+                    src="/brand/gym-risk-icon-v2.svg"
+                    alt="Gym-Risk logo"
+                    width={48}
+                    height={48}
                     priority
-                    className="h-auto w-[200px] md:w-[240px] opacity-95 object-contain"
+                    className="h-11 w-11 md:h-12 md:w-12 opacity-95 object-contain"
                   />
-                  <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                    Athlete-grade
+                  <span className={`${chipClass} text-[var(--lab-analytics)]`}>
+                    Athlete tested
                   </span>
                 </div>
                 <h1 className="hero-title text-left text-4xl font-semibold tracking-tight md:text-5xl">
                   Train harder without guessing your injury risk.
                 </h1>
                 <p className="hero-sub mt-4 text-left text-base text-white/75 md:text-lg">
-                  Gym-Risk turns training logs into clear load and risk signals.
+                  Gym-Risk turns training logs into clear readiness guidance.
                 </p>
               </div>
 
@@ -395,7 +391,7 @@ export default function WelcomePage() {
                 {heroChips.map((chip) => (
                   <div
                     key={chip.text}
-                    className="flex items-center gap-2 rounded-xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] px-3 py-2 text-xs text-white/80"
+                    className="flex items-center gap-2 rounded-xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] px-3 py-2 text-xs font-medium text-white/80"
                   >
                     <chip.icon className="h-4 w-4 text-[var(--lab-accent)]" />
                     <span>{chip.text}</span>
@@ -404,7 +400,7 @@ export default function WelcomePage() {
               </div>
 
               <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
-                <div className="text-xs uppercase tracking-wide text-white/60">Your dashboard shows</div>
+                <div className="text-xs font-semibold text-[var(--lab-analytics)]">Your dashboard shows</div>
                 <ul className="mt-3 grid gap-2 text-sm text-white/80">
                   <li className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-[var(--lab-safe)]" />
@@ -415,8 +411,8 @@ export default function WelcomePage() {
                     Weekly load trendlines.
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--lab-danger)]" />
-                    Session logs + RPE.
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--lab-accent)]" />
+                    Session notes + RPE.
                   </li>
                 </ul>
               </div>
@@ -425,11 +421,11 @@ export default function WelcomePage() {
             <div className="lab-card relative overflow-hidden rounded-[24px] p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs uppercase tracking-wide text-white/60">Dashboard preview</div>
+                  <div className="text-xs font-semibold text-[var(--lab-analytics)]">Dashboard preview</div>
                   <div className="mt-1 text-sm font-semibold text-white/90">Strength cycle · Week 6</div>
                 </div>
-                <div className="flex items-center gap-2 rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-2 py-1 text-[11px] text-white/70">
-                  <span className="text-[10px] uppercase tracking-[0.2em]">Sample week</span>
+                <div className="flex items-center gap-2">
+                  <span className={chipClass}>Sample week</span>
                   <div
                     role="radiogroup"
                     aria-label="Sample week"
@@ -444,7 +440,7 @@ export default function WelcomePage() {
                       onKeyDown={(event) => handleModeKeyDown(event, "overload")}
                       className={`rounded-full px-3 py-1 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)] motion-reduce:transition-none ${
                         mode === "balanced"
-                          ? "bg-white/15 text-white shadow-[0_0_0_1px_var(--lab-accent-strong),0_0_18px_rgba(125,211,252,0.25)]"
+                          ? "bg-white/15 text-white shadow-[0_0_0_1px_var(--lab-accent-strong)]"
                           : "text-white/60 hover:text-white"
                       }`}
                     >
@@ -459,7 +455,7 @@ export default function WelcomePage() {
                       onKeyDown={(event) => handleModeKeyDown(event, "balanced")}
                       className={`rounded-full px-3 py-1 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)] motion-reduce:transition-none ${
                         mode === "overload"
-                          ? "bg-white/15 text-white shadow-[0_0_0_1px_var(--lab-accent-strong),0_0_18px_rgba(125,211,252,0.25)]"
+                          ? "bg-white/15 text-white shadow-[0_0_0_1px_var(--lab-accent-strong)]"
                           : "text-white/60 hover:text-white"
                       }`}
                     >
@@ -472,18 +468,16 @@ export default function WelcomePage() {
               <div className="mt-5 grid gap-4">
                 <div className="grid gap-4 md:grid-cols-[1.1fr_1fr]">
                   <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4 transition motion-reduce:transition-none">
-                    <div className="flex items-center justify-between text-xs text-white/60">
+                    <div className="flex items-center justify-between text-xs font-medium text-white/60">
                       <span>Risk score</span>
-                      <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]">
-                        Weekly
-                      </span>
+                      <span className={chipClass}>Weekly</span>
                     </div>
                     <div className="mt-3 flex items-end justify-between">
                       <div className="text-3xl font-semibold text-white/90">
                         {animatedRisk}
                         <span className="text-sm font-medium text-white/50">/100</span>
                       </div>
-                      <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs text-white/70">
+                      <span className={chipClass}>
                         {activeData.status}
                       </span>
                     </div>
@@ -501,9 +495,9 @@ export default function WelcomePage() {
                   </div>
 
                   <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
-                    <div className="flex items-center justify-between text-xs text-white/60">
+                    <div className="flex items-center justify-between text-xs font-medium text-white/60">
                       <span>Weekly load</span>
-                      <span className="text-[10px] uppercase tracking-[0.2em] text-white/50">AU</span>
+                      <span className="text-[10px] font-medium text-white/50">AU</span>
                     </div>
                     <div className="mt-3 flex items-end justify-between">
                       <div className="text-3xl font-semibold text-white/90">
@@ -513,7 +507,7 @@ export default function WelcomePage() {
                       <span className="text-xs text-white/70">{activeData.loadDelta}</span>
                     </div>
                     <div className="mt-4 rounded-xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] p-3">
-                      <div className="flex items-center justify-between text-[11px] text-white/60">
+                      <div className="flex items-center justify-between text-[11px] font-medium text-white/60">
                         <span>Weekly load graph</span>
                         <span>Mon → Sun</span>
                       </div>
@@ -537,9 +531,9 @@ export default function WelcomePage() {
                 </div>
 
                 <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
-                  <div className="flex items-center justify-between text-xs text-white/60">
+                  <div className="flex items-center justify-between text-xs font-medium text-white/60">
                     <span>Training log</span>
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-white/50">3 sessions</span>
+                    <span className="text-[10px] font-medium text-white/50">3 sessions</span>
                   </div>
                   <div className="mt-3 space-y-2">
                     {activeData.log.map((row) => (
@@ -549,7 +543,7 @@ export default function WelcomePage() {
                       >
                         <div>
                           <div className="text-white/90">{row.session}</div>
-                          <div className="text-[10px] uppercase tracking-[0.2em] text-white/45">{row.date}</div>
+                          <div className="text-[10px] font-medium text-white/45">{row.date}</div>
                         </div>
                         <div className="text-right text-white/65">{row.note}</div>
                       </div>
@@ -565,7 +559,7 @@ export default function WelcomePage() {
       <section id="features" className="mt-16">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">Features</div>
+            <div className="text-xs font-semibold text-[var(--lab-analytics)]">Features</div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
               Train with clarity, not guesswork.
             </h2>
@@ -580,9 +574,6 @@ export default function WelcomePage() {
             >
               <div className="flex items-center justify-between">
                 <feature.icon className="h-9 w-9 text-[var(--lab-accent)]" />
-                <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs text-white/70">
-                  {feature.chip}
-                </span>
               </div>
               <h3 className="mt-4 text-lg font-semibold text-white/95">
                 <span className="text-[var(--lab-accent)]">{feature.highlight}</span>{" "}
@@ -595,18 +586,15 @@ export default function WelcomePage() {
       </section>
 
       <section id="how-it-works" className="mt-16">
-        <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">How it works</div>
+        <div className="text-xs font-semibold text-[var(--lab-analytics)]">How it works</div>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
           A tight loop from log → load → action.
         </h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          {howItWorks.map((step, index) => (
+          {howItWorks.map((step) => (
             <div key={step.title} className="lab-card rounded-2xl p-5">
               <div className="flex items-center justify-between">
                 <step.icon className="h-8 w-8 text-[var(--lab-accent)]" />
-                <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs text-white/60">
-                  Step {index + 1}
-                </span>
               </div>
               <h3 className="mt-4 text-lg font-semibold text-white/90">{step.title}</h3>
               <p className="mt-2 text-sm text-white/70">{step.description}</p>
@@ -616,7 +604,7 @@ export default function WelcomePage() {
       </section>
 
       <section id="metrics" className="mt-16">
-        <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">Metrics Gym-Risk uses</div>
+        <div className="text-xs font-semibold text-[var(--lab-analytics)]">Metrics Gym-Risk uses</div>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
           Signals built for training load context.
         </h2>
@@ -628,13 +616,13 @@ export default function WelcomePage() {
             </div>
           ))}
         </div>
-        <p className="mt-4 text-xs uppercase tracking-[0.2em] text-white/40">Informational only, not medical advice.</p>
+        <p className="mt-4 text-xs font-medium text-white/50">Informational only, not medical advice.</p>
       </section>
 
       <section id="built-with" className="mt-16">
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">Built with</div>
+            <div className="text-xs font-semibold text-[var(--lab-analytics)]">Built with</div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
               Product-grade foundation and engineering craft.
             </h2>
@@ -666,19 +654,15 @@ export default function WelcomePage() {
             <ul className="mt-3 space-y-2 text-sm text-white/70">
               <li className="flex gap-2">
                 <ChevronRight className="mt-1 h-3 w-3 text-[var(--lab-accent)]" />
-                Reusable landing sections with consistent spacing.
+                Consistent spacing and systemized layout.
               </li>
               <li className="flex gap-2">
                 <ChevronRight className="mt-1 h-3 w-3 text-[var(--lab-accent)]" />
-                Accessible focus states with semantic headings.
+                Semantic headings and accessible focus.
               </li>
               <li className="flex gap-2">
                 <ChevronRight className="mt-1 h-3 w-3 text-[var(--lab-accent)]" />
-                No chart libraries, charts drawn with SVG.
-              </li>
-              <li className="flex gap-2">
-                <ChevronRight className="mt-1 h-3 w-3 text-[var(--lab-accent)]" />
-                Type-safe forms with Zod + NextAuth.
+                Lightweight charts built with SVG.
               </li>
             </ul>
           </div>
@@ -686,7 +670,7 @@ export default function WelcomePage() {
       </section>
 
       <section id="faq" className="mt-16">
-        <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">FAQ</div>
+        <div className="text-xs font-semibold text-[var(--lab-analytics)]">FAQ</div>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
           Your questions, answered clearly.
         </h2>
@@ -726,11 +710,9 @@ export default function WelcomePage() {
         <div className="lab-card rounded-[24px] p-8">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-[rgba(125,211,252,0.7)]">
-                Ready to train smarter?
-              </div>
+              <div className="text-xs font-semibold text-[var(--lab-analytics)]">Ready to train smarter?</div>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
-                Get clarity on load, fatigue, and risk signals.
+                Get clarity on load, fatigue, and readiness.
               </h2>
               <p className="mt-2 text-sm text-white/70">
                 Signals are informational, not a replacement for medical advice.
@@ -751,7 +733,7 @@ export default function WelcomePage() {
       <footer className="mt-16 border-t border-[color:var(--lab-accent-border)] pt-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-white/80">Gym-Risk</div>
+            <div className="text-sm font-semibold text-white/80">Gym-Risk</div>
             <p className="mt-2 text-sm text-white/60">Load-aware training insights for committed athletes.</p>
             <p className="mt-2 text-xs text-white/45">Created by Aryan Rawat.</p>
           </div>
