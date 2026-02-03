@@ -256,6 +256,7 @@ export default function WelcomePage() {
       {
         title: "Pain notes",
         description: "Track discomfort patterns without losing training context over time.",
+        description: "Effort plus recovery signals combined.",
       },
     ],
     []
@@ -345,7 +346,7 @@ export default function WelcomePage() {
             >
               Sign in
             </Link>
-            <Link href="/signup" className="rounded-full bg-[var(--lab-safe)] px-4 py-2 text-xs font-semibold text-black/90 shadow-[0_0_0_1px_rgba(34,197,94,0.4),0_8px_20px_rgba(34,197,94,0.12)] transition hover:brightness-105">
+            <Link href="/signup" className="rounded-full bg-[var(--lab-safe)] px-4 py-2 text-xs font-semibold text-black/90 shadow-[0_0_0_1px_rgba(34,197,94,0.4),0_12px_30px_rgba(34,197,94,0.18)] transition hover:brightness-105">
               Create account
             </Link>
           </div>
