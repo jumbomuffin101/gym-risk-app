@@ -137,6 +137,8 @@ export default function WelcomePage() {
   const animatedRisk = useAnimatedNumber(activeData.risk, reducedMotion);
   const animatedLoad = useAnimatedNumber(activeData.weeklyLoad, reducedMotion);
   const [activeSection, setActiveSection] = useState("features");
+  const chipClass =
+    "rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs font-medium text-white/70";
 
   useEffect(() => {
     if (reducedMotion) {
@@ -198,22 +200,19 @@ export default function WelcomePage() {
         icon: ClipboardList,
         title: "Log fast",
         highlight: "Log",
-        description: "Capture sets, RPE, and pain in seconds.",
-        chip: "Fast",
+        description: "Capture sets, RPE, and pain in under a minute today.",
       },
       {
         icon: LineChart,
         title: "Spot trends",
         highlight: "Trends",
-        description: "See weekly load and spikes without digging.",
-        chip: "Trends",
+        description: "See weekly load shifts without digging through logs or spreadsheets.",
       },
       {
         icon: Gauge,
         title: "Train smarter",
         highlight: "Smarter",
-        description: "Act on risk signals before they become setbacks.",
-        chip: "Signals",
+        description: "Adjust intensity before fatigue compounds into avoidable in-season setbacks.",
       },
     ],
     []
@@ -224,17 +223,17 @@ export default function WelcomePage() {
       {
         icon: ClipboardList,
         title: "Log sessions",
-        description: "Log sets, RPE, and pain in under a minute.",
+        description: "Record sets, RPE, and pain in minutes, not hours.",
       },
       {
         icon: BarChart3,
         title: "See weekly load",
-        description: "Trends reveal weekly volume and intensity shifts.",
+        description: "Trends surface weekly volume and intensity shifts quickly.",
       },
       {
         icon: Sparkles,
         title: "Act on signals",
-        description: "Recovery flags highlight spikes so you adjust early.",
+        description: "Flags highlight spikes so you adjust before fatigue builds.",
       },
     ],
     []
@@ -244,15 +243,20 @@ export default function WelcomePage() {
     () => [
       {
         title: "Session load",
-        description: "RPE × duration for every session.",
+        description: "RPE × duration gives a simple, comparable load score.",
       },
       {
         title: "Weekly load trend",
-        description: "Baseline vs. weekly total to spot spikes.",
+        description: "Compare weekly totals to baseline to spot spikes.",
       },
       {
         title: "Fatigue indicators",
+        description: "Effort plus recovery trends surface fatigue early consistently.",
+      },
+      {
+        title: "Pain notes",
         description: "Track discomfort patterns without losing training context over time.",
+        description: "Effort plus recovery signals combined.",
       },
     ],
     []
@@ -307,7 +311,7 @@ export default function WelcomePage() {
         }
       `}</style>
 
-      <header className="sticky top-0 z-40 -mx-6 mb-10 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] px-6 py-3">
+      <header className="sticky top-0 z-40 -mx-6 mb-10 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] px-6 py-3 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-white/90">
             <Image
@@ -326,7 +330,7 @@ export default function WelcomePage() {
                 href={`#${section.id}`}
                 className={`rounded-full px-3 py-1 transition ${
                   activeSection === section.id
-                    ? "bg-white/10 text-white"
+                    ? "bg-[var(--lab-surface-2)] text-white"
                     : "text-white/70 hover:text-white"
                 }`}
                 aria-current={activeSection === section.id ? "page" : undefined}
@@ -363,7 +367,7 @@ export default function WelcomePage() {
                     priority
                     className="h-11 w-11 md:h-12 md:w-12 opacity-95 object-contain"
                   />
-                  <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs font-semibold text-[var(--lab-analytics)]">
+                  <span className={`${chipClass} text-[var(--lab-analytics)]`}>
                     Athlete tested
                   </span>
                 </div>
@@ -421,8 +425,8 @@ export default function WelcomePage() {
                   <div className="text-xs font-semibold text-[var(--lab-analytics)]">Dashboard preview</div>
                   <div className="mt-1 text-sm font-semibold text-white/90">Strength cycle · Week 6</div>
                 </div>
-                <div className="flex items-center gap-2 rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-2 py-1 text-[11px] text-white/70">
-                  <span className="text-[11px] font-medium text-white/70">Sample week</span>
+                <div className="flex items-center gap-2">
+                  <span className={chipClass}>Sample week</span>
                   <div
                     role="radiogroup"
                     aria-label="Sample week"
@@ -437,7 +441,7 @@ export default function WelcomePage() {
                       onKeyDown={(event) => handleModeKeyDown(event, "overload")}
                       className={`rounded-full px-3 py-1 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)] motion-reduce:transition-none ${
                         mode === "balanced"
-                          ? "bg-white/15 text-white shadow-[0_0_0_1px_var(--lab-accent-strong),0_0_18px_rgba(125,211,252,0.25)]"
+                          ? "bg-white/15 text-white shadow-[0_0_0_1px_var(--lab-accent-strong)]"
                           : "text-white/60 hover:text-white"
                       }`}
                     >
@@ -452,7 +456,7 @@ export default function WelcomePage() {
                       onKeyDown={(event) => handleModeKeyDown(event, "balanced")}
                       className={`rounded-full px-3 py-1 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)] motion-reduce:transition-none ${
                         mode === "overload"
-                          ? "bg-white/15 text-white shadow-[0_0_0_1px_var(--lab-accent-strong),0_0_18px_rgba(125,211,252,0.25)]"
+                          ? "bg-white/15 text-white shadow-[0_0_0_1px_var(--lab-accent-strong)]"
                           : "text-white/60 hover:text-white"
                       }`}
                     >
@@ -467,16 +471,14 @@ export default function WelcomePage() {
                   <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4 transition motion-reduce:transition-none">
                     <div className="flex items-center justify-between text-xs font-medium text-white/60">
                       <span>Risk score</span>
-                      <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-2 py-0.5 text-[10px] font-medium">
-                        Weekly
-                      </span>
+                      <span className={chipClass}>Weekly</span>
                     </div>
                     <div className="mt-3 flex items-end justify-between">
                       <div className="text-3xl font-semibold text-white/90">
                         {animatedRisk}
                         <span className="text-sm font-medium text-white/50">/100</span>
                       </div>
-                      <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs text-white/70">
+                      <span className={chipClass}>
                         {activeData.status}
                       </span>
                     </div>
@@ -573,9 +575,6 @@ export default function WelcomePage() {
             >
               <div className="flex items-center justify-between">
                 <feature.icon className="h-9 w-9 text-[var(--lab-accent)]" />
-                <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs text-white/70">
-                  {feature.chip}
-                </span>
               </div>
               <h3 className="mt-4 text-lg font-semibold text-white/95">
                 <span className="text-[var(--lab-accent)]">{feature.highlight}</span>{" "}
@@ -593,13 +592,10 @@ export default function WelcomePage() {
           A tight loop from log → load → action.
         </h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          {howItWorks.map((step, index) => (
+          {howItWorks.map((step) => (
             <div key={step.title} className="lab-card rounded-2xl p-5">
               <div className="flex items-center justify-between">
                 <step.icon className="h-8 w-8 text-[var(--lab-accent)]" />
-                <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs text-white/60">
-                  Step {index + 1}
-                </span>
               </div>
               <h3 className="mt-4 text-lg font-semibold text-white/90">{step.title}</h3>
               <p className="mt-2 text-sm text-white/70">{step.description}</p>
