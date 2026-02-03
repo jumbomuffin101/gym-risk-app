@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -85,32 +85,46 @@ function useReducedMotion() {
 function useAnimatedNumber(value: number, reducedMotion: boolean) {
   const [display, setDisplay] = useState(value);
   const previous = useRef(value);
+  const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
     if (reducedMotion) {
       setDisplay(value);
       previous.current = value;
       return;
     }
+    if (previous.current === value) {
+      return;
+    }
     const start = previous.current;
     const diff = value - start;
     const duration = 420;
-    let startTime = 0;
+    let startTime: number | null = null;
 
     const tick = (time: number) => {
-      if (!startTime) startTime = time;
+      if (startTime === null) startTime = time;
       const progress = Math.min((time - startTime) / duration, 1);
       const next = Math.round(start + diff * progress);
-      setDisplay(next);
+      setDisplay((current) => (current === next ? current : next));
       if (progress < 1) {
-        requestAnimationFrame(tick);
+        frameRef.current = requestAnimationFrame(tick);
       } else {
         previous.current = value;
+        frameRef.current = null;
       }
     };
 
-    const frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    frameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
   }, [value, reducedMotion]);
 
   return display;
@@ -286,7 +300,7 @@ export default function WelcomePage() {
 
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  const handleModeKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, next: PreviewMode) => {
+  const handleModeKeyDown = (event: KeyboardEvent<HTMLButtonElement>, next: PreviewMode) => {
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
       event.preventDefault();
       setMode(next);
