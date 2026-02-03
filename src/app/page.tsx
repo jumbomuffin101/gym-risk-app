@@ -85,36 +85,63 @@ function useReducedMotion() {
 function useAnimatedNumber(value: number, reducedMotion: boolean) {
   const [display, setDisplay] = useState(value);
   const previous = useRef(value);
+  const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // If reduced motion is on, skip animation work.
+    // We still keep "previous" updated so that when reducedMotion flips off,
+    // we animate from the correct starting point.
     if (reducedMotion) {
-      setDisplay(value);
       previous.current = value;
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
       return;
     }
+
+    // Cancel any in-flight animation
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+
     const start = previous.current;
+    if (start === value) return;
+
     const diff = value - start;
     const duration = 420;
-    let startTime = 0;
+    let startTime: number | null = null;
 
     const tick = (time: number) => {
-      if (!startTime) startTime = time;
+      if (startTime === null) startTime = time;
       const progress = Math.min((time - startTime) / duration, 1);
       const next = Math.round(start + diff * progress);
-      setDisplay(next);
+
+      setDisplay((current) => (current === next ? current : next));
+
       if (progress < 1) {
-        requestAnimationFrame(tick);
+        frameRef.current = requestAnimationFrame(tick);
       } else {
         previous.current = value;
+        frameRef.current = null;
       }
     };
 
-    const frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    frameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
   }, [value, reducedMotion]);
 
-  return display;
+  // If reduced motion, render the raw value (no setState needed)
+  return reducedMotion ? value : display;
 }
+
 
 export default function WelcomePage() {
   const [mode, setMode] = useState<PreviewMode>("balanced");
