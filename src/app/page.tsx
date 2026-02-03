@@ -252,7 +252,7 @@ export default function WelcomePage() {
       },
       {
         title: "Fatigue indicators",
-        description: "Effort plus recovery signals combined.",
+        description: "Track discomfort patterns without losing training context over time.",
       },
     ],
     []
