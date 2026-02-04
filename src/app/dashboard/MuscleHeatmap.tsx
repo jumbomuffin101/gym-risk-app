@@ -2,6 +2,9 @@
 
 import React, { useMemo, useState } from "react";
 
+import { MetricCard } from "./components/MetricCard";
+import { StatusChip } from "./components/StatusChip";
+
 type RiskLevel = "low" | "moderate" | "high";
 
 export type RiskMap = {
@@ -99,7 +102,7 @@ function Region({ id, label, x, y, w, h, risk, selected, onSelect }: RegionProps
     <button
       type="button"
       onClick={() => onSelect(id)}
-      className="absolute rounded-xl outline-none"
+      className="absolute rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
       style={{
         left: x,
         top: y,
@@ -142,24 +145,21 @@ export function MuscleHeatmap({ risk, active }: { risk: RiskMap; active: boolean
   );
 
   return (
-    <div className="lab-card lab-hover rounded-2xl p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs uppercase tracking-wide lab-muted">Muscle risk heatmap</div>
-          <div className="mt-1 text-sm text-[rgba(230,232,238,0.88)]">
-            Click a zone to see <span className="text-[rgba(230,232,238,0.96)]">why</span> it’s elevated.
-          </div>
+    <MetricCard
+      title="Muscle risk heatmap"
+      subtitle={
+        <>
+          Click a zone to see <span className="text-[rgba(230,232,238,0.96)]">why</span> it’s elevated.
+        </>
+      }
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusChip label="Stable" tone="safe" />
+          <StatusChip label="Watch" tone="watch" />
+          <StatusChip label="Elevated" tone="danger" />
         </div>
-
-        <div className="flex items-center gap-2 text-xs lab-muted">
-          <span className="h-2 w-2 rounded-full bg-[var(--lab-safe)]" />
-          Stable
-          <span className="ml-3 h-2 w-2 rounded-full bg-[var(--lab-watch)]" />
-          Watch
-          <span className="ml-3 h-2 w-2 rounded-full bg-[var(--lab-danger)]" />
-          Elevated
-        </div>
-      </div>
+      }
+    >
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {/* Heatmap surface */}
@@ -229,6 +229,6 @@ export function MuscleHeatmap({ risk, active }: { risk: RiskMap; active: boolean
           </div>
         </div>
       </div>
-    </div>
+    </MetricCard>
   );
 }

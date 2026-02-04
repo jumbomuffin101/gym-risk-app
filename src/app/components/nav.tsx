@@ -23,7 +23,7 @@ function isActive(pathname: string, href: string, match: "exact" | "section" = "
 function pillClass(active: boolean) {
   // IMPORTANT: no white active state, everything stays in green/black theme
   return [
-    "rounded-full px-3 py-1.5 text-sm font-medium transition",
+    "rounded-full px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]",
     "border outline-none",
     active
       ? [
@@ -54,7 +54,7 @@ export default function Nav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-black/10 backdrop-blur-md">
-      <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
+      <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-white/90">
           <Image
             src="/brand/gym-risk-icon-v2.svg"
@@ -66,7 +66,7 @@ export default function Nav() {
           gym-risk
         </Link>
 
-        <nav className="flex gap-2 rounded-full border border-white/10 bg-white/[0.03] p-1">
+        <nav className="flex flex-wrap gap-2 rounded-full border border-white/10 bg-white/[0.03] p-1">
           {isAuthed ? (
             navItems.map((item) => {
               const active = isActive(pathname, item.href, item.match ?? "exact");

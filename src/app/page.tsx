@@ -88,7 +88,9 @@ function useAnimatedNumber(value: number, reducedMotion: boolean) {
   const frameRef = useRef<number | null>(null);
   const displayRef = useRef(display);
 
-  displayRef.current = display;
+  useEffect(() => {
+    displayRef.current = display;
+  }, [display]);
 
   useEffect(() => {
     // If reduced motion is on, skip animation work.

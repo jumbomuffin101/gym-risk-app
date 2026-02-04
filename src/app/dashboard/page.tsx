@@ -12,6 +12,11 @@ import { RiskMeter } from "src/app/dashboard/RiskMeter";
 import { SessionStepper } from "src/app/dashboard/SessionStepper";
 import { MuscleHeatmap, type RiskMap } from "src/app/dashboard/MuscleHeatmap";
 import { LoadPanel } from "src/app/dashboard/LoadPanel";
+import { LabCard } from "src/app/dashboard/components/LabCard";
+import { MetricCard } from "src/app/dashboard/components/MetricCard";
+import { PageShell } from "src/app/dashboard/components/PageShell";
+import { SectionHeader } from "src/app/dashboard/components/SectionHeader";
+import { StatusChip } from "src/app/dashboard/components/StatusChip";
 
 export const runtime = "nodejs";
 
@@ -73,9 +78,9 @@ export default async function DashboardPage() {
     sessions.length > 0 ? daysAgo(new Date(sessions[0].startedAt)) : null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell>
       {/* HERO */}
-      <header className="lab-card rounded-2xl p-5 overflow-hidden relative">
+      <LabCard className="rounded-2xl p-5 overflow-hidden relative" hover={false}>
         {/* subtle divider gradient + ambient */}
         <div
           aria-hidden
@@ -85,34 +90,34 @@ export default async function DashboardPage() {
               "radial-gradient(800px 240px at 20% 30%, rgba(34,197,94,0.10), transparent 55%), radial-gradient(600px 220px at 80% 20%, rgba(56,189,248,0.06), transparent 55%)",
           }}
         />
-        <div className="relative flex items-start justify-between gap-4">
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wide lab-muted">Dashboard</div>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white/95 leading-tight">
-              Training overview
-            </h1>
-
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <div className="text-sm lab-muted">
-                Logged in as <span className="text-white/80">{email}</span>
-              </div>
-
-              <div className="h-4 w-px bg-white/10" />
-
-              <div className="text-sm text-white/80">
-                System:{" "}
-                <span className="lab-muted">
-                  {sessions.length === 0
-                    ? "No recent training load detected."
-                    : `Last session: ${lastSessionAgo}d ago.`}
-                </span>
-              </div>
-            </div>
+            <SectionHeader
+              eyebrow="Dashboard"
+              title="Training overview"
+              as="h1"
+              subtitle={
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="text-sm lab-muted">
+                    Logged in as <span className="text-white/80">{email}</span>
+                  </div>
+                  <div className="h-4 w-px bg-white/10" />
+                  <div className="text-sm text-white/80">
+                    System:{" "}
+                    <span className="lab-muted">
+                      {sessions.length === 0
+                        ? "No recent training load detected."
+                        : `Last session: ${lastSessionAgo}d ago.`}
+                    </span>
+                  </div>
+                </div>
+              }
+            />
           </div>
 
           <DashboardActions />
         </div>
-      </header>
+      </LabCard>
 
       {/* TOP GRID */}
       <section className="grid gap-4 md:grid-cols-3">
@@ -127,18 +132,28 @@ export default async function DashboardPage() {
           progress={activeSession ? 62 : 12}
         />
 
-        <div className="lab-card lab-hover rounded-2xl p-5 flex items-center justify-between gap-4 hover:">
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wide lab-muted">Risk status</div>
-            <div className="mt-1 text-sm text-white/85">
-              {activeSession ? "Adaptive estimate" : "Baseline estimate"}
+        <MetricCard
+          eyebrow="Risk status"
+          title={activeSession ? "Adaptive estimate" : "Baseline estimate"}
+          subtitle={
+            sessions.length === 0
+              ? "No data yet, risk starts stable."
+              : "Computed from volume, RPE, recovery."
+          }
+          actions={
+            <StatusChip
+              label={activeSession ? "Adaptive" : "Baseline"}
+              tone={activeSession ? "accent" : "neutral"}
+            />
+          }
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-xs lab-muted">
+              {activeSession ? "Live updates while logging sets." : "Static estimate until a session starts."}
             </div>
-            <div className="mt-3 text-xs lab-muted">
-              {sessions.length === 0 ? "No data yet, risk starts stable." : "Computed from volume, RPE, recovery."}
-            </div>
+            <RiskMeter score={fakeRiskScore} />
           </div>
-          <RiskMeter score={fakeRiskScore} />
-        </div>
+        </MetricCard>
 
         <KpiCard
           title="Muscle heatmap"
@@ -162,7 +177,7 @@ export default async function DashboardPage() {
 
       {/* RECENT SESSIONS + RISK FEED (still placeholder) */}
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="lab-card lab-hover rounded-2xl p-5">
+        <LabCard className="rounded-2xl p-5">
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-white/90">Recent sessions</div>
             <div className="text-xs lab-muted">{sessions.length} shown</div>
@@ -176,12 +191,8 @@ export default async function DashboardPage() {
               </div>
               <div className="mt-3">
                 <a
-                  className="inline-flex rounded-xl bg-[rgba(34,197,94,0.92)] px-3 py-2 text-xs font-medium text-black"
+                  className="btn-primary text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
                   href="/workouts"
-                  style={{
-                    boxShadow:
-                      "0 0 0 1px rgba(34,197,94,0.25), 0 18px 55px rgba(34,197,94,0.10)",
-                  }}
                 >
                   Go to workouts
                 </a>
@@ -205,9 +216,9 @@ export default async function DashboardPage() {
               ))}
             </div>
           )}
-        </div>
+        </LabCard>
 
-        <div className="lab-card lab-hover rounded-2xl p-5 relative overflow-hidden">
+        <LabCard className="rounded-2xl p-5 relative overflow-hidden">
           {/* faint animated line hint (alive micro-indicator) */}
           <div
             aria-hidden
@@ -234,8 +245,8 @@ export default async function DashboardPage() {
               Quick test: log sets with high RPE or pain.
             </div>
           </div>
-        </div>
+        </LabCard>
       </section>
-    </div>
+    </PageShell>
   );
 }

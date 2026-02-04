@@ -1,23 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { signOut } from "next-auth/react";
 
 export default function DashboardActions() {
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      <Link
+        href="/workouts/new"
+        className="btn-primary text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
+      >
+        New workout
+      </Link>
       <button
         type="button"
         onClick={() => signOut({ callbackUrl: "/" })}
-        className={[
-          "group inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium",
-          "border-[rgba(239,68,68,0.28)] bg-[rgba(239,68,68,0.10)] text-white/90",
-          "hover:bg-[rgba(239,68,68,0.14)] hover:border-[rgba(239,68,68,0.40)]",
-          "transition",
-        ].join(" ")}
-        style={{
-          boxShadow:
-            "0 0 0 1px rgba(239,68,68,0.14), 0 18px 55px rgba(239,68,68,0.10)",
-        }}
+        className="btn-secondary text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
       >
         Sign out
       </button>
@@ -25,11 +23,7 @@ export default function DashboardActions() {
       <button
         type="button"
         onClick={() => alert("Switch user coming next")}
-        className={[
-          "inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm",
-          "border-white/10 bg-white/[0.03] text-white/70 hover:text-white/85 hover:bg-white/[0.06]",
-          "transition",
-        ].join(" ")}
+        className="btn-secondary text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
       >
         Switch user
       </button>

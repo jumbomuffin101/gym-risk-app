@@ -1,34 +1,15 @@
 import React from "react";
 
+import { LabCard } from "./components/LabCard";
+import { StatusChip } from "./components/StatusChip";
+
 type Tone = "safe" | "watch" | "danger" | "neutral";
 
-function toneStyles(tone: Tone) {
-  switch (tone) {
-    case "safe":
-      return {
-        chip: "border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.10)] text-[rgba(230,232,238,0.92)]",
-        dot: "bg-[var(--lab-safe)]",
-        micro: "text-[rgba(34,197,94,0.85)]",
-      };
-    case "watch":
-      return {
-        chip: "border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.10)] text-[rgba(230,232,238,0.92)]",
-        dot: "bg-[var(--lab-watch)]",
-        micro: "text-[rgba(245,158,11,0.88)]",
-      };
-    case "danger":
-      return {
-        chip: "border-[rgba(239,68,68,0.24)] bg-[rgba(239,68,68,0.10)] text-[rgba(230,232,238,0.92)]",
-        dot: "bg-[var(--lab-danger)]",
-        micro: "text-[rgba(239,68,68,0.88)]",
-      };
-    default:
-      return {
-        chip: "border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.04)] text-[rgba(230,232,238,0.90)]",
-        dot: "bg-[rgba(230,232,238,0.35)]",
-        micro: "text-[rgba(230,232,238,0.65)]",
-      };
-  }
+function microToneClass(tone: Tone) {
+  if (tone === "safe") return "text-[rgba(34,197,94,0.85)]";
+  if (tone === "watch") return "text-[rgba(245,158,11,0.88)]";
+  if (tone === "danger") return "text-[rgba(239,68,68,0.88)]";
+  return "text-[rgba(230,232,238,0.65)]";
 }
 
 export function KpiCard(props: {
@@ -43,14 +24,13 @@ export function KpiCard(props: {
 }) {
   const badge = props.badge ?? "";
   const badgeTone = props.badgeTone ?? "neutral";
-  const microTone = props.microTone ?? "neutral";
+  const microToneValue = props.microTone ?? "neutral";
   const p = Math.max(0, Math.min(100, props.progress ?? 0));
 
-  const b = toneStyles(badgeTone);
-  const m = toneStyles(microTone);
+  const microClass = microToneClass(microToneValue);
 
   return (
-    <div className="lab-card lab-hover rounded-2xl p-5">
+    <LabCard className="rounded-2xl p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs uppercase tracking-wide lab-muted">{props.title}</div>
@@ -58,10 +38,7 @@ export function KpiCard(props: {
         </div>
 
         {badge ? (
-          <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${b.chip}`}>
-            <span className={`h-2 w-2 rounded-full ${b.dot}`} />
-            {badge}
-          </span>
+          <StatusChip label={badge} tone={badgeTone} />
         ) : null}
       </div>
 
@@ -82,8 +59,8 @@ export function KpiCard(props: {
       </div>
 
       {props.micro ? (
-        <div className={`mt-3 text-xs ${m.micro}`}>{props.micro}</div>
+        <div className={`mt-3 text-xs ${microClass}`}>{props.micro}</div>
       ) : null}
-    </div>
+    </LabCard>
   );
 }
