@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -54,7 +55,14 @@ export default function Nav() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-black/10 backdrop-blur-md">
       <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="font-semibold tracking-tight text-white/90">
+        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-white/90">
+          <Image
+            src="/brand/gym-risk-icon-v2.svg"
+            alt="Gym-Risk logo"
+            width={30}
+            height={30}
+            className="h-[30px] w-[30px] object-contain"
+          />
           gym-risk
         </Link>
 
