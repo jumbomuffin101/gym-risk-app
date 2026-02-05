@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -8,10 +9,8 @@ type NavItem = { href: string; label: string; protected?: boolean; match?: "exac
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", protected: true, match: "exact" },
-  { href: "/exercises", label: "Exercises", protected: true, match: "exact" },
-  { href: "/workouts/new", label: "New Workout", protected: true, match: "exact" },
   { href: "/workouts", label: "Workouts", protected: true, match: "exact" },
-  { href: "/history", label: "History", protected: true, match: "exact" },
+  { href: "/workouts/new", label: "New Workout", protected: true, match: "exact" },
 ];
 
 function isActive(pathname: string, href: string, match: "exact" | "section" = "exact") {
@@ -39,7 +38,7 @@ function pillClass(active: boolean) {
 
 export default function Nav() {
   const pathname = usePathname();
-  const { status } = useSession();
+  const { status, data } = useSession();
   const isAuthed = status === "authenticated";
   const hideNav = pathname === "/signin" || pathname === "/signup";
 
@@ -51,14 +50,23 @@ export default function Nav() {
     return null;
   }
 
+  const initials = data?.user?.email?.slice(0, 1)?.toUpperCase() ?? "U";
+
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-black/10 backdrop-blur-md">
-      <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="font-semibold tracking-tight text-white/90">
-          gym-risk
+    <header className="sticky top-0 z-40 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)]/90 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+        <Link href="/" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90">
+          <Image
+            src="/brand/gym-risk-icon.svg"
+            alt="Gym-Risk"
+            width={120}
+            height={40}
+            className="h-6 w-6"
+          />
+          <span>Gym-Risk</span>
         </Link>
 
-        <nav className="flex gap-2 rounded-full border border-white/10 bg-white/[0.03] p-1">
+        <nav className="hidden items-center gap-2 rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-1 text-xs text-white/80 md:flex">
           {isAuthed ? (
             navItems.map((item) => {
               const active = isActive(pathname, item.href, item.match ?? "exact");
@@ -79,6 +87,21 @@ export default function Nav() {
             </>
           )}
         </nav>
+
+        <div className="flex items-center">
+          {isAuthed ? (
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/[0.06] hover:text-white"
+              aria-label="User menu"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold text-white/85">
+                {initials}
+              </span>
+              <span className="hidden sm:inline">Menu</span>
+            </button>
+          ) : null}
+        </div>
       </div>
     </header>
   );
