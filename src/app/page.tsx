@@ -15,6 +15,7 @@ import {
   Sparkles,
   Trophy,
 } from "lucide-react";
+import { BRAND_ICON_SRC } from "@/lib/brand";
 
 type PreviewMode = "balanced" | "overload";
 
@@ -337,6 +338,13 @@ export default function WelcomePage() {
       <header className="sticky top-0 z-40 -mx-6 mb-10 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] px-6 py-3">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90">
+            <Image
+              src={BRAND_ICON_SRC}
+              alt="Gym-Risk"
+              width={32}
+              height={32}
+              className="h-6 w-6 object-contain"
+            />
             Gym-Risk
           </Link>
           <nav className="hidden items-center gap-1 rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)] p-1 text-xs text-white/80 md:flex">
@@ -376,10 +384,10 @@ export default function WelcomePage() {
               <div>
                 <div className="mb-6 flex items-center gap-4">
                   <Image
-                    src="/brand/gym-risk-icon.svg"
+                    src={BRAND_ICON_SRC}
                     alt="gym-risk"
-                    width={520}
-                    height={200}
+                    width={240}
+                    height={240}
                     priority
                     className="h-auto w-[200px] md:w-[240px] opacity-95 object-contain"
                   />
