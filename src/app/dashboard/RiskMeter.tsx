@@ -32,7 +32,7 @@ export function RiskMeter({ score }: { score: number }) {
   return (
     <div className="flex items-center gap-4">
       <div
-        className="relative grid h-20 w-20 place-items-center rounded-full"
+        className="relative grid h-24 w-24 place-items-center rounded-full"
         style={{
           background: conic,
           boxShadow:
@@ -44,8 +44,8 @@ export function RiskMeter({ score }: { score: number }) {
           transition: "background 220ms ease, box-shadow 220ms ease",
         }}
       >
-        <div className="grid h-[74px] w-[74px] place-items-center rounded-full bg-[rgba(11,15,20,0.92)]">
-          <div className="text-xs font-semibold lab-num" style={{ color }}>
+        <div className="grid h-[86px] w-[86px] place-items-center rounded-full bg-[rgba(11,15,20,0.92)]">
+          <div className="text-base font-semibold tracking-tight lab-num" style={{ color }}>
             {s}
           </div>
         </div>

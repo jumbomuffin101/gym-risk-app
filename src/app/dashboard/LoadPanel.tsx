@@ -1,5 +1,8 @@
 import React from "react";
 
+import { MetricCard } from "./components/MetricCard";
+import { StatusChip } from "./components/StatusChip";
+
 export function LoadPanel({
   today,
   baseline,
@@ -20,54 +23,44 @@ export function LoadPanel({
       : tone === "watch"
       ? "var(--lab-watch)"
       : "var(--lab-safe)";
+  const activityOpacity = active ? 0.75 : 0.45;
 
   return (
-    <div className="lab-card lab-hover rounded-2xl p-5">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-wide lab-muted">
-            Load analytics
-          </div>
-          <div className="mt-1 text-sm text-[rgba(230,232,238,0.88)]">
-            Rolling 7-day load vs baseline with spike detection.
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-3 text-xs">
-            <span className="rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.03)] px-3 py-1 lab-muted">
-              Today: <span className="lab-num text-[rgba(230,232,238,0.92)]">{today.toLocaleString()}</span>
-            </span>
-            <span className="rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.03)] px-3 py-1 lab-muted">
-              Baseline: <span className="lab-num text-[rgba(230,232,238,0.92)]">{baseline.toLocaleString()}</span>
-            </span>
-            <span
-              className="rounded-full border px-3 py-1"
-              style={{
-                borderColor: "rgba(255,255,255,0.10)",
-                background: "rgba(255,255,255,0.03)",
-                color,
-              }}
-            >
-              {deltaPct >= 0 ? "+" : ""}
-              {deltaPct}% vs baseline
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs lab-muted">
-          <span
-            className="h-2 w-2 rounded-full"
-            style={{
-              background: color,
-              boxShadow: `0 0 18px ${color}`,
-              opacity: active ? 0.9 : 0.5,
-            }}
-          />
-          {tone === "danger"
-            ? "Spike flagged"
-            : tone === "watch"
-            ? "Watch zone"
-            : "Stable trend"}
-        </div>
+    <MetricCard
+      title="Load analytics"
+      subtitle="Rolling 7-day load vs baseline with spike detection."
+      actions={
+        <StatusChip
+          label={
+            tone === "danger"
+              ? "Spike flagged"
+              : tone === "watch"
+              ? "Watch zone"
+              : "Stable trend"
+          }
+          tone={tone}
+        />
+      }
+    >
+      <div className="flex flex-wrap gap-2 text-xs">
+        <StatusChip
+          label={`Today: ${today.toLocaleString()}`}
+          tone="neutral"
+          showDot={false}
+          className="lab-num text-[rgba(230,232,238,0.92)]"
+        />
+        <StatusChip
+          label={`Baseline: ${baseline.toLocaleString()}`}
+          tone="neutral"
+          showDot={false}
+          className="lab-num text-[rgba(230,232,238,0.92)]"
+        />
+        <StatusChip
+          label={`${deltaPct >= 0 ? "+" : ""}${deltaPct}% vs baseline`}
+          tone={tone}
+          showDot={false}
+          className="text-[rgba(230,232,238,0.92)]"
+        />
       </div>
 
       {/* Minimal chart placeholder that still feels analytical */}
@@ -96,7 +89,7 @@ export function LoadPanel({
                 style={{
                   background: color,
                   boxShadow: `0 0 20px ${color}`,
-                  opacity: 0.75,
+                  opacity: activityOpacity,
                 }}
               />
 
@@ -115,6 +108,6 @@ export function LoadPanel({
       <div className="mt-3 text-xs lab-muted">
         Charts will be wired to your real session/set data next — this panel is the dashboard shell.
       </div>
-    </div>
+    </MetricCard>
   );
 }

@@ -86,6 +86,11 @@ function useAnimatedNumber(value: number, reducedMotion: boolean) {
   const [display, setDisplay] = useState(value);
   const previous = useRef(value);
   const frameRef = useRef<number | null>(null);
+  const displayRef = useRef(display);
+
+  useEffect(() => {
+    displayRef.current = display;
+  }, [display]);
 
   useEffect(() => {
     // If reduced motion is on, skip animation work.
@@ -107,7 +112,21 @@ function useAnimatedNumber(value: number, reducedMotion: boolean) {
     }
 
     const start = previous.current;
-    if (start === value) return;
+    if (start === value) {
+      if (displayRef.current !== value) {
+        frameRef.current = requestAnimationFrame(() => {
+          setDisplay(value);
+          frameRef.current = null;
+        });
+      }
+      previous.current = value;
+      return () => {
+        if (frameRef.current !== null) {
+          cancelAnimationFrame(frameRef.current);
+          frameRef.current = null;
+        }
+      };
+    }
 
     const diff = value - start;
     const duration = 420;
@@ -269,7 +288,6 @@ export default function WelcomePage() {
       {
         title: "Pain notes",
         description: "Track discomfort patterns without losing training context over time.",
-        description: "Effort plus recovery signals combined.",
       },
     ],
     []
@@ -373,7 +391,7 @@ export default function WelcomePage() {
               <div>
                 <div className="mb-6 flex items-center gap-4">
                   <Image
-                    src="/brand/gym-risk-icon.png"
+                    src="/brand/gym-risk-icon-v2.svg"
                     alt="Gym-Risk logo"
                     width={48}
                     height={48}

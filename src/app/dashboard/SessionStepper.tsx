@@ -3,6 +3,8 @@
 import Link from "next/link";
 import React from "react";
 
+import { LabCard } from "./components/LabCard";
+
 type Step = 1 | 2 | 3;
 
 function StepPill({
@@ -12,7 +14,8 @@ function StepPill({
   label: string;
   state: "active" | "done" | "next" | "locked";
 }) {
-  const base = "flex items-center justify-between gap-3 rounded-xl border px-4 py-3";
+  const base =
+    "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]";
 
   const styles =
     state === "active"
@@ -49,7 +52,7 @@ export function SessionStepper({ active }: { active: boolean }) {
   const current: Step = active ? 2 : 1;
 
   return (
-    <div className="lab-card lab-hover rounded-2xl p-5">
+    <LabCard className="rounded-2xl p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs uppercase tracking-wide lab-muted">Session flow</div>
@@ -59,7 +62,7 @@ export function SessionStepper({ active }: { active: boolean }) {
         </div>
 
         <Link
-          className="rounded-lg border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-xs lab-muted hover:bg-[rgba(255,255,255,0.05)]"
+          className="btn-secondary text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
           href="/workouts"
         >
           Open workouts
@@ -90,6 +93,6 @@ export function SessionStepper({ active }: { active: boolean }) {
           <>Start a session to enable live risk tracking and heatmap updates.</>
         )}
       </div>
-    </div>
+    </LabCard>
   );
 }
