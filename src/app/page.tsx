@@ -376,7 +376,7 @@ export default function WelcomePage() {
               <div>
                 <div className="mb-6 flex items-center gap-4">
                   <Image
-                    src="/brand/gym-risk-icon.svg"
+                    src="/brand/gym-risk-icon.png"
                     alt="gym-risk"
                     width={520}
                     height={200}
