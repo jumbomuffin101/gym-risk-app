@@ -385,11 +385,11 @@ export default function WelcomePage() {
                 <div className="mb-6 flex items-center gap-4">
                   <Image
                     src={BRAND_ICON_SRC}
-                    alt="gym-risk"
-                    width={240}
-                    height={240}
+                    alt="Gym-Risk logo"
+                    width={48}
+                    height={48}
                     priority
-                    className="h-auto w-[200px] md:w-[240px] opacity-95 object-contain"
+                    className="h-11 w-11 md:h-12 md:w-12 object-contain opacity-95"
                   />
                   <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
                     Athlete-grade
