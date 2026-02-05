@@ -389,7 +389,7 @@ export default function WelcomePage() {
                     width={48}
                     height={48}
                     priority
-                    className="h-11 w-11 md:h-12 md:w-12 object-contain opacity-95"
+                    className="h-11 w-11 md:h-12 md:w-12 object-contain"
                   />
                   <span className="rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
                     Athlete-grade
