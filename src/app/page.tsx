@@ -88,7 +88,9 @@ function useAnimatedNumber(value: number, reducedMotion: boolean) {
   const frameRef = useRef<number | null>(null);
   const displayRef = useRef(display);
 
-  displayRef.current = display;
+  useEffect(() => {
+    displayRef.current = display;
+  }, [display]);
 
   useEffect(() => {
     // If reduced motion is on, skip animation work.
@@ -389,7 +391,7 @@ export default function WelcomePage() {
               <div>
                 <div className="mb-6 flex items-center gap-4">
                   <Image
-                    src="/brand/gym-risk-icon.png"
+                    src="/brand/gym-risk-icon-v2.svg"
                     alt="Gym-Risk logo"
                     width={48}
                     height={48}
