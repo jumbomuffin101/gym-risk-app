@@ -41,31 +41,34 @@ export async function endWorkoutSessionAction(formData: FormData) {
   redirect("/workouts");
 }
 
-const optionalNumber = (schema: z.ZodTypeAny) =>
-  z.preprocess((value) => (value === "" || value === null ? undefined : value), schema.optional());
-
 const CreateSetSchema = z.object({
   exerciseId: z.string().min(1),
   reps: z.coerce.number().int().min(1),
   weight: z.coerce.number().min(0),
-  rpe: optionalNumber(z.coerce.number().min(1).max(10)),
-  pain: optionalNumber(z.coerce.number().int().min(0).max(10)),
 });
+
+function parseOptionalNumber(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
 export async function createSetEntryAction(formData: FormData) {
   const parsed = CreateSetSchema.safeParse({
     exerciseId: formData.get("exerciseId"),
     reps: formData.get("reps"),
     weight: formData.get("weight"),
-    rpe: formData.get("rpe"),
-    pain: formData.get("pain"),
   });
 
   if (!parsed.success) {
     return { ok: false as const, error: parsed.error.issues.map(i => i.message).join(", ") };
   }
 
-  const { exerciseId, reps, weight, rpe, pain } = parsed.data;
+  const { exerciseId, reps, weight } = parsed.data;
+  const rpe = parseOptionalNumber(formData.get("rpe"));
+  const pain = parseOptionalNumber(formData.get("pain"));
 
   // Ensure we have a real DB user
   const userId = await getOrCreateDbUserId();
