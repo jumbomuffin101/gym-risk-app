@@ -85,9 +85,9 @@ export default async function DashboardPage() {
               "radial-gradient(800px 240px at 20% 30%, rgba(34,197,94,0.10), transparent 55%), radial-gradient(600px 220px at 80% 20%, rgba(56,189,248,0.06), transparent 55%)",
           }}
         />
-        <div className="relative flex items-start justify-between gap-4">
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wide lab-muted">Dashboard</div>
+            <div className="lab-eyebrow">Dashboard</div>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white/95 leading-tight">
               Training overview
             </h1>
@@ -127,9 +127,9 @@ export default async function DashboardPage() {
           progress={activeSession ? 62 : 12}
         />
 
-        <div className="lab-card lab-hover rounded-2xl p-5 flex items-center justify-between gap-4 hover:">
+        <div className="lab-card lab-hover h-full rounded-2xl p-5 flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wide lab-muted">Risk status</div>
+            <div className="lab-eyebrow">Risk status</div>
             <div className="mt-1 text-sm text-white/85">
               {activeSession ? "Adaptive estimate" : "Baseline estimate"}
             </div>
@@ -164,24 +164,20 @@ export default async function DashboardPage() {
       <section className="grid gap-4 md:grid-cols-2">
         <div className="lab-card lab-hover rounded-2xl p-5">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-white/90">Recent sessions</div>
+            <div className="lab-section-title">Recent sessions</div>
             <div className="text-xs lab-muted">{sessions.length} shown</div>
           </div>
 
           {sessions.length === 0 ? (
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="mt-4 rounded-2xl p-4 lab-panel">
               <div className="text-sm text-white/85">No sessions yet</div>
               <div className="mt-1 text-xs lab-muted">
                 Start a workout and log sets to populate your dashboard.
               </div>
               <div className="mt-3">
                 <a
-                  className="inline-flex rounded-xl bg-[rgba(34,197,94,0.92)] px-3 py-2 text-xs font-medium text-black"
+                  className="lab-button lab-button--primary lab-button--sm"
                   href="/workouts"
-                  style={{
-                    boxShadow:
-                      "0 0 0 1px rgba(34,197,94,0.25), 0 18px 55px rgba(34,197,94,0.10)",
-                  }}
                 >
                   Go to workouts
                 </a>
@@ -192,7 +188,7 @@ export default async function DashboardPage() {
               {sessions.map((s) => (
                 <div
                   key={s.id}
-                  className="rounded-xl border border-white/10 bg-white/[0.02] p-3 hover:bg-white/[0.03] transition"
+                  className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 transition hover:bg-white/[0.04]"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-medium text-white/90">
@@ -220,11 +216,11 @@ export default async function DashboardPage() {
           />
 
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-white/90">Risk feed</div>
+            <div className="lab-section-title">Risk feed</div>
             <div className="text-xs lab-muted">v0</div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="mt-4 rounded-2xl p-4 lab-panel">
             <div className="text-sm text-white/85">No risk events yet</div>
             <div className="mt-1 text-xs lab-muted">
               Status: <span className="text-white/75">Last spike: 3 days ago</span>

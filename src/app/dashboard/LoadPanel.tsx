@@ -21,32 +21,30 @@ export function LoadPanel({
       ? "var(--lab-watch)"
       : "var(--lab-safe)";
 
+  const toneChip =
+    tone === "danger"
+      ? "lab-chip--danger"
+      : tone === "watch"
+      ? "lab-chip--watch"
+      : "lab-chip--safe";
+
   return (
-    <div className="lab-card lab-hover rounded-2xl p-5">
+    <div className="lab-card lab-hover h-full rounded-2xl p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <div className="text-xs uppercase tracking-wide lab-muted">
-            Load analytics
-          </div>
+          <div className="lab-eyebrow">Load analytics</div>
           <div className="mt-1 text-sm text-[rgba(230,232,238,0.88)]">
             Rolling 7-day load vs baseline with spike detection.
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3 text-xs">
-            <span className="rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.03)] px-3 py-1 lab-muted">
+            <span className="lab-chip lab-chip--neutral">
               Today: <span className="lab-num text-[rgba(230,232,238,0.92)]">{today.toLocaleString()}</span>
             </span>
-            <span className="rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.03)] px-3 py-1 lab-muted">
+            <span className="lab-chip lab-chip--neutral">
               Baseline: <span className="lab-num text-[rgba(230,232,238,0.92)]">{baseline.toLocaleString()}</span>
             </span>
-            <span
-              className="rounded-full border px-3 py-1"
-              style={{
-                borderColor: "rgba(255,255,255,0.10)",
-                background: "rgba(255,255,255,0.03)",
-                color,
-              }}
-            >
+            <span className={`lab-chip ${toneChip}`} style={{ color }}>
               {deltaPct >= 0 ? "+" : ""}
               {deltaPct}% vs baseline
             </span>
@@ -71,7 +69,7 @@ export function LoadPanel({
       </div>
 
       {/* Minimal chart placeholder that still feels analytical */}
-      <div className="mt-5 overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[rgba(15,21,32,0.6)]">
+      <div className="mt-5 overflow-hidden rounded-2xl lab-panel">
         <div className="p-4">
           <div className="flex items-center justify-between text-xs lab-muted">
             <span>7-day rolling</span>

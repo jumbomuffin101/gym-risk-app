@@ -12,7 +12,7 @@ function StepPill({
   label: string;
   state: "active" | "done" | "next" | "locked";
 }) {
-  const base = "flex items-center justify-between gap-3 rounded-xl border px-4 py-3";
+  const base = "flex items-center justify-between gap-3 rounded-2xl border px-4 py-3";
 
   const styles =
     state === "active"
@@ -49,17 +49,17 @@ export function SessionStepper({ active }: { active: boolean }) {
   const current: Step = active ? 2 : 1;
 
   return (
-    <div className="lab-card lab-hover rounded-2xl p-5">
+    <div className="lab-card lab-hover h-full rounded-2xl p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide lab-muted">Session flow</div>
+          <div className="lab-eyebrow">Session flow</div>
           <div className="mt-1 text-sm text-[rgba(230,232,238,0.88)]">
             A guided pipeline that highlights what matters now.
           </div>
         </div>
 
         <Link
-          className="rounded-lg border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-xs lab-muted hover:bg-[rgba(255,255,255,0.05)]"
+          className="lab-button lab-button--ghost lab-button--sm"
           href="/workouts"
         >
           Open workouts

@@ -145,25 +145,31 @@ export function MuscleHeatmap({ risk, active }: { risk: RiskMap; active: boolean
     <div className="lab-card lab-hover rounded-2xl p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide lab-muted">Muscle risk heatmap</div>
+          <div className="lab-eyebrow">Muscle risk heatmap</div>
           <div className="mt-1 text-sm text-[rgba(230,232,238,0.88)]">
             Click a zone to see <span className="text-[rgba(230,232,238,0.96)]">why</span> it’s elevated.
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs lab-muted">
-          <span className="h-2 w-2 rounded-full bg-[var(--lab-safe)]" />
-          Stable
-          <span className="ml-3 h-2 w-2 rounded-full bg-[var(--lab-watch)]" />
-          Watch
-          <span className="ml-3 h-2 w-2 rounded-full bg-[var(--lab-danger)]" />
-          Elevated
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="lab-chip lab-chip--safe">
+            <span className="lab-chip-dot bg-[var(--lab-safe)]" />
+            Stable
+          </span>
+          <span className="lab-chip lab-chip--watch">
+            <span className="lab-chip-dot bg-[var(--lab-watch)]" />
+            Watch
+          </span>
+          <span className="lab-chip lab-chip--danger">
+            <span className="lab-chip-dot bg-[var(--lab-danger)]" />
+            Elevated
+          </span>
         </div>
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {/* Heatmap surface */}
-        <div className="relative overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[rgba(15,21,32,0.6)] p-4">
+        <div className="relative overflow-hidden rounded-2xl p-4 lab-panel">
           <div className="mb-3 flex items-center justify-between text-xs lab-muted">
             <span>Body zones</span>
             <span className="lab-num">explainable signals</span>
@@ -189,23 +195,16 @@ export function MuscleHeatmap({ risk, active }: { risk: RiskMap; active: boolean
         </div>
 
         {/* Explainability panel */}
-        <div className="rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[rgba(15,21,32,0.6)] p-4">
+        <div className="rounded-2xl p-4 lab-panel">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-xs uppercase tracking-wide lab-muted">Explainable risk</div>
+              <div className="lab-eyebrow">Explainable risk</div>
               <div className="mt-1 text-lg font-semibold tracking-tight" style={{ color: selectedColor }}>
                 {panel.title} — {levelLabel(selectedLevel)}
               </div>
             </div>
 
-            <span
-              className="rounded-full border px-3 py-1 text-xs"
-              style={{
-                borderColor: "rgba(255,255,255,0.10)",
-                background: "rgba(255,255,255,0.03)",
-                color: selectedColor,
-              }}
-            >
+            <span className="lab-chip lab-chip--neutral" style={{ color: selectedColor }}>
               {selected.replace(/([A-Z])/g, " $1")}
             </span>
           </div>

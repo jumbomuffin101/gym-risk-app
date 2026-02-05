@@ -6,25 +6,25 @@ function toneStyles(tone: Tone) {
   switch (tone) {
     case "safe":
       return {
-        chip: "border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.10)] text-[rgba(230,232,238,0.92)]",
+        chip: "lab-chip--safe",
         dot: "bg-[var(--lab-safe)]",
         micro: "text-[rgba(34,197,94,0.85)]",
       };
     case "watch":
       return {
-        chip: "border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.10)] text-[rgba(230,232,238,0.92)]",
+        chip: "lab-chip--watch",
         dot: "bg-[var(--lab-watch)]",
         micro: "text-[rgba(245,158,11,0.88)]",
       };
     case "danger":
       return {
-        chip: "border-[rgba(239,68,68,0.24)] bg-[rgba(239,68,68,0.10)] text-[rgba(230,232,238,0.92)]",
+        chip: "lab-chip--danger",
         dot: "bg-[var(--lab-danger)]",
         micro: "text-[rgba(239,68,68,0.88)]",
       };
     default:
       return {
-        chip: "border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.04)] text-[rgba(230,232,238,0.90)]",
+        chip: "lab-chip--neutral",
         dot: "bg-[rgba(230,232,238,0.35)]",
         micro: "text-[rgba(230,232,238,0.65)]",
       };
@@ -50,16 +50,16 @@ export function KpiCard(props: {
   const m = toneStyles(microTone);
 
   return (
-    <div className="lab-card lab-hover rounded-2xl p-5">
+    <div className="lab-card lab-hover h-full rounded-2xl p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide lab-muted">{props.title}</div>
+          <div className="lab-eyebrow">{props.title}</div>
           <div className="mt-2 text-3xl font-semibold lab-num">{props.value}</div>
         </div>
 
         {badge ? (
-          <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${b.chip}`}>
-            <span className={`h-2 w-2 rounded-full ${b.dot}`} />
+          <span className={`lab-chip ${b.chip}`}>
+            <span className={`lab-chip-dot ${b.dot}`} />
             {badge}
           </span>
         ) : null}

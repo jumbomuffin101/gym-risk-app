@@ -276,6 +276,124 @@ body {
   letter-spacing: -0.02em;
 }
 
+.lab-eyebrow {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lab-muted);
+}
+
+.lab-section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(230, 232, 238, 0.92);
+}
+
+.lab-panel {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(15,21,32,0.6);
+  border-radius: 1rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.lab-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.03);
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  color: rgba(230,232,238,0.88);
+}
+
+.lab-chip-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 9999px;
+}
+
+.lab-chip--safe {
+  border-color: var(--lab-safe-28);
+  background: var(--lab-safe-10);
+  color: rgba(230,232,238,0.92);
+}
+
+.lab-chip--watch {
+  border-color: rgba(245,158,11,0.25);
+  background: rgba(245,158,11,0.10);
+  color: rgba(230,232,238,0.92);
+}
+
+.lab-chip--danger {
+  border-color: rgba(239,68,68,0.24);
+  background: rgba(239,68,68,0.10);
+  color: rgba(230,232,238,0.92);
+}
+
+.lab-chip--neutral {
+  border-color: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.03);
+  color: rgba(230,232,238,0.82);
+}
+
+.lab-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.85rem;
+  border: 1px solid transparent;
+  padding: 0.55rem 0.95rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: transform 150ms ease, box-shadow 200ms ease, background 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+.lab-button--sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.lab-button--primary {
+  background: rgba(34,197,94,0.92);
+  color: #070b12;
+  border-color: rgba(34,197,94,0.35);
+  box-shadow: var(--lab-cta-shadow);
+}
+
+.lab-button--primary:hover {
+  background: rgba(34,197,94,0.98);
+  box-shadow: 0 0 0 1px rgba(34,197,94,0.32), 0 22px 60px rgba(34,197,94,0.2);
+}
+
+.lab-button--ghost {
+  border-color: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.03);
+  color: rgba(230,232,238,0.82);
+}
+
+.lab-button--ghost:hover {
+  background: rgba(255,255,255,0.06);
+  color: rgba(230,232,238,0.94);
+}
+
+.lab-button--danger {
+  border-color: rgba(239,68,68,0.30);
+  background: rgba(239,68,68,0.12);
+  color: rgba(255,255,255,0.92);
+  box-shadow: 0 0 0 1px rgba(239,68,68,0.16), 0 18px 55px rgba(239,68,68,0.12);
+}
+
+.lab-button--danger:hover {
+  background: rgba(239,68,68,0.16);
+  border-color: rgba(239,68,68,0.45);
+}
+
 /* Thin divider */
 .lab-divider {
   height: 1px;

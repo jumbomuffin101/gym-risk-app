@@ -37,6 +37,13 @@ function pillClass(active: boolean) {
   ].join(" ");
 }
 
+function navItemClass(active: boolean, isPrimary: boolean) {
+  if (isPrimary) {
+    return `lab-button lab-button--primary lab-button--sm ${active ? "" : "opacity-95"}`;
+  }
+  return pillClass(active);
+}
+
 export default function Nav() {
   const pathname = usePathname();
   const { status } = useSession();
@@ -53,17 +60,18 @@ export default function Nav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-black/10 backdrop-blur-md">
-      <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
         <Link href="/" className="font-semibold tracking-tight text-white/90">
           gym-risk
         </Link>
 
-        <nav className="flex gap-2 rounded-full border border-white/10 bg-white/[0.03] p-1">
+        <nav className="flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] p-1">
           {isAuthed ? (
             navItems.map((item) => {
               const active = isActive(pathname, item.href, item.match ?? "exact");
+              const isPrimary = item.href === "/workouts/new";
               return (
-                <Link key={item.href} href={item.href} className={pillClass(active)}>
+                <Link key={item.href} href={item.href} className={navItemClass(active, isPrimary)}>
                   {item.label}
                 </Link>
               );
