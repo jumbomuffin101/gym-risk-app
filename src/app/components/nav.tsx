@@ -58,11 +58,11 @@ export default function Nav() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90">
           <Image
-            src="/brand/gym-risk-icon.png"
+            src="/brand/gym-risk-icon.svg"
             alt="Gym-Risk"
-            width={64}
-            height={64}
-            className="h-6 w-6 object-contain"
+            width={120}
+            height={40}
+            className="h-6 w-6"
           />
           <span>Gym-Risk</span>
         </Link>
