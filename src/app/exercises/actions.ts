@@ -2,6 +2,7 @@
 
 import { prisma } from "@/app/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getOrCreateDbUserId } from "@/app/lib/auth/getUserId";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
@@ -40,11 +41,15 @@ export async function endWorkoutSessionAction(formData: FormData) {
   redirect("/workouts");
 }
 
+const optionalNumber = (schema: z.ZodTypeAny) =>
+  z.preprocess((value) => (value === "" || value === null ? undefined : value), schema.optional());
+
 const CreateSetSchema = z.object({
   exerciseId: z.string().min(1),
   reps: z.coerce.number().int().min(1),
   weight: z.coerce.number().min(0),
-  rpe: z.coerce.number().min(1).max(10).optional().or(z.nan().transform(() => undefined)),
+  rpe: optionalNumber(z.coerce.number().min(1).max(10)),
+  pain: optionalNumber(z.coerce.number().int().min(0).max(10)),
 });
 
 export async function createSetEntryAction(formData: FormData) {
@@ -53,13 +58,14 @@ export async function createSetEntryAction(formData: FormData) {
     reps: formData.get("reps"),
     weight: formData.get("weight"),
     rpe: formData.get("rpe"),
+    pain: formData.get("pain"),
   });
 
   if (!parsed.success) {
     return { ok: false as const, error: parsed.error.issues.map(i => i.message).join(", ") };
   }
 
-  const { exerciseId, reps, weight, rpe } = parsed.data;
+  const { exerciseId, reps, weight, rpe, pain } = parsed.data;
 
   // Ensure we have a real DB user
   const userId = await getOrCreateDbUserId();
@@ -80,7 +86,7 @@ export async function createSetEntryAction(formData: FormData) {
       reps,
       weight,
       rpe: rpe ?? null,
-      pain: null,
+      pain: pain ?? null,
     },
   });
 
@@ -91,4 +97,39 @@ export async function createSetEntryAction(formData: FormData) {
   revalidatePath("/history");
 
   return { ok: true as const, volume, risk: 0, label: "Logged" };
+}
+
+const CreateExerciseSchema = z.object({
+  name: z.string().min(2),
+  category: z.string().optional(),
+});
+
+export async function createExerciseAction(formData: FormData) {
+  const parsed = CreateExerciseSchema.safeParse({
+    name: formData.get("name"),
+    category: formData.get("category"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false as const, error: parsed.error.issues.map((i) => i.message).join(", ") };
+  }
+
+  try {
+    await prisma.exercise.create({
+      data: {
+        name: parsed.data.name.trim(),
+        category: parsed.data.category?.trim() || null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { ok: false as const, error: "Exercise already exists." };
+    }
+    return { ok: false as const, error: "Unable to create exercise." };
+  }
+
+  revalidatePath("/exercises");
+  revalidatePath("/dashboard");
+
+  return { ok: true as const };
 }
