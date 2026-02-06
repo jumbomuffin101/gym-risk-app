@@ -64,7 +64,7 @@ export async function createSetEntryAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    return { ok: false as const, error: parsed.error.issues.map(i => i.message).join(", ") };
+    return { ok: false as const, error: parsed.error.issues.map((issue) => issue.message).join(", ") };
   }
 
   const { exerciseId, reps, weight } = parsed.data;

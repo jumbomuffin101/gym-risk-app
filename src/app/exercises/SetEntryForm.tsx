@@ -1,10 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createSetEntryAction } from "./actions";
-type CreateSetEntryResult =
-  | { ok: true; volume: number; risk: number; label: string }
-  | { ok: false; error: string };
+import { createSetEntryAction, type CreateSetEntryResult } from "./actions";
 
 export default function SetEntryForm({ exerciseId }: { exerciseId: string }) {
   const [pending, startTransition] = useTransition();
@@ -24,7 +21,6 @@ export default function SetEntryForm({ exerciseId }: { exerciseId: string }) {
 
         startTransition(async () => {
           const res = (await createSetEntryAction(fd)) as CreateSetEntryResult;
-
 
           if (!res.ok) {
             setError(res.error ?? "Something went wrong.");
