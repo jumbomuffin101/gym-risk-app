@@ -3,6 +3,9 @@ import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import ExerciseLibrary from "./ExerciseLibrary";
 import { BRAND_ICON_SRC } from "@/lib/brand";
+import { prisma } from "@/app/lib/prisma";
+import { requireDbUserId } from "@/app/lib/auth/requireUser";
+import ExerciseLibrary from "@/app/exercises/ExerciseLibrary";
 
 export const runtime = "nodejs";
 
@@ -53,6 +56,16 @@ export default async function ExercisesPage() {
         }))}
         categories={categories}
       />
+        <div className="text-xs uppercase tracking-wide lab-muted">Exercises</div>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/95">
+          Exercise library
+        </h1>
+        <p className="mt-1 text-sm lab-muted">
+          Search, filter, and open an exercise to log sets.
+        </p>
+      </header>
+
+      <ExerciseLibrary exercises={exercises} />
     </div>
   );
 }
