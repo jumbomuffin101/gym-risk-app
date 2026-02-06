@@ -1,10 +1,12 @@
 // src/app/dashboard/page.tsx
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/app/lib/auth/authOptions";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
+import { BRAND_ICON_SRC } from "@/lib/brand";
 import { computeSessionRisk } from "@/app/lib/riskEngine";
 import QuickLogPanel from "@/app/dashboard/QuickLogPanel";
 import Link from "next/link";
@@ -138,10 +140,19 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 pb-10 pt-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="flex items-center gap-3">
+          <Image
+            src={BRAND_ICON_SRC}
+            alt="Gym-Risk"
+            width={32}
+            height={32}
+            className="h-8 w-8 object-contain"
+          />
+          <div>
           <div className="text-xs uppercase tracking-wide lab-muted">Dashboard</div>
           <div className="mt-1 text-2xl font-semibold tracking-tight text-white/95">
             Training overview
+          </div>
           </div>
         </div>
         <div className="flex items-center gap-3">

@@ -11,7 +11,7 @@ export default async function ExerciseDetailPage({
 }: {
   params: { id: string };
 }) {
-  await requireDbUserId();
+  const userId = await requireDbUserId();
 
   const id = params.id?.trim();
   if (!id) return notFound();
@@ -22,7 +22,6 @@ export default async function ExerciseDetailPage({
       id: true,
       name: true,
       category: true,
-      _count: { select: { sets: true } },
     },
   });
 
@@ -43,7 +42,7 @@ export default async function ExerciseDetailPage({
           {ex.name}
         </h1>
         <p className="mt-1 text-sm lab-muted">
-          {ex.category ?? "Uncategorized"} • {ex._count.sets} sets logged
+          {ex.category ?? "Uncategorized"} • {setCount} sets logged
         </p>
       </header>
 

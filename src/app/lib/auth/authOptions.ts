@@ -3,8 +3,6 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { prisma } from "@/app/lib/prisma";
 
-type TokenWithSub = { sub?: string };
-
 export const authOptions: NextAuthOptions = {
   providers: [
     Credentials({

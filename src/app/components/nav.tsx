@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { BRAND_ICON_SRC } from "@/lib/brand";
 
 type NavItem = { href: string; label: string; protected?: boolean; match?: "exact" | "section" };
 
@@ -58,11 +59,11 @@ export default function Nav() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90">
           <Image
-            src="/brand/gym-risk-icon.svg"
+            src={BRAND_ICON_SRC}
             alt="Gym-Risk"
-            width={120}
-            height={40}
-            className="h-6 w-6"
+            width={32}
+            height={32}
+            className="h-6 w-6 object-contain"
           />
           <span>Gym-Risk</span>
         </Link>
