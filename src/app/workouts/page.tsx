@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import { startWorkoutSession, endWorkoutSessionAction } from "@/app/exercises/actions";
@@ -50,8 +51,14 @@ export default async function WorkoutPage() {
               Next move
             </div>
             <div className="mt-1 text-sm text-white/80">
-              Open an exercise and log sets to drive risk signals.
+              Open an exercise from the library to log sets and drive risk signals.
             </div>
+            <Link
+              href="/exercises"
+              className="mt-3 inline-flex rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/[0.08]"
+            >
+              Open exercise library
+            </Link>
           </div>
         </div>
       ) : (

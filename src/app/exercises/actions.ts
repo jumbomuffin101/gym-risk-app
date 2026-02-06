@@ -6,8 +6,9 @@ import { z } from "zod";
 import { getOrCreateDbUserId } from "@/app/lib/auth/getUserId";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import { redirect } from "next/navigation";
+import { computeSetRisk } from "@/app/lib/risk";
 
-export async function startWorkoutSession(_formData: FormData) {
+export async function startWorkoutSession() {
   const userId = await getOrCreateDbUserId();
 
   const existing = await getActiveWorkoutSession(userId);
@@ -47,6 +48,10 @@ const CreateSetSchema = z.object({
   rpe: z.coerce.number().min(1).max(10).optional().or(z.nan().transform(() => undefined)),
 });
 
+export type CreateSetEntryResult =
+  | { ok: true; volume: number; risk: number; label: string }
+  | { ok: false; error: string };
+
 export async function createSetEntryAction(formData: FormData) {
   const parsed = CreateSetSchema.safeParse({
     exerciseId: formData.get("exerciseId"),
@@ -56,7 +61,7 @@ export async function createSetEntryAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    return { ok: false as const, error: parsed.error.issues.map(i => i.message).join(", ") };
+    return { ok: false as const, error: parsed.error.issues.map((issue) => issue.message).join(", ") };
   }
 
   const { exerciseId, reps, weight, rpe } = parsed.data;
@@ -71,6 +76,7 @@ export async function createSetEntryAction(formData: FormData) {
   }
 
   const volume = reps * weight;
+  const { risk, label } = computeSetRisk({ reps, weight, rpe });
 
   await prisma.setEntry.create({
     data: {
@@ -90,5 +96,43 @@ export async function createSetEntryAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/history");
 
-  return { ok: true as const, volume, risk: 0, label: "Logged" };
+  return { ok: true as const, volume, risk, label };
+}
+
+const CreateExerciseSchema = z.object({
+  name: z.string().min(2),
+  category: z.string().optional().or(z.literal("")),
+});
+
+export async function createExerciseAction(formData: FormData) {
+  const parsed = CreateExerciseSchema.safeParse({
+    name: formData.get("name"),
+    category: formData.get("category"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false as const, error: parsed.error.issues.map((issue) => issue.message).join(", ") };
+  }
+
+  const { name, category } = parsed.data;
+  await getOrCreateDbUserId();
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    return { ok: false as const, error: "Exercise name is required." };
+  }
+
+  const existing = await prisma.exercise.findUnique({ where: { name: trimmedName } });
+  if (existing) {
+    return { ok: false as const, error: "Exercise already exists." };
+  }
+
+  await prisma.exercise.create({
+    data: { name: trimmedName, category: category?.trim() || null },
+  });
+
+  revalidatePath("/exercises");
+  revalidatePath("/workouts");
+
+  return { ok: true as const };
 }
