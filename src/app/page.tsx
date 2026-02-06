@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -314,7 +314,7 @@ export default function WelcomePage() {
 
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  const handleModeKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, next: PreviewMode) => {
+  const handleModeKeyDown = (event: KeyboardEvent<HTMLButtonElement>, next: PreviewMode) => {
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
       event.preventDefault();
       setMode(next);
