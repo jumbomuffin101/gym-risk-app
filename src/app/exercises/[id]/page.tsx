@@ -27,8 +27,12 @@ export default async function ExerciseDetailPage({
 
   if (!ex) return notFound();
 
+  const setCount = await prisma.setEntry.count({
+    where: { exerciseId: ex.id, userId },
+  });
+
   const recentSets = await prisma.setEntry.findMany({
-    where: { exerciseId: ex.id },
+    where: { exerciseId: ex.id, userId },
     orderBy: { performedAt: "desc" },
     take: 6,
     select: { id: true, performedAt: true, reps: true, weight: true, rpe: true, pain: true },
