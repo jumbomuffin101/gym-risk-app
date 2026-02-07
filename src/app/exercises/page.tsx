@@ -1,10 +1,7 @@
 import Image from "next/image";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
-import ExerciseLibrary from "./ExerciseLibrary";
 import { BRAND_ICON_SRC } from "@/lib/brand";
-import { prisma } from "@/app/lib/prisma";
-import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import ExerciseLibrary from "@/app/exercises/ExerciseLibrary";
 
 export const runtime = "nodejs";
@@ -24,9 +21,6 @@ export default async function ExercisesPage() {
   });
 
   const countMap = new Map(counts.map((count) => [count.exerciseId, count._count._all]));
-  const categories = Array.from(
-    new Set(exercises.map((exercise) => exercise.category).filter((category): category is string => !!category))
-  ).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 pb-10 pt-6">
@@ -52,20 +46,9 @@ export default async function ExercisesPage() {
       <ExerciseLibrary
         exercises={exercises.map((exercise) => ({
           ...exercise,
-          setCount: countMap.get(exercise.id) ?? 0,
+          _count: { sets: countMap.get(exercise.id) ?? 0 },
         }))}
-        categories={categories}
       />
-        <div className="text-xs uppercase tracking-wide lab-muted">Exercises</div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/95">
-          Exercise library
-        </h1>
-        <p className="mt-1 text-sm lab-muted">
-          Search, filter, and open an exercise to log sets.
-        </p>
-      </header>
-
-      <ExerciseLibrary exercises={exercises} />
     </div>
   );
 }

@@ -170,6 +170,7 @@ export default async function DashboardPage() {
             Start workout
           </Link>
         </div>
+      </header>
 
       {!hasAnySets ? (
         <div className="lab-card rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">

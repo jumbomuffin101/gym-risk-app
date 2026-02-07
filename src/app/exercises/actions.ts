@@ -48,6 +48,10 @@ const CreateSetSchema = z.object({
   weight: z.coerce.number().min(0),
 });
 
+export type CreateSetEntryResult =
+  | { ok: true; volume: number; risk: number; label: string }
+  | { ok: false; error: string };
+
 function parseOptionalNumber(value: FormDataEntryValue | null) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -138,41 +142,6 @@ export async function createExerciseAction(formData: FormData) {
 
   revalidatePath("/exercises");
   revalidatePath("/workouts");
-
-  return { ok: true as const };
-}
-
-const CreateExerciseSchema = z.object({
-  name: z.string().min(2),
-  category: z.string().optional(),
-});
-
-export async function createExerciseAction(formData: FormData) {
-  const parsed = CreateExerciseSchema.safeParse({
-    name: formData.get("name"),
-    category: formData.get("category"),
-  });
-
-  if (!parsed.success) {
-    return { ok: false as const, error: parsed.error.issues.map((i) => i.message).join(", ") };
-  }
-
-  try {
-    await prisma.exercise.create({
-      data: {
-        name: parsed.data.name.trim(),
-        category: parsed.data.category?.trim() || null,
-      },
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return { ok: false as const, error: "Exercise already exists." };
-    }
-    return { ok: false as const, error: "Unable to create exercise." };
-  }
-
-  revalidatePath("/exercises");
-  revalidatePath("/dashboard");
 
   return { ok: true as const };
 }
