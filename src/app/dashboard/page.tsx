@@ -6,7 +6,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth/authOptions";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
-import { BRAND_ICON_SRC } from "@/lib/brand";
 import { computeSessionRisk } from "@/app/lib/riskEngine";
 import QuickLogPanel from "@/app/dashboard/QuickLogPanel";
 import Link from "next/link";
@@ -142,7 +141,7 @@ export default async function DashboardPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex items-center gap-3">
           <Image
-            src={BRAND_ICON_SRC}
+            src="/brand/gym-risk-icon.svg"
             alt="Gym-Risk"
             width={32}
             height={32}

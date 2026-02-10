@@ -15,7 +15,6 @@ import {
   Sparkles,
   Trophy,
 } from "lucide-react";
-import { BRAND_ICON_SRC } from "@/lib/brand";
 
 type PreviewMode = "balanced" | "overload";
 
@@ -339,7 +338,7 @@ export default function WelcomePage() {
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90">
             <Image
-              src={BRAND_ICON_SRC}
+              src="/brand/gym-risk-icon.svg"
               alt="Gym-Risk"
               width={32}
               height={32}
@@ -384,7 +383,7 @@ export default function WelcomePage() {
               <div>
                 <div className="mb-6 flex items-center gap-4">
                   <Image
-                    src={BRAND_ICON_SRC}
+                    src="/brand/gym-risk-icon.svg"
                     alt="Gym-Risk logo"
                     width={48}
                     height={48}

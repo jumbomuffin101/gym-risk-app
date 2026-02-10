@@ -1,7 +1,6 @@
 import Image from "next/image";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
-import { BRAND_ICON_SRC } from "@/lib/brand";
 import ExerciseLibrary from "@/app/exercises/ExerciseLibrary";
 
 export const runtime = "nodejs";
@@ -27,7 +26,7 @@ export default async function ExercisesPage() {
       <header className="lab-card rounded-2xl p-5">
         <div className="flex flex-wrap items-center gap-3">
           <Image
-            src={BRAND_ICON_SRC}
+            src="/brand/gym-risk-icon.svg"
             alt="Gym-Risk"
             width={32}
             height={32}
