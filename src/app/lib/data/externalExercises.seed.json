@@ -1,0 +1,7 @@
+[
+  {"externalId":"seed-push-up","name":"Push-Up","category":"Chest","primaryMuscles":["chest","triceps"],"equipment":"Bodyweight","instructions":"Keep core tight and lower chest under control."},
+  {"externalId":"seed-back-squat","name":"Back Squat","category":"Legs","primaryMuscles":["quadriceps","glutes"],"equipment":"Barbell","instructions":"Brace trunk and keep knees tracking toes."},
+  {"externalId":"seed-bent-row","name":"Bent Over Row","category":"Back","primaryMuscles":["lats","upper back"],"equipment":"Barbell","instructions":"Hinge at hips and pull bar toward lower ribs."},
+  {"externalId":"seed-deadlift","name":"Deadlift","category":"Posterior Chain","primaryMuscles":["hamstrings","glutes","back"],"equipment":"Barbell","instructions":"Maintain neutral spine and push floor away."},
+  {"externalId":"seed-overhead-press","name":"Overhead Press","category":"Shoulders","primaryMuscles":["deltoids","triceps"],"equipment":"Barbell","instructions":"Stack ribcage over pelvis and press overhead."}
+]

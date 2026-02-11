@@ -38,8 +38,10 @@ export async function createSetEntryAction(formData: FormData): Promise<CreateSe
   }
 
   const { exerciseId, reps, weight, sessionId } = parsed.data;
-  const rpe = parseOptionalNumber(formData.get("rpe"));
-  const pain = parseOptionalNumber(formData.get("pain"));
+  const rawRpe = parseOptionalNumber(formData.get("rpe"));
+  const rawPain = parseOptionalNumber(formData.get("pain"));
+  const rpe = rawRpe == null ? null : Math.max(1, Math.min(10, rawRpe));
+  const pain = rawPain == null ? null : Math.max(0, Math.min(10, Math.round(rawPain)));
   const userId = await getOrCreateDbUserId();
 
   let session =
@@ -61,8 +63,8 @@ export async function createSetEntryAction(formData: FormData): Promise<CreateSe
       exerciseId,
       reps,
       weight: weight ?? 0,
-      rpe: rpe ?? null,
-      pain: pain ?? null,
+      rpe,
+      pain,
     },
   });
 
@@ -92,25 +94,17 @@ export async function createExerciseAction(formData: FormData) {
   }
 
   const { name, category } = parsed.data;
-  await getOrCreateDbUserId();
+  const userId = await getOrCreateDbUserId();
 
-  const trimmedName = name.trim();
-  if (!trimmedName) {
-    return { ok: false as const, error: "Exercise name is required." };
-  }
-
-  const existing = await prisma.exercise.findUnique({ where: { name: trimmedName } });
-  if (existing) {
-    return { ok: false as const, error: "Exercise already exists." };
-  }
-
-  await prisma.exercise.create({
-    data: { name: trimmedName, category: category?.trim() || null },
+  const exercise = await prisma.exercise.create({
+    data: {
+      name: name.trim(),
+      category: category?.trim() || null,
+      source: "custom",
+      createdByUserId: userId,
+    },
   });
 
   revalidatePath("/exercises");
-  revalidatePath("/workouts");
-  revalidatePath("/workouts/new");
-
-  return { ok: true as const };
+  return { ok: true as const, id: exercise.id };
 }

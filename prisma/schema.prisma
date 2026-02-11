@@ -37,13 +37,27 @@ model PasswordResetToken {
   @@index([expiresAt])
 }
 
+enum ExerciseSource {
+  external
+  custom
+}
+
 model Exercise {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  category  String?
-  createdAt DateTime @default(now())
+  id              String         @id @default(uuid())
+  name            String
+  category        String?
+  source          ExerciseSource @default(custom)
+  externalId      String?        @unique
+  createdByUserId String?
+  primaryMuscles  String?
+  equipment       String?
+  instructions    String?
+  createdAt       DateTime       @default(now())
 
   sets SetEntry[]
+
+  @@unique([name, source, createdByUserId])
+  @@index([source, category])
 }
 
 model WorkoutSession {

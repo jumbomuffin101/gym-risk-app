@@ -1,6 +1,6 @@
+import Link from "next/link";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
-import { notFound } from "next/navigation";
 import SetEntryForm from "@/app/exercises/SetEntryForm";
 import { computeExerciseRisk } from "@/app/lib/exerciseRisk";
 
@@ -9,10 +9,33 @@ export const runtime = "nodejs";
 export default async function ExerciseDetailPage({ params }: { params: { id: string } }) {
   const userId = await requireDbUserId();
   const id = params.id?.trim();
-  if (!id) return notFound();
 
-  const ex = await prisma.exercise.findUnique({ where: { id }, select: { id: true, name: true, category: true } });
-  if (!ex) return notFound();
+  const ex = id
+    ? await prisma.exercise.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          source: true,
+          primaryMuscles: true,
+          equipment: true,
+          instructions: true,
+        },
+      })
+    : null;
+
+  if (!ex) {
+    return (
+      <div className="mx-auto max-w-5xl px-4 pb-10 pt-6">
+        <div className="lab-card rounded-2xl p-5 space-y-3">
+          <div className="text-sm text-white/90">Exercise not found</div>
+          <div className="text-xs text-white/60">This exercise does not exist or is no longer available.</div>
+          <Link href="/exercises" className="inline-flex rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-xs font-semibold text-black">Back to exercises</Link>
+        </div>
+      </div>
+    );
+  }
 
   const recentSets = await prisma.setEntry.findMany({
     where: { exerciseId: ex.id, userId },
@@ -28,7 +51,8 @@ export default async function ExerciseDetailPage({ params }: { params: { id: str
       <header className="lab-card rounded-2xl p-5">
         <div className="text-xs uppercase tracking-wide lab-muted">Exercise</div>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/95">{ex.name}</h1>
-        <p className="mt-1 text-sm lab-muted">{ex.category ?? "Uncategorized"}</p>
+        <p className="mt-1 text-sm lab-muted">{ex.category ?? "Uncategorized"} • {ex.source}</p>
+        <p className="mt-2 text-xs text-white/60">{ex.primaryMuscles ?? "No muscle metadata"}</p>
       </header>
 
       <div className="lab-card rounded-2xl p-5">
@@ -57,7 +81,7 @@ export default async function ExerciseDetailPage({ params }: { params: { id: str
             recentSets.map((set) => (
               <div key={set.id} className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/80">
                 {new Date(set.performedAt).toLocaleString()} • {set.reps} reps • {set.weight > 0 ? `${set.weight} lb` : "Bodyweight"}
-                {set.rpe ? ` • RPE ${set.rpe}` : ""}
+                {set.rpe != null ? ` • RPE ${set.rpe}` : ""}
                 {set.pain != null ? ` • Pain ${set.pain}` : ""}
               </div>
             ))
