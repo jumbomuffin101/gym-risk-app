@@ -8,7 +8,6 @@ import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { BRAND_ICON_SRC } from "@/lib/brand";
 import { computeSessionRisk } from "@/app/lib/riskEngine";
-import QuickLogPanel from "@/app/dashboard/QuickLogPanel";
 import Link from "next/link";
 
 
@@ -43,8 +42,6 @@ export default async function DashboardPage() {
     select: {
       id: true,
       startedAt: true,
-      endedAt: true,
-      note: true,
       _count: { select: { sets: true } },
     },
   });
@@ -56,20 +53,10 @@ export default async function DashboardPage() {
 
   const now = new Date();
   const sevenDaysAgo = startOfDay(new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000));
-  const fourteenDaysAgo = startOfDay(new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000));
 
   const recentSets = await prisma.setEntry.findMany({
     where: { userId: user.id, performedAt: { gte: sevenDaysAgo } },
     select: { reps: true, weight: true, rpe: true, pain: true, performedAt: true },
-  });
-
-  const priorPainSets = await prisma.setEntry.findMany({
-    where: {
-      userId: user.id,
-      performedAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo },
-      pain: { not: null },
-    },
-    select: { pain: true },
   });
 
   const latestSet = await prisma.setEntry.findFirst({
@@ -82,29 +69,13 @@ export default async function DashboardPage() {
   const riskScore = riskReasons[0]?.score ?? null;
 
   const weeklyLoad = recentSets.reduce((sum, set) => sum + set.reps * set.weight, 0);
-  const rpeValues = recentSets.map((set) => set.rpe).filter((val): val is number => val !== null);
-  const painValues = recentSets.map((set) => set.pain).filter((val): val is number => val !== null);
-  const avgRpe = rpeValues.length > 0 ? rpeValues.reduce((sum, val) => sum + val, 0) / rpeValues.length : null;
-
+  const avgRpeValues = recentSets.map((set) => set.rpe).filter((val): val is number => val !== null);
+  const avgRpe =
+    avgRpeValues.length > 0
+      ? avgRpeValues.reduce((sum, val) => sum + val, 0) / avgRpeValues.length
+      : null;
   const fatigueLabel =
     avgRpe === null ? "Not available" : avgRpe >= 8 ? "High" : avgRpe >= 6 ? "Moderate" : "Low";
-
-  const recentPainAvg =
-    painValues.length > 0 ? painValues.reduce((sum, val) => sum + val, 0) / painValues.length : null;
-  const priorPainValues = priorPainSets
-    .map((set) => set.pain)
-    .filter((val): val is number => val !== null);
-  const priorPainAvg =
-    priorPainValues.length > 0
-      ? priorPainValues.reduce((sum, val) => sum + val, 0) / priorPainValues.length
-      : null;
-
-  const painTrend =
-    recentPainAvg === null
-      ? "Not available"
-      : priorPainAvg !== null && recentPainAvg > priorPainAvg + 0.5
-        ? "Rising"
-        : "Stable";
 
   const dayBuckets = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(sevenDaysAgo);
@@ -132,13 +103,29 @@ export default async function DashboardPage() {
         .join(" ")
     : "";
 
-  const exercises = await prisma.exercise.findMany({
-    select: { id: true, name: true, category: true },
-    orderBy: { name: "asc" },
-  });
+  const activeDays = dailyTotals.filter((total) => total > 0).length;
+  const sevenDayAverage = activeDays > 0 ? Math.round(weeklyLoad / activeDays) : null;
+  const latestDayLoad = dailyTotals[dailyTotals.length - 1] ?? 0;
+  const priorActiveLoads = dailyTotals.slice(0, -1).filter((total) => total > 0);
+  const priorAverageLoad =
+    priorActiveLoads.length > 0
+      ? priorActiveLoads.reduce((sum, total) => sum + total, 0) / priorActiveLoads.length
+      : null;
+  const loadSpike =
+    !hasAnySets || priorAverageLoad === null || latestDayLoad === 0
+      ? "Not available"
+      : latestDayLoad > priorAverageLoad * 1.3
+        ? "Elevated"
+        : "Stable";
+  const recovery =
+    !hasAnySets || lastSessionAgo === null
+      ? "Not available"
+      : lastSessionAgo >= 3
+        ? "Due"
+        : "On track";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 pb-10 pt-6">
+    <div className="mx-auto max-w-6xl space-y-8 px-4 pb-10 pt-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex items-center gap-3">
           <Image
@@ -149,10 +136,10 @@ export default async function DashboardPage() {
             className="h-8 w-8 object-contain"
           />
           <div>
-          <div className="text-xs uppercase tracking-wide lab-muted">Dashboard</div>
-          <div className="mt-1 text-2xl font-semibold tracking-tight text-white/95">
-            Training overview
-          </div>
+            <div className="text-xs uppercase tracking-wide lab-muted">Dashboard</div>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/95">
+              Training overview
+            </h1>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -168,6 +155,12 @@ export default async function DashboardPage() {
             }}
           >
             Start workout
+          </Link>
+          <Link
+            href="/history"
+            className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/85"
+          >
+            View history
           </Link>
         </div>
       </header>
@@ -193,89 +186,61 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="lab-card rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-wide lab-muted">Risk score</div>
-          <div className="mt-3 flex items-center justify-between">
-            <div className="text-3xl font-semibold text-white/95">
-              {!hasAnySets ? "—" : riskScore ?? "Baseline"}
-            </div>
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-medium text-white/70">
-              {!hasAnySets ? "No data" : riskScore ? "Estimated" : "No estimate"}
-            </span>
-          </div>
-        </div>
-
-        <div className="lab-card rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-wide lab-muted">Weekly load</div>
-          <div className="mt-3 text-3xl font-semibold text-white/95">
-            {recentSets.length === 0 ? "—" : weeklyLoad.toLocaleString()}
-          </div>
-          <div className="mt-2 text-xs text-white/60">
-            {recentSets.length === 0 ? "No data" : "Last 7 days"}
-          </div>
-        </div>
-
-        <div className="lab-card rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-wide lab-muted">Fatigue</div>
-          <div className="mt-3">
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-xs font-medium text-white/75">
-              {hasAnySets ? fatigueLabel : "No data"}
-            </span>
-          </div>
-        </div>
-
-        <div className="lab-card rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-wide lab-muted">Pain trend</div>
-          <div className="mt-3">
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-xs font-medium text-white/75">
-              {hasAnySets ? painTrend : "No data"}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="lab-card rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div className="text-xs uppercase tracking-wide lab-muted">Load trend</div>
-            <div className="text-sm font-semibold text-white/90">
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-white/80">Primary metrics</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="lab-card rounded-2xl p-5">
+            <div className="text-xs uppercase tracking-wide lab-muted">Weekly load</div>
+            <div className="mt-3 text-3xl font-semibold text-white/95">
               {recentSets.length === 0 ? "—" : weeklyLoad.toLocaleString()}
             </div>
           </div>
-          {hasTrendData ? (
-            <div className="mt-4">
-              <svg viewBox="0 0 240 80" className="h-16 w-full">
+
+          <div className="lab-card rounded-2xl p-5">
+            <div className="text-xs uppercase tracking-wide lab-muted">7-day avg load</div>
+            <div className="mt-3 text-3xl font-semibold text-white/95">
+              {sevenDayAverage === null ? "—" : sevenDayAverage.toLocaleString()}
+            </div>
+          </div>
+
+          <div className="lab-card rounded-2xl p-5">
+            <div className="text-xs uppercase tracking-wide lab-muted">Injury risk score</div>
+            <div className="mt-3 text-3xl font-semibold text-white/95">
+              {!hasAnySets ? "—" : riskScore ?? "Baseline"}
+            </div>
+          </div>
+
+          <div className="lab-card rounded-2xl p-5">
+            <div className="text-xs uppercase tracking-wide lab-muted">7-day sparkline</div>
+            {hasTrendData ? (
+              <svg viewBox="0 0 240 80" className="mt-3 h-14 w-full">
                 <polyline
                   fill="none"
-                  stroke="rgba(34,197,94,0.8)"
+                  stroke="rgba(34,197,94,0.85)"
                   strokeWidth="2"
                   points={trendPoints}
                 />
               </svg>
-            </div>
-          ) : (
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-xs text-white/70">
-              No data yet
-            </div>
-          )}
-        </div>
-
-        <div className="lab-card rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div className="text-xs uppercase tracking-wide lab-muted">Recent sessions</div>
-            <div className="text-xs text-white/60">{Math.min(3, sessions.length)} shown</div>
-          </div>
-          <div className="mt-4 space-y-2">
-            {sessions.length === 0 ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/70">
-                No sessions yet
-              </div>
             ) : (
-              sessions.slice(0, 3).map((session) => (
+              <div className="mt-3 text-sm text-white/60">No data</div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-white/80">
+          Training log summary
+        </h2>
+        <div className="lab-card rounded-2xl p-5">
+          <div className="space-y-3">
+            {sessions.length === 0 ? (
+              <div className="text-sm text-white/70">No sessions yet</div>
+            ) : (
+              sessions.slice(0, 5).map((session) => (
                 <div
                   key={session.id}
-                  className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/80"
+                  className="flex items-center justify-between border-b border-white/10 pb-3 text-sm text-white/85 last:border-b-0 last:pb-0"
                 >
                   <span>{new Date(session.startedAt).toLocaleDateString()}</span>
                   <span className="text-white/60">{session._count.sets} sets</span>
@@ -286,7 +251,42 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <QuickLogPanel exercises={exercises} />
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-white/80">Load trend</h2>
+        <div className="lab-card rounded-2xl p-5">
+          {hasTrendData ? (
+            <div>
+              <svg viewBox="0 0 240 80" className="h-24 w-full">
+                <polyline fill="none" stroke="rgba(34,197,94,0.85)" strokeWidth="2" points={trendPoints} />
+              </svg>
+            </div>
+          ) : (
+            <div className="text-sm text-white/70">
+              No data yet
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-white/80">Signals</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="lab-card rounded-2xl p-5">
+            <div className="text-xs uppercase tracking-wide lab-muted">Fatigue</div>
+            <div className="mt-3 text-lg font-semibold text-white/90">
+              {hasAnySets ? fatigueLabel : "No data"}
+            </div>
+          </div>
+          <div className="lab-card rounded-2xl p-5">
+            <div className="text-xs uppercase tracking-wide lab-muted">Load spike</div>
+            <div className="mt-3 text-lg font-semibold text-white/90">{loadSpike}</div>
+          </div>
+          <div className="lab-card rounded-2xl p-5">
+            <div className="text-xs uppercase tracking-wide lab-muted">Recovery</div>
+            <div className="mt-3 text-lg font-semibold text-white/90">{recovery}</div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createSetEntryAction } from "@/app/exercises/actions";
 
 type ExerciseOption = { id: string; name: string; category: string | null };
@@ -24,7 +25,7 @@ export default function QuickLogPanel({ exercises }: { exercises: ExerciseOption
           Add an exercise to start logging sets.
         </div>
         <div className="mt-4">
-          <a
+          <Link
             href="/exercises"
             className="inline-flex rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black"
             style={{
@@ -33,7 +34,7 @@ export default function QuickLogPanel({ exercises }: { exercises: ExerciseOption
             }}
           >
             Create exercises
-          </a>
+          </Link>
         </div>
       </div>
     );
