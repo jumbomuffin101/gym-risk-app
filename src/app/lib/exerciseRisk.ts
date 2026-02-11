@@ -1,81 +1,96 @@
-import type { SetEntry } from "@prisma/client";
+import { calculateSetLoad } from "@/app/lib/trainingMetrics";
 
-export type ExerciseRiskPayload =
-  | {
-      hasData: true;
-      score: number;
-      label: "Low" | "Mod" | "High";
-      recentVolume: number;
-      recentRpe: number | null;
-      painAvg: number | null;
-      changePct: number | null;
-    }
-  | { hasData: false };
+type RiskSet = {
+  performedAt: Date;
+  reps: number;
+  weight: number;
+  rpe: number | null;
+  pain: number | null;
+};
 
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
+export type ExerciseRiskResult = {
+  score: number;
+  label: "Low" | "Moderate" | "High";
+  drivers: string[];
+};
 
-function toLabel(score: number): "Low" | "Mod" | "High" {
-  if (score >= 75) return "High";
-  if (score >= 45) return "Mod";
-  return "Low";
-}
+export function computeExerciseRisk(sets: RiskSet[]): ExerciseRiskResult | null {
+  if (sets.length < 3) return null;
 
-export function computeExerciseRisk(sets: Array<Pick<SetEntry, "performedAt" | "reps" | "weight" | "rpe" | "pain">>): ExerciseRiskPayload {
-  if (sets.length === 0) {
-    return { hasData: false };
-  }
-
-  const latest = Math.max(...sets.map((set) => new Date(set.performedAt).getTime()));
+  const latest = Math.max(...sets.map((set) => set.performedAt.getTime()));
   const weekMs = 7 * 24 * 60 * 60 * 1000;
   const recentStart = latest - weekMs;
-  const prevStart = latest - weekMs * 2;
+  const baselineStart = latest - 2 * weekMs;
 
-  let recentVolume = 0;
-  let prevVolume = 0;
-  let rpeTotal = 0;
-  let rpeCount = 0;
-  let painTotal = 0;
-  let painCount = 0;
+  const recentSets = sets.filter((set) => set.performedAt.getTime() >= recentStart);
+  const baselineSets = sets.filter(
+    (set) => set.performedAt.getTime() >= baselineStart && set.performedAt.getTime() < recentStart
+  );
 
-  for (const set of sets) {
-    const performedAt = new Date(set.performedAt).getTime();
-    const volume = set.reps * set.weight;
+  if (recentSets.length === 0) return null;
 
-    if (performedAt >= recentStart) {
-      recentVolume += volume;
-      if (set.rpe != null) {
-        rpeTotal += set.rpe;
-        rpeCount += 1;
-      }
-      if (set.pain != null) {
-        painTotal += set.pain;
-        painCount += 1;
-      }
-    } else if (performedAt >= prevStart) {
-      prevVolume += volume;
+  const recentLoad = recentSets.reduce(
+    (sum, set) => sum + calculateSetLoad(set.reps, set.weight),
+    0
+  );
+  const baselineLoad = baselineSets.reduce(
+    (sum, set) => sum + calculateSetLoad(set.reps, set.weight),
+    0
+  );
+  const recentRpeSets = recentSets.filter((set) => set.rpe != null);
+  const recentPainSets = recentSets.filter((set) => set.pain != null);
+
+  const avgRpe =
+    recentRpeSets.length > 0
+      ? recentRpeSets.reduce((sum, set) => sum + (set.rpe ?? 0), 0) / recentRpeSets.length
+      : null;
+  const avgPain =
+    recentPainSets.length > 0
+      ? recentPainSets.reduce((sum, set) => sum + (set.pain ?? 0), 0) / recentPainSets.length
+      : null;
+
+  const drivers: string[] = [];
+  let score = 20;
+
+  if (avgRpe != null) {
+    if (avgRpe >= 8) {
+      score += 30;
+      drivers.push("High avg RPE");
+    } else if (avgRpe >= 6.5) {
+      score += 18;
+      drivers.push("Moderate avg RPE");
     }
   }
 
-  const recentRpe = rpeCount > 0 ? rpeTotal / rpeCount : null;
-  const painAvg = painCount > 0 ? painTotal / painCount : null;
-  const changePct = prevVolume > 0 ? Math.round(((recentVolume - prevVolume) / prevVolume) * 100) : null;
+  if (avgPain != null) {
+    if (avgPain >= 4) {
+      score += 28;
+      drivers.push("Pain reported");
+    } else if (avgPain >= 2) {
+      score += 14;
+      drivers.push("Mild pain trend");
+    }
+  }
 
-  const volumeScore = Math.min(45, (recentVolume / 1000) * 7.5);
-  const rpeScore = recentRpe != null ? Math.min(35, (recentRpe / 10) * 35) : 0;
-  const painScore = painAvg != null ? Math.min(20, (painAvg / 10) * 20) : 0;
-  const changeScore = changePct != null && changePct > 0 ? Math.min(20, changePct / 2) : 0;
+  if (baselineLoad > 0) {
+    const spikeRatio = recentLoad / baselineLoad;
+    if (spikeRatio >= 1.35) {
+      score += 24;
+      drivers.push("Load spike vs baseline");
+    } else if (spikeRatio <= 0.7) {
+      score -= 10;
+      drivers.push("Load reduced vs baseline");
+    }
+  }
 
-  const score = clamp(Math.round(volumeScore + rpeScore + painScore + changeScore), 0, 100);
+  if (recentLoad > 3000) {
+    score += 10;
+    drivers.push("High absolute load");
+  }
 
-  return {
-    hasData: true,
-    score,
-    label: toLabel(score),
-    recentVolume: Math.round(recentVolume),
-    recentRpe: recentRpe != null ? Math.round(recentRpe * 10) / 10 : null,
-    painAvg: painAvg != null ? Math.round(painAvg * 10) / 10 : null,
-    changePct,
-  };
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  const label: ExerciseRiskResult["label"] = score >= 75 ? "High" : score >= 45 ? "Moderate" : "Low";
+
+  return { score, label, drivers };
 }

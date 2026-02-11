@@ -55,8 +55,7 @@ export default function SetEntryForm({ exerciseId }: { exerciseId: string }) {
             min={0}
             step="0.5"
             className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/90"
-            placeholder="135"
-            required
+            placeholder="optional"
           />
         </label>
 

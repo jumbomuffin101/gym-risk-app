@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import type { ExerciseRiskPayload } from "@/app/lib/exerciseRisk";
+
+type RiskResponse = { score: number | null; label: string; drivers: string[] };
 
 export default function ExerciseRiskSummary({ exerciseId }: { exerciseId: string }) {
-  const [risk, setRisk] = useState<ExerciseRiskPayload | null>(null);
+  const [risk, setRisk] = useState<RiskResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -14,12 +14,12 @@ export default function ExerciseRiskSummary({ exerciseId }: { exerciseId: string
       .then((res) => res.json())
       .then((data) => {
         if (!active) return;
-        setRisk(data?.risk ?? { hasData: false });
+        setRisk(data);
         setLoading(false);
       })
       .catch(() => {
         if (!active) return;
-        setRisk({ hasData: false });
+        setRisk({ score: null, label: "No estimate", drivers: [] });
         setLoading(false);
       });
 
@@ -28,27 +28,14 @@ export default function ExerciseRiskSummary({ exerciseId }: { exerciseId: string
     };
   }, [exerciseId]);
 
-  if (loading) {
-    return <div className="text-xs text-white/60">Loading risk…</div>;
-  }
-
-  if (!risk || !risk.hasData) {
-    return (
-      <div className="text-sm text-white/70">
-        No data yet. <Link href="#log-sets" className="text-white underline">Log a set</Link> to calculate risk.
-      </div>
-    );
-  }
+  if (loading) return <div className="text-xs text-white/60">Loading risk…</div>;
+  if (!risk || risk.score == null) return <div className="text-sm text-white/70">No estimate</div>;
 
   return (
     <div className="text-sm text-white/80">
       <div className="text-xs uppercase tracking-wide text-white/60">Exercise risk score</div>
-      <div className="mt-1 text-2xl font-semibold text-white/95">
-        {risk.score} <span className="text-sm font-medium text-white/70">({risk.label})</span>
-      </div>
-      <div className="mt-2 text-xs text-white/60">
-        Recent volume {risk.recentVolume.toLocaleString()} • RPE {risk.recentRpe ?? "—"}
-      </div>
+      <div className="mt-1 text-2xl font-semibold text-white/95">{risk.score} ({risk.label})</div>
+      <div className="mt-2 text-xs text-white/60">{risk.drivers.join(" • ") || "No drivers"}</div>
     </div>
   );
 }

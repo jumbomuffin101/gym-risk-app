@@ -12,44 +12,22 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const exerciseId = searchParams.get("exerciseId")?.trim() || null;
+  const exerciseId = searchParams.get("exerciseId")?.trim();
 
-  if (exerciseId) {
-    const sets = await prisma.setEntry.findMany({
-      where: { userId, exerciseId },
-      select: { performedAt: true, reps: true, weight: true, rpe: true, pain: true },
-    });
-
-    const risk = computeExerciseRisk(sets);
-    return NextResponse.json({ exerciseId, risk });
+  if (!exerciseId) {
+    return NextResponse.json({ error: "exerciseId is required" }, { status: 400 });
   }
-
-  const exercises = await prisma.exercise.findMany({
-    select: { id: true, name: true, category: true },
-    orderBy: { name: "asc" },
-  });
 
   const sets = await prisma.setEntry.findMany({
-    where: { userId },
-    select: { exerciseId: true, performedAt: true, reps: true, weight: true, rpe: true, pain: true },
+    where: { userId, exerciseId },
+    select: { performedAt: true, reps: true, weight: true, rpe: true, pain: true },
+    orderBy: { performedAt: "desc" },
   });
 
-  const setsByExercise = new Map<string, typeof sets>();
-  for (const set of sets) {
-    const list = setsByExercise.get(set.exerciseId) ?? [];
-    list.push(set);
-    setsByExercise.set(set.exerciseId, list);
+  const result = computeExerciseRisk(sets);
+  if (!result) {
+    return NextResponse.json({ score: null, label: "No estimate", drivers: [] });
   }
 
-  const items = exercises.map((exercise) => {
-    const risk = computeExerciseRisk(setsByExercise.get(exercise.id) ?? []);
-    return {
-      exerciseId: exercise.id,
-      name: exercise.name,
-      category: exercise.category,
-      risk,
-    };
-  });
-
-  return NextResponse.json({ items });
+  return NextResponse.json(result);
 }

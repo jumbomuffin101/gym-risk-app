@@ -13,6 +13,7 @@ const navItems: NavItem[] = [
   { href: "/exercises", label: "Exercises", protected: true, match: "exact" },
   { href: "/workouts", label: "Workouts", protected: true, match: "exact" },
   { href: "/workouts/new", label: "New Workout", protected: true, match: "exact" },
+  { href: "/history", label: "History", protected: true, match: "exact" },
 ];
 
 function isActive(pathname: string, href: string, match: "exact" | "section" = "exact") {

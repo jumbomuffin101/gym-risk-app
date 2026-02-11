@@ -2,54 +2,19 @@
 
 import { prisma } from "@/app/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getOrCreateDbUserId } from "@/app/lib/auth/getUserId";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
-import { redirect } from "next/navigation";
-import { computeSetRisk } from "@/app/lib/risk";
-
-export async function startWorkoutSession() {
-  const userId = await getOrCreateDbUserId();
-
-  const existing = await getActiveWorkoutSession(userId);
-  if (!existing) {
-    await prisma.workoutSession.create({
-      data: { userId },
-    });
-  }
-
-  revalidatePath("/workouts");
-  revalidatePath("/dashboard");
-  revalidatePath("/history");
-  revalidatePath("/exercises");
-
-  redirect("/workouts");
-}
-
-export async function endWorkoutSessionAction(formData: FormData) {
-  const sessionId = String(formData.get("sessionId") ?? "");
-  if (!sessionId) return;
-
-  await prisma.workoutSession.update({
-    where: { id: sessionId },
-    data: { endedAt: new Date() },
-  });
-
-  revalidatePath("/workouts");
-  revalidatePath("/");
-
-  redirect("/workouts");
-}
 
 const CreateSetSchema = z.object({
   exerciseId: z.string().min(1),
   reps: z.coerce.number().int().min(1),
-  weight: z.coerce.number().min(0),
+  weight: z.coerce.number().min(0).optional(),
+  sessionId: z.string().optional(),
 });
 
 export type CreateSetEntryResult =
-  | { ok: true; volume: number; risk: number; label: string }
+  | { ok: true }
   | { ok: false; error: string };
 
 function parseOptionalNumber(value: FormDataEntryValue | null) {
@@ -60,32 +25,34 @@ function parseOptionalNumber(value: FormDataEntryValue | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export async function createSetEntryAction(formData: FormData) {
+export async function createSetEntryAction(formData: FormData): Promise<CreateSetEntryResult> {
   const parsed = CreateSetSchema.safeParse({
     exerciseId: formData.get("exerciseId"),
     reps: formData.get("reps"),
     weight: formData.get("weight"),
+    sessionId: formData.get("sessionId") ?? undefined,
   });
 
   if (!parsed.success) {
-    return { ok: false as const, error: parsed.error.issues.map((issue) => issue.message).join(", ") };
+    return { ok: false, error: parsed.error.issues.map((issue) => issue.message).join(", ") };
   }
 
-  const { exerciseId, reps, weight } = parsed.data;
+  const { exerciseId, reps, weight, sessionId } = parsed.data;
   const rpe = parseOptionalNumber(formData.get("rpe"));
   const pain = parseOptionalNumber(formData.get("pain"));
-
-  // Ensure we have a real DB user
   const userId = await getOrCreateDbUserId();
 
-  // Ensure we have an active session (endedAt = null)
-  let session = await getActiveWorkoutSession(userId);
+  let session =
+    sessionId != null
+      ? await prisma.workoutSession.findFirst({ where: { id: sessionId, userId, endedAt: null } })
+      : null;
+
+  if (!session) {
+    session = await getActiveWorkoutSession(userId);
+  }
   if (!session) {
     session = await prisma.workoutSession.create({ data: { userId } });
   }
-
-  const volume = reps * weight;
-  const { risk, label } = computeSetRisk({ reps, weight, rpe });
 
   await prisma.setEntry.create({
     data: {
@@ -93,19 +60,20 @@ export async function createSetEntryAction(formData: FormData) {
       sessionId: session.id,
       exerciseId,
       reps,
-      weight,
+      weight: weight ?? 0,
       rpe: rpe ?? null,
       pain: pain ?? null,
     },
   });
 
-  revalidatePath(`/exercises/${exerciseId}`);
-  revalidatePath("/exercises");
-  revalidatePath("/workouts");
   revalidatePath("/dashboard");
+  revalidatePath("/workouts");
+  revalidatePath("/workouts/new");
   revalidatePath("/history");
+  revalidatePath("/exercises");
+  revalidatePath(`/exercises/${exerciseId}`);
 
-  return { ok: true as const, volume, risk, label };
+  return { ok: true };
 }
 
 const CreateExerciseSchema = z.object({
@@ -142,6 +110,7 @@ export async function createExerciseAction(formData: FormData) {
 
   revalidatePath("/exercises");
   revalidatePath("/workouts");
+  revalidatePath("/workouts/new");
 
   return { ok: true as const };
 }
