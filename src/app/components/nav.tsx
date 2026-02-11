@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { BRAND_ICON_ALT, BRAND_ICON_SRC } from "@/lib/brand";
+import { BRAND_ICON_SRC } from "@/lib/brand";
 
 type NavItem = { href: string; label: string; match?: "exact" | "section" };
 
@@ -78,6 +78,12 @@ export default function Nav() {
     }
   }, [open]);
 
+  useEffect(() => {
+    // close menu on route change
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setOpen(false);
+  }, [pathname, open]);
+
   if (hidden) return null;
 
   const initials = data?.user?.email?.slice(0, 1)?.toUpperCase() ?? "U";
@@ -86,7 +92,7 @@ export default function Nav() {
     <header className="sticky top-0 z-40 border-b border-[color:var(--lab-accent-border)] bg-[var(--lab-bg)]/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90">
-          <Image src={BRAND_ICON_SRC} alt={BRAND_ICON_ALT} width={36} height={36} className="object-contain" />
+          <Image src={BRAND_ICON_SRC} alt="Gym-Risk" width={32} height={32} className="h-7 w-7 object-contain" />
           <span>Gym-Risk</span>
         </Link>
 

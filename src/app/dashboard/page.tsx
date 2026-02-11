@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
-import { BRAND_ICON_ALT, BRAND_ICON_SRC } from "@/lib/brand";
+import { BRAND_ICON_SRC } from "@/lib/brand";
 import QuickLogPanel from "@/app/dashboard/QuickLogPanel";
 import { average, baselineLoad, recoveryWarning, riskScore, weeklyLoad, type MetricSet } from "@/app/lib/metrics";
 import { startOrResumeWorkoutAction } from "@/app/workouts/actions";
@@ -51,7 +51,7 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-6xl space-y-6 px-4 pb-10 pt-6">
       <header className="flex items-end justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Image src={BRAND_ICON_SRC} alt={BRAND_ICON_ALT} width={36} height={36} className="object-contain" />
+          <Image src={BRAND_ICON_SRC} alt="Gym-Risk" width={32} height={32} className="h-7 w-7 object-contain" />
           <h1 className="text-2xl font-semibold text-white/95">Training overview</h1>
         </div>
         {activeSession ? (
