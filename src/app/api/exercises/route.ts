@@ -1,22 +1,16 @@
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
-import { syncExternalExercisesIntoDb } from "@/app/lib/exerciseSource";
 import { getOptionalDbUserId } from "@/app/lib/auth/requireUser";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export async function GET() {
   const userId = await getOptionalDbUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { searchParams } = new URL(request.url);
-  const sync = searchParams.get("sync") === "1";
-  if (sync) {
-    await syncExternalExercisesIntoDb();
-  }
-
   const [exercises, counts] = await Promise.all([
-    prisma.exercise.findMany({ orderBy: [{ name: "asc" }]}),
+    prisma.exercise.findMany({ orderBy: [{ name: "asc" }] }),
     prisma.setEntry.groupBy({ by: ["exerciseId"], where: { userId }, _count: { _all: true } }),
   ]);
 
@@ -28,40 +22,44 @@ export async function GET(request: Request) {
       name: exercise.name,
       category: exercise.category,
       source: exercise.source,
-      externalId: exercise.externalId,
-      primaryMuscles: exercise.primaryMuscles,
       equipment: exercise.equipment,
-      instructions: exercise.instructions,
+      externalId: exercise.externalId,
       setCount: countMap.get(exercise.id) ?? 0,
     })),
   });
 }
+
+const CreateExerciseSchema = z.object({
+  name: z.string().min(2),
+  category: z.string().optional(),
+  equipment: z.string().optional(),
+});
 
 export async function POST(request: Request) {
   const userId = await getOptionalDbUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => null);
-  const name = typeof body?.name === "string" ? body.name.trim() : "";
-  const category = typeof body?.category === "string" ? body.category.trim() : "";
-  const primaryMuscles = typeof body?.primaryMuscles === "string" ? body.primaryMuscles.trim() : "";
-  const equipment = typeof body?.equipment === "string" ? body.equipment.trim() : "";
-  const instructions = typeof body?.instructions === "string" ? body.instructions.trim() : "";
+  const parsed = CreateExerciseSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
 
-  if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  const name = parsed.data.name.trim();
+  const category = parsed.data.category?.trim() ?? "";
+  const equipment = parsed.data.equipment?.trim() ?? "";
 
-  const exercise = await prisma.exercise.create({
+
+  const created = await prisma.exercise.create({
     data: {
       name,
       category: category || null,
+      equipment: equipment || null,
       source: "custom",
       createdByUserId: userId,
-      primaryMuscles: primaryMuscles || null,
-      equipment: equipment || null,
-      instructions: instructions || null,
     },
     select: { id: true },
   });
 
-  return NextResponse.json({ id: exercise.id }, { status: 201 });
+  return NextResponse.json({ id: created.id }, { status: 201 });
 }

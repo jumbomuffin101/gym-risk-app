@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import SetEntryForm from "@/app/exercises/SetEntryForm";
 import { computeExerciseRisk } from "@/app/lib/exerciseRisk";
+import { notFound } from "next/navigation";
 
 export const runtime = "nodejs";
 
@@ -25,17 +25,7 @@ export default async function ExerciseDetailPage({ params }: { params: { id: str
       })
     : null;
 
-  if (!ex) {
-    return (
-      <div className="mx-auto max-w-5xl px-4 pb-10 pt-6">
-        <div className="lab-card rounded-2xl p-5 space-y-3">
-          <div className="text-sm text-white/90">Exercise not found</div>
-          <div className="text-xs text-white/60">This exercise does not exist or is no longer available.</div>
-          <Link href="/exercises" className="inline-flex rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-xs font-semibold text-black">Back to exercises</Link>
-        </div>
-      </div>
-    );
-  }
+  if (!ex) notFound();
 
   const recentSets = await prisma.setEntry.findMany({
     where: { exerciseId: ex.id, userId },
