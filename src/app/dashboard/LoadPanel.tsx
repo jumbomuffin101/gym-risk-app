@@ -3,111 +3,69 @@ import React from "react";
 import { MetricCard } from "./components/MetricCard";
 import { StatusChip } from "./components/StatusChip";
 
-export function LoadPanel({
-  today,
-  baseline,
-  deltaPct,
-  active,
-}: {
-  today: number;
-  baseline: number;
-  deltaPct: number;
-  active: boolean;
-}) {
-  const tone =
-    deltaPct >= 20 ? "danger" : deltaPct >= 12 ? "watch" : "safe";
+type RiskState = "Stable" | "Monitor" | "High";
 
-  const color =
-    tone === "danger"
-      ? "var(--lab-danger)"
-      : tone === "watch"
-      ? "var(--lab-watch)"
-      : "var(--lab-safe)";
-  const activityOpacity = active ? 0.75 : 0.45;
+export function LoadPanel({
+  weeklyLoad,
+  baseline7d,
+  wowPct,
+  ratio,
+  riskState,
+  driver,
+  trend,
+  baselinePending,
+}: {
+  weeklyLoad: number;
+  baseline7d: number;
+  wowPct: number;
+  ratio: number;
+  riskState: RiskState;
+  driver: string;
+  trend: number[];
+  baselinePending: boolean;
+}) {
+  const tone = riskState === "High" ? "danger" : riskState === "Monitor" ? "watch" : "safe";
+
+  const points = trend.length > 1
+    ? trend
+        .map((value, index) => {
+          const max = Math.max(...trend, 1);
+          const min = Math.min(...trend, 0);
+          const x = (index / (trend.length - 1)) * 100;
+          const y = 100 - ((value - min) / Math.max(max - min, 1)) * 100;
+          return `${x},${y}`;
+        })
+        .join(" ")
+    : "0,50 100,50";
 
   return (
     <MetricCard
       title="Load analytics"
-      subtitle="Rolling 7-day load vs baseline with spike detection."
-      actions={
-        <StatusChip
-          label={
-            tone === "danger"
-              ? "Spike flagged"
-              : tone === "watch"
-              ? "Watch zone"
-              : "Stable trend"
-          }
-          tone={tone}
-        />
-      }
+      subtitle="Real session load from logged sets (weight × reps, RPE-adjusted when present)."
+      actions={<StatusChip label={riskState} tone={tone} />}
     >
       <div className="flex flex-wrap gap-2 text-xs">
-        <StatusChip
-          label={`Today: ${today.toLocaleString()}`}
-          tone="neutral"
-          showDot={false}
-          className="lab-num text-[rgba(230,232,238,0.92)]"
-        />
-        <StatusChip
-          label={`Baseline: ${baseline.toLocaleString()}`}
-          tone="neutral"
-          showDot={false}
-          className="lab-num text-[rgba(230,232,238,0.92)]"
-        />
-        <StatusChip
-          label={`${deltaPct >= 0 ? "+" : ""}${deltaPct}% vs baseline`}
-          tone={tone}
-          showDot={false}
-          className="text-[rgba(230,232,238,0.92)]"
-        />
+        <StatusChip label={`Weekly Load: ${Math.round(weeklyLoad).toLocaleString()}`} tone="neutral" showDot={false} className="lab-num text-[rgba(230,232,238,0.92)]" />
+        <StatusChip label={baselinePending ? "Baseline: pending" : `Baseline: ${Math.round(baseline7d).toLocaleString()}`} tone="neutral" showDot={false} className="lab-num text-[rgba(230,232,238,0.92)]" />
+        <StatusChip label={`WoW: ${wowPct >= 0 ? "+" : ""}${wowPct.toFixed(1)}%`} tone={tone} showDot={false} className="text-[rgba(230,232,238,0.92)]" />
+        <StatusChip label={`A:C Ratio: ${ratio.toFixed(2)}`} tone={tone} showDot={false} className="text-[rgba(230,232,238,0.92)]" />
       </div>
 
-      {/* Minimal chart placeholder that still feels analytical */}
-      <div className="mt-5 overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[rgba(15,21,32,0.6)]">
-        <div className="p-4">
-          <div className="flex items-center justify-between text-xs lab-muted">
-            <span>7-day rolling</span>
-            <span className="lab-num">baseline + trend</span>
-          </div>
-
-          <div className="mt-3 h-36 rounded-xl bg-[rgba(255,255,255,0.02)]">
-            <div className="relative h-full w-full">
-              <div className="absolute inset-0 opacity-[0.35]">
-                <div className="h-full w-full lab-gridline opacity-[0.30]" />
-              </div>
-
-              {/* “glowing line” vibe */}
-              <div
-                className="absolute left-4 top-[56%] h-0.5 w-[78%]"
-                style={{
-                  background: "rgba(230,232,238,0.16)",
-                }}
-              />
-              <div
-                className="absolute left-4 top-[48%] h-0.5 w-[70%]"
-                style={{
-                  background: color,
-                  boxShadow: `0 0 20px ${color}`,
-                  opacity: activityOpacity,
-                }}
-              />
-
-              <div className="absolute bottom-3 left-4 text-xs lab-muted">
-                {tone === "danger"
-                  ? "Spike detected (+threshold)"
-                  : tone === "watch"
-                  ? "Approaching threshold"
-                  : "Within baseline range"}
-              </div>
-            </div>
-          </div>
+      <div className="mt-5 overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[rgba(15,21,32,0.6)] p-4">
+        <div className="flex items-center justify-between text-xs lab-muted">
+          <span>Recent 8 sessions</span>
+          <span>{driver}</span>
         </div>
+
+        <svg viewBox="0 0 100 100" className="mt-3 h-28 w-full rounded-xl bg-[rgba(255,255,255,0.02)] p-2" preserveAspectRatio="none" role="img" aria-label="Session load trend">
+          <polyline fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" points="0,50 100,50" />
+          <polyline fill="none" stroke={tone === "danger" ? "var(--lab-danger)" : tone === "watch" ? "var(--lab-watch)" : "var(--lab-safe)"} strokeWidth="2.5" points={points} />
+        </svg>
       </div>
 
-      <div className="mt-3 text-xs lab-muted">
-        Charts will be wired to your real session/set data next — this panel is the dashboard shell.
-      </div>
+      {baselinePending ? (
+        <div className="mt-3 text-xs lab-muted">Need 2+ weeks of sessions to compute baseline.</div>
+      ) : null}
     </MetricCard>
   );
 }
