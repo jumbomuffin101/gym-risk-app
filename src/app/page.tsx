@@ -1,25 +1,27 @@
+"use client";
+
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 import { KpiCard } from "./dashboard/KpiCard";
-import { LoadPanel } from "./dashboard/LoadPanel";
 import { RiskMeter } from "./dashboard/RiskMeter";
 
 const metricDefinitions = [
   {
     label: "Acute Load (7d)",
-    definition: "Summed session load over the last 7 days from structured set entries.",
+    definition: "Σ session load over last 7 days (AU).",
   },
   {
     label: "Chronic Load (28d)",
-    definition: "Rolling 28-day baseline used as the expected workload reference.",
+    definition: "28-day rolling baseline (AU).",
   },
   {
     label: "Load Ratio",
-    definition: "Acute Load divided by Chronic Load to quantify short-term load acceleration.",
+    definition: "Acute / Chronic.",
   },
   {
     label: "Risk Index",
-    definition: "Deterministic score derived from load ratio, trend slope, and threshold states.",
+    definition: "f(ratio, trend, thresholds).",
   },
 ];
 
@@ -31,16 +33,21 @@ const systemModelItems = [
 ];
 
 export default function WelcomePage() {
+  const { status } = useSession();
+  const isAuthed = status === "authenticated";
+  const primaryHref = isAuthed ? "/dashboard" : "/signin";
+  const workspaceHref = isAuthed ? "/dashboard" : "/signin";
+
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-12 md:px-10 md:py-16">
-      <section className="grid gap-10 border-b border-white/10 pb-14 md:grid-cols-[1.05fr_0.95fr] md:items-start">
-        <div className="space-y-6">
+      <section className="grid gap-10 border-b border-white/10 pb-14 lg:grid-cols-[1.02fr_0.98fr] lg:items-start">
+        <div className="space-y-6 lg:pr-4">
           <div className="inline-flex rounded-full border border-[var(--lab-safe-28)] bg-[var(--lab-safe-10)] px-3 py-1 text-xs font-medium uppercase tracking-wide text-white/85">
             Gym-Risk Engine
           </div>
 
           <div className="space-y-4">
-            <h1 className="text-4xl font-semibold leading-tight text-white md:text-5xl">
+            <h1 className="max-w-xl text-4xl font-semibold leading-tight text-white md:text-5xl md:leading-tight">
               Training Load Analytics and Risk Modeling
             </h1>
             <p className="max-w-2xl text-base text-white/70 md:text-lg">
@@ -50,12 +57,12 @@ export default function WelcomePage() {
 
           <div className="flex flex-wrap items-center gap-5">
             <Link
-              href="/signup"
+              href={primaryHref}
               className="inline-flex h-11 items-center justify-center rounded-md border border-[var(--lab-safe)] bg-[var(--lab-safe)] px-5 text-sm font-semibold text-black transition hover:brightness-105"
             >
               Start analysis
             </Link>
-            <Link href="/signin" className="text-sm font-medium text-white/70 transition hover:text-white">
+            <Link href={workspaceHref} className="text-sm font-medium text-white/70 transition hover:text-white">
               Open existing workspace
             </Link>
           </div>
@@ -63,43 +70,82 @@ export default function WelcomePage() {
 
         <div className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <KpiCard
-              title="Weekly Load"
-              value="462"
-              badge="Stable"
-              badgeTone="safe"
-              subline="Total session load, last 7 days"
-              micro="+3.9% vs prior 7d"
-              microTone="safe"
-              progress={64}
-            />
-            <KpiCard
-              title="Acute:Chronic"
-              value="1.18"
-              badge="Watch"
-              badgeTone="watch"
-              subline="7d load / 28d baseline"
-              micro="Threshold warning at 1.30"
-              microTone="watch"
-              progress={58}
-            />
+            <div className="h-full [&>*]:h-full">
+              <KpiCard
+                title="Weekly Load"
+                value="462"
+                badge="Status: Stable"
+                badgeTone="safe"
+                subline="Total session load, last 7 days"
+                micro="+3.9% vs prior 7d"
+                microTone="safe"
+                progress={64}
+              />
+            </div>
+            <div className="h-full [&>*]:h-full">
+              <KpiCard
+                title="Acute:Chronic"
+                value="1.18"
+                badge="Threshold: Monitor"
+                badgeTone="watch"
+                subline="7d load / 28d baseline"
+                micro="Monitor threshold at 1.30"
+                microTone="watch"
+                progress={58}
+              />
+            </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-[1.1fr_0.9fr]">
-            <LoadPanel today={462} baseline={391} deltaPct={18} active />
-            <div className="lab-card rounded-2xl p-5">
-              <div className="text-xs uppercase tracking-wide lab-muted">Risk Index</div>
-              <div className="mt-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <article className="lab-card flex h-full flex-col rounded-2xl p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-wide lab-muted">Load Analytics</div>
+                  <div className="mt-1 text-lg font-semibold text-white/90">Rolling Trend</div>
+                </div>
+                <span className="inline-flex items-center rounded-full border border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.10)] px-3 py-1 text-xs font-medium text-[rgba(230,232,238,0.92)]">
+                  Model: Rolling
+                </span>
+              </div>
+
+              <div className="mt-4 flex-1 overflow-hidden rounded-xl border border-white/10 bg-[rgba(255,255,255,0.02)] p-3">
+                <div className="mb-2 flex items-center justify-between text-xs lab-muted">
+                  <span>7-day window</span>
+                  <span className="lab-num">baseline + deviation</span>
+                </div>
+                <svg viewBox="0 0 220 100" className="h-28 w-full">
+                  <path d="M0 82 H220" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+                  <path d="M0 60 H220" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                  <path d="M10 72 C45 68, 72 64, 105 57 C136 50, 168 44, 210 35" fill="none" stroke="rgba(34,197,94,0.8)" strokeWidth="2.5" />
+                  <path d="M10 78 C45 75, 72 73, 105 70 C136 68, 168 64, 210 60" fill="none" stroke="rgba(230,232,238,0.45)" strokeWidth="1.8" />
+                </svg>
+              </div>
+
+              <p className="mt-3 text-xs lab-muted">Preview computed from sample session set.</p>
+            </article>
+
+            <article className="lab-card flex h-full flex-col rounded-2xl p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs uppercase tracking-wide lab-muted">Risk Index</div>
+                <span className="inline-flex items-center rounded-full border border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.10)] px-3 py-1 text-xs font-medium text-[rgba(230,232,238,0.92)]">
+                  State: Moderate
+                </span>
+              </div>
+              <div className="mt-4 flex-1">
                 <RiskMeter score={63} />
               </div>
-            </div>
+            </article>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-8 border-b border-white/10 py-12 md:grid-cols-2">
-        <div>
+      <section className="grid gap-8 border-b border-white/10 py-12 md:grid-cols-2 md:items-start">
+        <div className="space-y-3">
           <h2 className="text-2xl font-semibold text-white">System Model</h2>
+          <p className="max-w-md text-sm text-white/70">
+            Deterministic computation pipeline over structured training events, with fixed rolling windows and threshold
+            state transitions.
+          </p>
         </div>
         <ul className="space-y-3">
           {systemModelItems.map((item) => (
