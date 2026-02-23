@@ -1,4 +1,3 @@
-// prisma/seed.ts
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 
@@ -11,56 +10,30 @@ if (!process.env.DATABASE_URL) {
 const prisma = new PrismaClient();
 
 const exercises = [
-  // Squat / legs
-  { name: "Back Squat", category: "squat" },
-  { name: "Front Squat", category: "squat" },
-  { name: "Goblet Squat", category: "squat" },
-  { name: "Leg Press", category: "squat" },
-  { name: "Walking Lunge", category: "squat" },
-  { name: "Bulgarian Split Squat", category: "squat" },
-
-  // Hinge
-  { name: "Deadlift", category: "hinge" },
-  { name: "Romanian Deadlift", category: "hinge" },
-  { name: "Hip Thrust", category: "hinge" },
-  { name: "Good Morning", category: "hinge" },
-  { name: "Back Extension", category: "hinge" },
-
-  // Push
-  { name: "Bench Press", category: "push" },
-  { name: "Incline Bench Press", category: "push" },
-  { name: "Overhead Press", category: "push" },
-  { name: "Dumbbell Bench Press", category: "push" },
-  { name: "Dips", category: "push" },
-  { name: "Push-Up", category: "push" },
-
-  // Pull
-  { name: "Pull-Up", category: "pull" },
-  { name: "Lat Pulldown", category: "pull" },
-  { name: "Barbell Row", category: "pull" },
-  { name: "Dumbbell Row", category: "pull" },
-  { name: "Seated Cable Row", category: "pull" },
-  { name: "Face Pull", category: "pull" },
-
-  // Arms
-  { name: "Bicep Curl", category: "arms" },
-  { name: "Hammer Curl", category: "arms" },
-  { name: "Tricep Pushdown", category: "arms" },
-  { name: "Skull Crushers", category: "arms" },
-
-  // Core
-  { name: "Plank", category: "core" },
-  { name: "Hanging Leg Raise", category: "core" },
-  { name: "Cable Crunch", category: "core" },
-
-  // Calves
-  { name: "Standing Calf Raise", category: "calves" },
-  { name: "Seated Calf Raise", category: "calves" },
-
-  // Conditioning
-  { name: "Rowing Machine", category: "conditioning" },
-  { name: "Assault Bike", category: "conditioning" },
-  { name: "Treadmill Run", category: "conditioning" },
+  { name: "Squat", category: "competition" },
+  { name: "Paused Squat", category: "variation" },
+  { name: "Front Squat", category: "variation" },
+  { name: "Tempo Squat", category: "variation" },
+  { name: "Bench Press", category: "competition" },
+  { name: "Paused Bench", category: "variation" },
+  { name: "Close Grip Bench", category: "variation" },
+  { name: "Incline Bench", category: "upper" },
+  { name: "Deadlift", category: "competition" },
+  { name: "Paused Deadlift", category: "variation" },
+  { name: "Romanian Deadlift", category: "accessory" },
+  { name: "Block Pull", category: "variation" },
+  { name: "Overhead Press", category: "upper" },
+  { name: "Barbell Row", category: "upper" },
+  { name: "Dumbbell Row", category: "upper" },
+  { name: "Pull-Ups", category: "upper" },
+  { name: "Lat Pulldown", category: "upper" },
+  { name: "Hamstring Curl", category: "lower" },
+  { name: "Leg Press", category: "lower" },
+  { name: "Split Squat", category: "lower" },
+  { name: "Triceps Pushdown", category: "accessory" },
+  { name: "Skull Crushers", category: "accessory" },
+  { name: "Bicep Curl", category: "accessory" },
+  { name: "Back Extensions", category: "lower" },
 ];
 
 async function main() {
@@ -72,7 +45,7 @@ async function main() {
     });
   }
 
-  console.log(`Seeded ${exercises.length} exercises`);
+  console.log(`Seeded ${exercises.length} powerlifting exercises`);
 }
 
 main()

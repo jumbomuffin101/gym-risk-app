@@ -7,7 +7,7 @@ import { getOrCreateDbUserId } from "@/app/lib/auth/getUserId";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import { redirect } from "next/navigation";
 
-export async function startWorkoutSession(_formData: FormData) {
+export async function startWorkoutSession(formData: FormData) {
   const userId = await getOrCreateDbUserId();
 
   const existing = await getActiveWorkoutSession(userId);
@@ -21,8 +21,10 @@ export async function startWorkoutSession(_formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/history");
   revalidatePath("/exercises");
+  revalidatePath("/workouts/new");
 
-  redirect("/workouts");
+  const redirectTo = String(formData.get("redirectTo") ?? "/workouts");
+  redirect(redirectTo || "/workouts");
 }
 
 export async function endWorkoutSessionAction(formData: FormData) {
