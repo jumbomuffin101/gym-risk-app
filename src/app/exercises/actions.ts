@@ -128,7 +128,6 @@ export async function createExerciseDetailSetEntryAction(formData: FormData) {
   });
 
   revalidatePath("/exercises");
-  revalidatePath("/exercises/[id]");
   revalidatePath(`/exercises/${exerciseId}`);
   revalidatePath("/dashboard");
 }
