@@ -26,7 +26,7 @@ export default async function ExercisesPage() {
 
       {exercises.length === 0 ? (
         <div className="lab-card rounded-2xl p-6 text-white/80">
-          No exercises yet.
+          No exercises yet. Run the seed script to load the default powerlifting library, or create your first custom exercise from workout logging.
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
