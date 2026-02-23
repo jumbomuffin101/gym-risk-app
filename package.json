@@ -10,7 +10,8 @@
     "seed": "tsx prisma/seed.ts",
     "postinstall": "prisma generate",
     "test": "node --import tsx --test src/**/*.test.ts",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "prisma:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",

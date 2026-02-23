@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth/authOptions";
 import { prisma } from "@/app/lib/prisma";
+import { getServerSession } from "next-auth";
+
+type ExerciseDto = {
+  id: string;
+  name: string;
+  category: string | null;
+};
 
 async function getAuthedUserId() {
   const session = await getServerSession(authOptions);
@@ -20,6 +25,28 @@ async function getAuthedUserId() {
   return user?.id ?? null;
 }
 
+function normalizeExerciseName(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function orderByRelevance(exercises: ExerciseDto[], query: string) {
+  const normalizedQuery = query.toLowerCase();
+
+  return exercises.sort((a, b) => {
+    const aName = a.name.toLowerCase();
+    const bName = b.name.toLowerCase();
+
+    const aStartsWith = aName.startsWith(normalizedQuery);
+    const bStartsWith = bName.startsWith(normalizedQuery);
+
+    if (aStartsWith !== bStartsWith) {
+      return aStartsWith ? -1 : 1;
+    }
+
+    return aName.localeCompare(bName);
+  });
+}
+
 export async function GET(req: Request) {
   const userId = await getAuthedUserId();
   if (!userId) {
@@ -27,45 +54,25 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const query = searchParams.get("query")?.trim() ?? "";
+  const query = normalizeExerciseName(searchParams.get("query") ?? "");
 
   const exercises = await prisma.exercise.findMany({
     where: query
       ? {
-          name: {
-            contains: query,
-            mode: "insensitive",
-          },
+          OR: [
+            { name: { startsWith: query, mode: "insensitive" } },
+            { name: { contains: query, mode: "insensitive" } },
+          ],
         }
       : undefined,
     select: { id: true, name: true, category: true },
-    take: 40,
+    orderBy: { name: "asc" },
+    take: 50,
   });
 
-  const normalized = query.toLowerCase();
+  const ordered = query ? orderByRelevance(exercises, query) : exercises;
 
-  const ordered = exercises.sort((a, b) => {
-    const aName = a.name.toLowerCase();
-    const bName = b.name.toLowerCase();
-
-    const aStarts = normalized ? aName.startsWith(normalized) : false;
-    const bStarts = normalized ? bName.startsWith(normalized) : false;
-
-    if (aStarts !== bStarts) {
-      return aStarts ? -1 : 1;
-    }
-
-    const aIndex = normalized ? aName.indexOf(normalized) : 0;
-    const bIndex = normalized ? bName.indexOf(normalized) : 0;
-
-    if (aIndex !== bIndex) {
-      return aIndex - bIndex;
-    }
-
-    return aName.localeCompare(bName);
-  });
-
-  return NextResponse.json({ exercises: ordered });
+  return NextResponse.json(ordered);
 }
 
 export async function POST(req: Request) {
@@ -75,45 +82,46 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => null);
-  const name = typeof body?.name === "string" ? body.name.trim() : "";
+
+  const name = typeof body?.name === "string" ? normalizeExerciseName(body.name) : "";
   const category = typeof body?.category === "string" ? body.category.trim() : "";
 
   if (name.length < 2) {
-    return NextResponse.json({ error: "Exercise name must be at least 2 characters." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Exercise name must be at least 2 characters." },
+      { status: 400 }
+    );
   }
 
-  const createdCategory = category.length > 0 ? category : "accessory";
-
-  try {
-    const exercise = await prisma.exercise.create({
-      data: {
-        name,
-        category: createdCategory,
+  const existing = await prisma.exercise.findFirst({
+    where: {
+      name: {
+        equals: name,
+        mode: "insensitive",
       },
-      select: {
-        id: true,
-        name: true,
-        category: true,
-      },
-    });
+    },
+    select: {
+      id: true,
+      name: true,
+      category: true,
+    },
+  });
 
-    return NextResponse.json({ exercise }, { status: 201 });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      const existing = await prisma.exercise.findUnique({
-        where: { name },
-        select: { id: true, name: true, category: true },
-      });
-
-      return NextResponse.json(
-        {
-          error: "Exercise already exists.",
-          exercise: existing,
-        },
-        { status: 409 }
-      );
-    }
-
-    return NextResponse.json({ error: "Failed to create exercise." }, { status: 500 });
+  if (existing) {
+    return NextResponse.json(existing);
   }
+
+  const created = await prisma.exercise.create({
+    data: {
+      name,
+      category: category.length > 0 ? category : "accessory",
+    },
+    select: {
+      id: true,
+      name: true,
+      category: true,
+    },
+  });
+
+  return NextResponse.json(created, { status: 201 });
 }

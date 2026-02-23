@@ -11,41 +11,55 @@ const prisma = new PrismaClient();
 
 const exercises = [
   { name: "Squat", category: "competition" },
+  { name: "Bench Press", category: "competition" },
+  { name: "Deadlift", category: "competition" },
+
   { name: "Paused Squat", category: "variation" },
   { name: "Front Squat", category: "variation" },
   { name: "Tempo Squat", category: "variation" },
-  { name: "Bench Press", category: "competition" },
+  { name: "Box Squat", category: "variation" },
+
   { name: "Paused Bench", category: "variation" },
   { name: "Close Grip Bench", category: "variation" },
-  { name: "Incline Bench", category: "upper" },
-  { name: "Deadlift", category: "competition" },
+  { name: "Incline Bench", category: "variation" },
+  { name: "Spoto Press", category: "variation" },
+
   { name: "Paused Deadlift", category: "variation" },
-  { name: "Romanian Deadlift", category: "accessory" },
+  { name: "Romanian Deadlift", category: "variation" },
   { name: "Block Pull", category: "variation" },
+  { name: "Deficit Deadlift", category: "variation" },
+
   { name: "Overhead Press", category: "upper" },
   { name: "Barbell Row", category: "upper" },
   { name: "Dumbbell Row", category: "upper" },
-  { name: "Pull-Ups", category: "upper" },
+  { name: "Pull-ups", category: "upper" },
   { name: "Lat Pulldown", category: "upper" },
-  { name: "Hamstring Curl", category: "lower" },
+  { name: "Skull Crushers", category: "upper" },
+  { name: "Triceps Pushdown", category: "upper" },
+  { name: "Barbell Curl", category: "upper" },
+  { name: "Dumbbell Curl", category: "upper" },
+
   { name: "Leg Press", category: "lower" },
-  { name: "Split Squat", category: "lower" },
-  { name: "Triceps Pushdown", category: "accessory" },
-  { name: "Skull Crushers", category: "accessory" },
-  { name: "Bicep Curl", category: "accessory" },
-  { name: "Back Extensions", category: "lower" },
-];
+  { name: "Bulgarian Split Squat", category: "lower" },
+  { name: "Hamstring Curl", category: "lower" },
+  { name: "Back Extension", category: "lower" },
+  { name: "Hip Thrust", category: "lower" },
+] as const;
 
 async function main() {
-  for (const ex of exercises) {
+  let upsertedCount = 0;
+
+  for (const exercise of exercises) {
     await prisma.exercise.upsert({
-      where: { name: ex.name },
-      update: { category: ex.category },
-      create: { name: ex.name, category: ex.category },
+      where: { name: exercise.name },
+      update: { category: exercise.category },
+      create: { name: exercise.name, category: exercise.category },
     });
+
+    upsertedCount += 1;
   }
 
-  console.log(`Seeded ${exercises.length} powerlifting exercises`);
+  console.log(`Seed complete: ${upsertedCount} exercises upserted.`);
 }
 
 main()
