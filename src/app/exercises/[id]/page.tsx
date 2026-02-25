@@ -47,7 +47,7 @@ export default async function ExerciseDetailPage({
         id: true,
         name: true,
         category: true,
-        _count: { select: { sets: true } },
+        createdAt: true,
       },
     }),
     getActiveWorkoutSession(userId),
