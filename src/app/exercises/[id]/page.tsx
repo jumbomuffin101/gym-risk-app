@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import { createExerciseDetailSetEntryAction, startWorkoutSession } from "@/app/exercises/actions";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const runtime = "nodejs";
 
@@ -15,20 +19,7 @@ export default async function ExerciseDetailPage({
   const id = params.id?.trim();
 
   if (!id) {
-    return (
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div className="lab-card rounded-2xl p-6">
-          <div className="text-lg font-semibold text-white/90">Exercise not found</div>
-          <p className="mt-2 text-sm lab-muted">That exercise could not be loaded.</p>
-          <Link
-            href="/exercises"
-            className="mt-4 inline-flex rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
-          >
-            Back to exercises
-          </Link>
-        </div>
-      </div>
-    );
+    notFound();
   }
 
   const [exercise, activeSession, recentSets] = await Promise.all([
@@ -61,17 +52,35 @@ export default async function ExerciseDetailPage({
   ]);
 
   if (!exercise) {
+    const encodedId = encodeURIComponent(id);
+
     return (
       <div className="mx-auto max-w-5xl space-y-6">
-        <div className="lab-card rounded-2xl p-6">
+        <div className="lab-card rounded-2xl p-6 space-y-3">
           <div className="text-lg font-semibold text-white/90">Exercise not found</div>
-          <p className="mt-2 text-sm lab-muted">That exercise does not exist in your library.</p>
-          <Link
-            href="/exercises"
-            className="mt-4 inline-flex rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
-          >
-            Back to exercises
-          </Link>
+          <p className="text-sm lab-muted">
+            This ID was not found in the database connected to this deployment.
+          </p>
+          <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/85">
+            Requested ID: <code className="font-mono text-xs text-white/90">{id}</code>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Link
+              href="/exercises"
+              className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
+            >
+              Back to Exercises
+            </Link>
+            <Link
+              href={`/api/exercises/by-id?id=${encodedId}`}
+              className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
+            >
+              Open API check
+            </Link>
+          </div>
+          <p className="text-xs lab-muted">
+            Preview deployments can point to a different database than your local seeded environment.
+          </p>
         </div>
       </div>
     );
@@ -241,4 +250,20 @@ export default async function ExerciseDetailPage({
       </section>
     </div>
   );
+}
+
+type RecentSet = {
+  performedAt: Date;
+  reps: number;
+  weight: number;
+};
+
+function sumTonnageFromDate(sets: RecentSet[], fromDate: Date) {
+  return sets.reduce((sum, set) => {
+    if (set.performedAt < fromDate) {
+      return sum;
+    }
+
+    return sum + set.reps * set.weight;
+  }, 0);
 }
