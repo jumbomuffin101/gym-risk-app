@@ -1,9 +1,11 @@
-// src/app/exercises/[id]/page.tsx
+
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { notFound } from "next/navigation";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function ExerciseDetailPage({
   params,
