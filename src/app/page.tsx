@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSession } from "next-auth/react";
 import {
   Activity,
   BarChart3,
@@ -20,40 +21,57 @@ type PreviewMode = "balanced" | "overload";
 
 type PreviewData = {
   risk: number;
-  status: string;
+  riskState: string;
+  riskStateTone: "amber" | "red";
   weeklyLoad: number;
+  weeklyStatus: string;
+  weeklyStatusTone: "green" | "amber" | "red";
+  acuteLoad: number;
+  chronicLoad: number;
+  ratio: string;
+  ratioThreshold: string;
+  ratioThresholdTone: "amber" | "red";
   loadDelta: string;
   graph: string;
-  log: Array<{ date: string; session: string; note: string }>;
-  recoveryFlag?: string;
 };
 
 const previewModes: Record<PreviewMode, PreviewData> = {
   balanced: {
     risk: 72,
-    status: "Moderate risk",
+    riskState: "Moderate",
+    riskStateTone: "amber",
     weeklyLoad: 415,
+    weeklyStatus: "Stable",
+    weeklyStatusTone: "green",
+    acuteLoad: 415,
+    chronicLoad: 430,
+    ratio: "0.97",
+    ratioThreshold: "Monitor",
+    ratioThresholdTone: "amber",
     loadDelta: "+4% vs last week",
     graph: "M2,58 C18,50 34,42 50,38 C66,34 82,36 98,28 C114,22 130,26 146,20",
-    log: [
-      { date: "Tue", session: "Lower body strength", note: "RPE 7 · Pain 1/10" },
-      { date: "Thu", session: "Tempo run + mobility", note: "RPE 7 · Pain 1/10" },
-      { date: "Sat", session: "Upper body volume", note: "RPE 8 · Pain 1/10" },
-    ],
   },
   overload: {
     risk: 86,
-    status: "High risk",
+    riskState: "Exceeded",
+    riskStateTone: "red",
     weeklyLoad: 620,
+    weeklyStatus: "Monitor",
+    weeklyStatusTone: "amber",
+    acuteLoad: 620,
+    chronicLoad: 500,
+    ratio: "1.24",
+    ratioThreshold: "Exceeded",
+    ratioThresholdTone: "red",
     loadDelta: "+22% vs last week",
     graph: "M2,58 C18,52 34,48 50,44 C66,40 82,36 98,26 C114,16 130,10 146,6",
-    log: [
-      { date: "Tue", session: "Lower body strength", note: "RPE 8 · Pain 2/10" },
-      { date: "Thu", session: "Sprint intervals", note: "RPE 9 · Pain 3/10" },
-      { date: "Sat", session: "Upper body volume", note: "RPE 9 · Pain 3/10" },
-    ],
-    recoveryFlag: "Recovery flag: load spike + elevated pain signals",
   },
+};
+
+const toneClass: Record<"green" | "amber" | "red", string> = {
+  green: "border-[rgba(34,197,94,0.35)] bg-[rgba(34,197,94,0.12)] text-[rgb(134,239,172)]",
+  amber: "border-[rgba(251,191,36,0.35)] bg-[rgba(251,191,36,0.12)] text-[rgb(253,230,138)]",
+  red: "border-[rgba(248,113,113,0.35)] bg-[rgba(248,113,113,0.12)] text-[rgb(252,165,165)]",
 };
 
 const sections = [
@@ -163,6 +181,7 @@ function useAnimatedNumber(value: number, reducedMotion: boolean) {
 
 
 export default function WelcomePage() {
+  const { status } = useSession();
   const [mode, setMode] = useState<PreviewMode>("balanced");
   const reducedMotion = useReducedMotion();
   const activeData = previewModes[mode];
@@ -171,6 +190,9 @@ export default function WelcomePage() {
   const [activeSection, setActiveSection] = useState("features");
   const chipClass =
     "rounded-full border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-1 text-xs font-medium text-white/70";
+  const signedIn = status === "authenticated";
+  const primaryCtaHref = signedIn ? "/dashboard" : "/signin";
+  const secondaryCtaHref = signedIn ? "/dashboard" : "/signin";
 
   useEffect(() => {
     if (reducedMotion) {
@@ -274,20 +296,20 @@ export default function WelcomePage() {
   const metrics = useMemo(
     () => [
       {
-        title: "Session load",
-        description: "RPE × duration gives a simple, comparable load score.",
+        title: "Acute Load (7d)",
+        description: "Σ session load over last 7 days (AU).",
       },
       {
-        title: "Weekly load trend",
-        description: "Compare weekly totals to baseline to spot spikes.",
+        title: "Chronic Load (28d)",
+        description: "28-day rolling baseline (AU).",
       },
       {
-        title: "Fatigue indicators",
-        description: "Effort plus recovery trends surface fatigue early consistently.",
+        title: "Load Ratio",
+        description: "Acute / Chronic.",
       },
       {
-        title: "Pain notes",
-        description: "Track discomfort patterns without losing training context over time.",
+        title: "Risk Index",
+        description: "f(ratio, trend, thresholds).",
       },
     ],
     []
@@ -411,11 +433,11 @@ export default function WelcomePage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <Link href="/signup" className="btn-primary">
+                <Link href={primaryCtaHref} className="btn-primary">
                   Start tracking workouts free
                 </Link>
-                <Link href="/signup" className="btn-secondary">
-                  Get your injury risk score
+                <Link href={secondaryCtaHref} className="btn-secondary">
+                  Open existing workspace
                 </Link>
               </div>
 
@@ -497,90 +519,109 @@ export default function WelcomePage() {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-4">
-                <div className="grid gap-4 md:grid-cols-[1.1fr_1fr]">
-                  <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4 transition motion-reduce:transition-none">
-                    <div className="flex items-center justify-between text-xs font-medium text-white/60">
-                      <span>Risk score</span>
-                      <span className={chipClass}>Weekly</span>
-                    </div>
-                    <div className="mt-3 flex items-end justify-between">
-                      <div className="text-3xl font-semibold text-white/90">
-                        {animatedRisk}
-                        <span className="text-sm font-medium text-white/50">/100</span>
-                      </div>
-                      <span className={chipClass}>
-                        {activeData.status}
-                      </span>
-                    </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
-                      <div
-                        className="h-full rounded-full bg-[rgba(125,211,252,0.45)] transition-all duration-500 motion-reduce:transition-none"
-                        style={{ width: `${activeData.risk}%` }}
-                      />
-                    </div>
-                    {activeData.recoveryFlag ? (
-                      <div className="mt-3 rounded-xl border border-[rgba(248,113,113,0.2)] bg-[rgba(248,113,113,0.08)] px-3 py-2 text-xs text-white/75">
-                        {activeData.recoveryFlag}
-                      </div>
-                    ) : null}
+              <div className="mt-5 grid auto-rows-fr gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
+                  <div className="flex items-center justify-between text-xs font-medium text-white/60">
+                    <span>Risk Index</span>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneClass[activeData.riskStateTone]}`}
+                    >
+                      State: {activeData.riskState}
+                    </span>
                   </div>
+                  <div className="mt-3 flex items-end justify-between">
+                    <div className="text-3xl font-semibold text-white/90">
+                      {animatedRisk}
+                      <span className="text-sm font-medium text-white/50">/100</span>
+                    </div>
+                    <span className="text-xs text-white/65">f(ratio, trend, thresholds)</span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
+                    <div
+                      className="h-full rounded-full bg-[rgba(125,211,252,0.45)] transition-all duration-500 motion-reduce:transition-none"
+                      style={{ width: `${activeData.risk}%` }}
+                    />
+                  </div>
+                </div>
 
-                  <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
-                    <div className="flex items-center justify-between text-xs font-medium text-white/60">
-                      <span>Weekly load</span>
-                      <span className="text-[10px] font-medium text-white/50">AU</span>
+                <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
+                  <div className="flex items-center justify-between text-xs font-medium text-white/60">
+                    <span>Weekly Load</span>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneClass[activeData.weeklyStatusTone]}`}
+                    >
+                      Status: {activeData.weeklyStatus}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-end justify-between">
+                    <div className="text-3xl font-semibold text-white/90">
+                      {animatedLoad}
+                      <span className="text-sm font-medium text-white/50"> AU</span>
                     </div>
-                    <div className="mt-3 flex items-end justify-between">
-                      <div className="text-3xl font-semibold text-white/90">
-                        {animatedLoad}
-                        <span className="text-sm font-medium text-white/50"> AU</span>
-                      </div>
-                      <span className="text-xs text-white/70">{activeData.loadDelta}</span>
+                    <span className="text-xs text-white/70">{activeData.loadDelta}</span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-white/65">
+                    <div className="rounded-lg border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-2.5 py-2">
+                      7d total
                     </div>
-                    <div className="mt-4 rounded-xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] p-3">
-                      <div className="flex items-center justify-between text-[11px] font-medium text-white/60">
-                        <span>Weekly load graph</span>
-                        <span>Mon → Sun</span>
-                      </div>
-                      <svg viewBox="0 0 150 64" className="mt-3 h-16 w-full">
-                        <path
-                          d="M2,58 L2,58 146,58"
-                          stroke="rgba(255,255,255,0.08)"
-                          strokeWidth="2"
-                          fill="none"
-                        />
-                        <path
-                          d={activeData.graph}
-                          stroke="var(--lab-analytics)"
-                          strokeWidth="3"
-                          fill="none"
-                          className="transition-all duration-500 motion-reduce:transition-none"
-                        />
-                      </svg>
+                    <div className="rounded-lg border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-2.5 py-2 text-right">
+                      AU scale
                     </div>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
                   <div className="flex items-center justify-between text-xs font-medium text-white/60">
-                    <span>Training log</span>
-                    <span className="text-[10px] font-medium text-white/50">3 sessions</span>
+                    <span>Acute:Chronic</span>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneClass[activeData.ratioThresholdTone]}`}
+                    >
+                      Threshold: {activeData.ratioThreshold}
+                    </span>
                   </div>
-                  <div className="mt-3 space-y-2">
-                    {activeData.log.map((row) => (
-                      <div
-                        key={`${row.date}-${row.session}`}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-3 py-2 text-xs text-white/80 transition motion-reduce:transition-none"
-                      >
-                        <div>
-                          <div className="text-white/90">{row.session}</div>
-                          <div className="text-[10px] font-medium text-white/45">{row.date}</div>
-                        </div>
-                        <div className="text-right text-white/65">{row.note}</div>
-                      </div>
-                    ))}
+                  <div className="mt-3 grid grid-cols-3 items-end gap-3">
+                    <div>
+                      <div className="text-[10px] font-medium uppercase tracking-wide text-white/45">Acute</div>
+                      <div className="mt-1 text-xl font-semibold text-white/90">{activeData.acuteLoad}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-medium uppercase tracking-wide text-white/45">Chronic</div>
+                      <div className="mt-1 text-xl font-semibold text-white/90">{activeData.chronicLoad}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] font-medium uppercase tracking-wide text-white/45">Ratio</div>
+                      <div className="mt-1 text-2xl font-semibold text-white/90">{activeData.ratio}</div>
+                    </div>
                   </div>
+                </div>
+
+                <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
+                  <div className="flex items-center justify-between text-xs font-medium text-white/60">
+                    <span>Load analytics</span>
+                    <span className={chipClass}>Model: Rolling</span>
+                  </div>
+                  <div className="mt-4 rounded-xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] p-3">
+                    <div className="flex items-center justify-between text-[11px] font-medium text-white/60">
+                      <span>Session trend</span>
+                      <span>Mon → Sun</span>
+                    </div>
+                    <svg viewBox="0 0 150 64" className="mt-3 h-16 w-full">
+                      <path
+                        d="M2,58 L2,58 146,58"
+                        stroke="rgba(255,255,255,0.08)"
+                        strokeWidth="2"
+                        fill="none"
+                      />
+                      <path
+                        d={activeData.graph}
+                        stroke="var(--lab-analytics)"
+                        strokeWidth="3"
+                        fill="none"
+                        className="transition-all duration-500 motion-reduce:transition-none"
+                      />
+                    </svg>
+                  </div>
+                  <p className="mt-3 text-xs text-white/60">Preview computed from sample session set.</p>
                 </div>
               </div>
             </div>
@@ -678,6 +719,13 @@ export default function WelcomePage() {
                 </span>
               ))}
             </div>
+
+            <div className="mt-6 rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-5">
+              <div className="text-xs font-semibold text-[var(--lab-analytics)]">System model</div>
+              <p className="mt-2 text-sm text-white/70">
+                Deterministic load scoring combines rolling exposure and threshold checks into an interpretable readiness state.
+              </p>
+            </div>
           </div>
           <div className="lab-card rounded-2xl p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
@@ -751,11 +799,11 @@ export default function WelcomePage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link href="/signup" className="btn-primary">
+              <Link href={primaryCtaHref} className="btn-primary">
                 Start tracking workouts free
               </Link>
-              <Link href="/signup" className="btn-secondary">
-                Get your injury risk score
+              <Link href={secondaryCtaHref} className="btn-secondary">
+                Open existing workspace
               </Link>
             </div>
           </div>

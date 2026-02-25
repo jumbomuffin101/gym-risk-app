@@ -48,7 +48,6 @@ function StepPill({
 }
 
 export function SessionStepper({ active }: { active: boolean }) {
-  // This is intentionally only 1 or 2 for now, until you have a real "review" state.
   const current: Step = active ? 2 : 1;
 
   return (
@@ -57,7 +56,7 @@ export function SessionStepper({ active }: { active: boolean }) {
         <div>
           <div className="text-xs uppercase tracking-wide lab-muted">Session flow</div>
           <div className="mt-1 text-sm text-[rgba(230,232,238,0.88)]">
-            A guided pipeline that highlights what matters now.
+            Current session pipeline based on your workout state.
           </div>
         </div>
 
@@ -79,10 +78,9 @@ export function SessionStepper({ active }: { active: boolean }) {
           state={current === 2 ? "active" : "next"}
         />
 
-        {/* Risk review shown, but locked until you add a real "review" step state */}
         <StepPill
           label="Risk review"
-          state="locked"
+          state={active ? "next" : "locked"}
         />
       </div>
 

@@ -7,7 +7,7 @@ import { getOrCreateDbUserId } from "@/app/lib/auth/getUserId";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import { redirect } from "next/navigation";
 
-export async function startWorkoutSession(_formData: FormData) {
+export async function startWorkoutSession(formData: FormData) {
   const userId = await getOrCreateDbUserId();
 
   const existing = await getActiveWorkoutSession(userId);
@@ -21,8 +21,10 @@ export async function startWorkoutSession(_formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/history");
   revalidatePath("/exercises");
+  revalidatePath("/workouts/new");
 
-  redirect("/workouts");
+  const redirectTo = String(formData.get("redirectTo") ?? "/workouts");
+  redirect(redirectTo || "/workouts");
 }
 
 export async function endWorkoutSessionAction(formData: FormData) {
@@ -45,6 +47,7 @@ const CreateSetSchema = z.object({
   reps: z.coerce.number().int().min(1),
   weight: z.coerce.number().min(0),
   rpe: z.coerce.number().min(1).max(10).optional().or(z.nan().transform(() => undefined)),
+  pain: z.coerce.number().int().min(0).max(10).optional().or(z.nan().transform(() => undefined)),
 });
 
 export async function createSetEntryAction(formData: FormData) {
@@ -53,18 +56,16 @@ export async function createSetEntryAction(formData: FormData) {
     reps: formData.get("reps"),
     weight: formData.get("weight"),
     rpe: formData.get("rpe"),
+    pain: formData.get("pain"),
   });
 
   if (!parsed.success) {
-    return { ok: false as const, error: parsed.error.issues.map(i => i.message).join(", ") };
+    return { ok: false as const, error: parsed.error.issues.map((i) => i.message).join(", ") };
   }
 
-  const { exerciseId, reps, weight, rpe } = parsed.data;
+  const { exerciseId, reps, weight, rpe, pain } = parsed.data;
 
-  // Ensure we have a real DB user
   const userId = await getOrCreateDbUserId();
-
-  // Ensure we have an active session (endedAt = null)
   let session = await getActiveWorkoutSession(userId);
   if (!session) {
     session = await prisma.workoutSession.create({ data: { userId } });
@@ -80,7 +81,7 @@ export async function createSetEntryAction(formData: FormData) {
       reps,
       weight,
       rpe: rpe ?? null,
-      pain: null,
+      pain: pain ?? null,
     },
   });
 
@@ -91,4 +92,42 @@ export async function createSetEntryAction(formData: FormData) {
   revalidatePath("/history");
 
   return { ok: true as const, volume, risk: 0, label: "Logged" };
+}
+
+export async function createExerciseDetailSetEntryAction(formData: FormData) {
+  const parsed = CreateSetSchema.safeParse({
+    exerciseId: formData.get("exerciseId"),
+    reps: formData.get("reps"),
+    weight: formData.get("weight"),
+    rpe: formData.get("rpe"),
+    pain: formData.get("pain"),
+  });
+
+  if (!parsed.success) {
+    return;
+  }
+
+  const { exerciseId, reps, weight, rpe, pain } = parsed.data;
+  const userId = await getOrCreateDbUserId();
+  const activeSession = await getActiveWorkoutSession(userId);
+
+  if (!activeSession) {
+    return;
+  }
+
+  await prisma.setEntry.create({
+    data: {
+      userId,
+      sessionId: activeSession.id,
+      exerciseId,
+      reps,
+      weight,
+      rpe: rpe ?? null,
+      pain: pain ?? null,
+    },
+  });
+
+  revalidatePath("/exercises");
+  revalidatePath(`/exercises/${exerciseId}`);
+  revalidatePath("/dashboard");
 }
