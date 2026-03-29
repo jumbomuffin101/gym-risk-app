@@ -12,20 +12,18 @@ export default function DashboardActions() {
       >
         New workout
       </Link>
+      <Link
+        href="/history"
+        className="btn-secondary text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
+      >
+        History
+      </Link>
       <button
         type="button"
         onClick={() => signOut({ callbackUrl: "/" })}
         className="btn-secondary text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
       >
         Sign out
-      </button>
-
-      <button
-        type="button"
-        onClick={() => alert("Switch user coming next")}
-        className="btn-secondary text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
-      >
-        Switch user
       </button>
     </div>
   );
