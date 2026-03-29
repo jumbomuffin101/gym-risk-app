@@ -32,7 +32,12 @@ export default function ExercisePicker({ enabled }: Props) {
   }, [query]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setResults([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
 
     const controller = new AbortController();
 
