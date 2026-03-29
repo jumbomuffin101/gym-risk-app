@@ -55,8 +55,9 @@ export default function ExercisePicker({ enabled }: Props) {
           throw new Error("Search failed");
         }
 
-        const data = (await response.json()) as { exercises: Exercise[] };
-        setResults(data.exercises);
+        const data = (await response.json()) as { exercises?: Exercise[] } | Exercise[];
+        const exercises = Array.isArray(data) ? data : data.exercises ?? [];
+        setResults(exercises);
       } catch {
         if (!controller.signal.aborted) {
           setError("Could not load exercises. Try again.");
@@ -96,17 +97,22 @@ export default function ExercisePicker({ enabled }: Props) {
         body: JSON.stringify({ name: query.trim(), category: "accessory" }),
       });
 
-      const data = (await response.json()) as {
-        exercise?: Exercise;
-        error?: string;
-      };
+      const data = (await response.json()) as
+        | {
+            exercise?: Exercise;
+            error?: string;
+          }
+        | Exercise;
 
-      if (!response.ok && !data.exercise) {
-        throw new Error(data.error ?? "Failed to create");
+      const exercise = "id" in data ? data : data.exercise;
+      const errorMessage = "error" in data ? data.error : undefined;
+
+      if (!response.ok && !exercise) {
+        throw new Error(errorMessage ?? "Failed to create");
       }
 
-      if (data.exercise) {
-        addExercise(data.exercise);
+      if (exercise) {
+        addExercise(exercise);
         setQuery("");
         setDebouncedQuery("");
       }

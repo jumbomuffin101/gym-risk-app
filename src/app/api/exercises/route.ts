@@ -72,7 +72,7 @@ export async function GET(req: Request) {
 
   const ordered = query ? orderByRelevance(exercises, query) : exercises;
 
-  return NextResponse.json(ordered);
+  return NextResponse.json({ exercises: ordered });
 }
 
 export async function POST(req: Request) {
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
   });
 
   if (existing) {
-    return NextResponse.json(existing);
+    return NextResponse.json({ exercise: existing });
   }
 
   const created = await prisma.exercise.create({
@@ -123,5 +123,5 @@ export async function POST(req: Request) {
     },
   });
 
-  return NextResponse.json(created, { status: 201 });
+  return NextResponse.json({ exercise: created }, { status: 201 });
 }
