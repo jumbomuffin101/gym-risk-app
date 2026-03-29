@@ -13,10 +13,11 @@ export const runtime = "nodejs";
 export default async function ExerciseDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const userId = await requireDbUserId();
-  const id = params.id?.trim();
+  const { id: rawId } = await params;
+  const id = rawId?.trim();
 
   if (!id) {
     notFound();
@@ -239,8 +240,8 @@ export default async function ExerciseDetailPage({
                     <td className="py-2 pr-4">{new Date(set.performedAt).toLocaleString()}</td>
                     <td className="py-2 pr-4">{set.reps}</td>
                     <td className="py-2 pr-4">{set.weight}</td>
-                    <td className="py-2 pr-4">{set.rpe ?? "—"}</td>
-                    <td className="py-2 pr-4">{set.pain ?? "—"}</td>
+                    <td className="py-2 pr-4">{set.rpe ?? "-"}</td>
+                    <td className="py-2 pr-4">{set.pain ?? "-"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -258,12 +259,8 @@ type RecentSet = {
   weight: number;
 };
 
-function sumTonnageFromDate(sets: RecentSet[], fromDate: Date) {
-  return sets.reduce((sum, set) => {
-    if (set.performedAt < fromDate) {
-      return sum;
-    }
-
-    return sum + set.reps * set.weight;
-  }, 0);
+function sumTonnageFromDate(sets: RecentSet[], from: Date) {
+  return sets
+    .filter((set) => set.performedAt >= from)
+    .reduce((total, set) => total + set.reps * set.weight, 0);
 }
