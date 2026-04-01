@@ -55,6 +55,23 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const query = normalizeExerciseName(searchParams.get("query") ?? "");
+  const ids = searchParams
+    .get("ids")
+    ?.split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (ids && ids.length > 0) {
+    const exercises = await prisma.exercise.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, category: true },
+    });
+
+    const order = new Map(ids.map((item, index) => [item, index]));
+    const ordered = exercises.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
+
+    return NextResponse.json({ exercises: ordered });
+  }
 
   const exercises = await prisma.exercise.findMany({
     where: query

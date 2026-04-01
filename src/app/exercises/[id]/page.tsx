@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
+import { readSessionPlan } from "@/app/lib/sessionPlan";
 import { createExerciseDetailSetEntryAction, startWorkoutSession } from "@/app/exercises/actions";
 
 export const runtime = "nodejs";
@@ -88,9 +89,10 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
     );
   }
 
-  const selectedIds = parseSelectedIds(selectedParam, id);
+  const activeSession = await getActiveWorkoutSession(userId);
+  const selectedIds = parseSelectedIds(selectedParam, readSessionPlan(activeSession?.note).selectedExerciseIds, id);
 
-  const [exercise, activeSession, recentSets, selectedExercises] = await Promise.all([
+  const [exercise, recentSets, selectedExercises] = await Promise.all([
     prisma.exercise.findUnique({
       where: { id },
       select: {
@@ -100,7 +102,6 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
         createdAt: true,
       },
     }),
-    getActiveWorkoutSession(userId),
     prisma.setEntry.findMany({
       where: {
         userId,
@@ -512,13 +513,13 @@ function MetricCard({
   );
 }
 
-function parseSelectedIds(value: string | undefined, currentId: string) {
-  const items = (value ?? "")
+function parseSelectedIds(value: string | undefined, persistedIds: string[], currentId: string) {
+  const queryIds = (value ?? "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 
-  const unique = Array.from(new Set(items));
+  const unique = Array.from(new Set([...queryIds, ...persistedIds]));
   return unique.includes(currentId) ? unique : [currentId, ...unique];
 }
 

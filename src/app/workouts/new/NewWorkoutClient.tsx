@@ -8,6 +8,7 @@ import { formatSessionStartedAt } from "./formatSessionStartedAt";
 type ActiveSession = {
   id: string;
   startedAt: string;
+  selectedExerciseIds: string[];
 };
 
 export default function NewWorkoutClient({
@@ -89,7 +90,10 @@ export default function NewWorkoutClient({
         </div>
       )}
 
-      <ExercisePicker enabled={Boolean(activeSession)} />
+      <ExercisePicker
+        enabled={Boolean(activeSession)}
+        initialSelectedExerciseIds={activeSession?.selectedExerciseIds ?? []}
+      />
 
       <div className="flex flex-wrap gap-2">
         <Link

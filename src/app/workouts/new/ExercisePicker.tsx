@@ -12,11 +12,12 @@ type Exercise = {
 
 type Props = {
   enabled: boolean;
+  initialSelectedExerciseIds: string[];
 };
 
 const MAX_SELECTED = 10;
 
-export default function ExercisePicker({ enabled }: Props) {
+export default function ExercisePicker({ enabled, initialSelectedExerciseIds }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -25,6 +26,7 @@ export default function ExercisePicker({ enabled }: Props) {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectionReady, setSelectionReady] = useState(initialSelectedExerciseIds.length === 0);
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebouncedQuery(query.trim()), 200);
@@ -34,8 +36,10 @@ export default function ExercisePicker({ enabled }: Props) {
   useEffect(() => {
     if (!enabled) {
       setResults([]);
+      setSelected([]);
       setLoading(false);
       setError(null);
+      setSelectionReady(initialSelectedExerciseIds.length === 0);
       return;
     }
 
@@ -78,6 +82,52 @@ export default function ExercisePicker({ enabled }: Props) {
     return () => controller.abort();
   }, [debouncedQuery, enabled]);
 
+  useEffect(() => {
+    if (!enabled) return;
+    if (initialSelectedExerciseIds.length === 0) {
+      setSelected([]);
+      setSelectionReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    setSelectionReady(false);
+
+    async function loadSelectedExercises() {
+      try {
+        const response = await fetch(`/api/exercises?ids=${initialSelectedExerciseIds.join(",")}`, {
+          method: "GET",
+        });
+        if (!response.ok) {
+          throw new Error("Failed to load exercise catalog");
+        }
+
+        const data = (await response.json()) as { exercises?: Exercise[] } | Exercise[];
+        const exercises = Array.isArray(data) ? data : data.exercises ?? [];
+        const byId = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+        const nextSelected = initialSelectedExerciseIds
+          .map((id) => byId.get(id))
+          .filter((exercise): exercise is Exercise => Boolean(exercise));
+
+        if (!cancelled) {
+          setSelected(nextSelected);
+          setSelectionReady(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setSelected([]);
+          setSelectionReady(true);
+        }
+      }
+    }
+
+    void loadSelectedExercises();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, initialSelectedExerciseIds]);
+
   const selectedIds = useMemo(() => new Set(selected.map((item) => item.id)), [selected]);
   const selectedQuery = useMemo(() => {
     if (selected.length === 0) return "";
@@ -88,6 +138,29 @@ export default function ExercisePicker({ enabled }: Props) {
 
     return `?${params.toString()}`;
   }, [selected]);
+
+  useEffect(() => {
+    if (!enabled || !selectionReady) return;
+
+    const controller = new AbortController();
+
+    async function persistSelection() {
+      try {
+        await fetch("/api/sessions/active", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ selectedExerciseIds: selected.map((item) => item.id) }),
+          signal: controller.signal,
+        });
+      } catch {
+        // Ignore plan persistence failures in the UI; navigation still works via query string fallback.
+      }
+    }
+
+    void persistSelection();
+
+    return () => controller.abort();
+  }, [enabled, selected, selectionReady]);
 
   function removeExercise(id: string) {
     setSelected((prev) => prev.filter((item) => item.id !== id));

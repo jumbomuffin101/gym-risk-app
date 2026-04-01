@@ -4,6 +4,7 @@ import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import { startWorkoutSession, endWorkoutSessionAction } from "@/app/exercises/actions";
 import { computeSessionRisk } from "@/app/lib/riskEngine";
 import { prisma } from "@/app/lib/prisma";
+import { readSessionPlan } from "@/app/lib/sessionPlan";
 
 export const runtime = "nodejs";
 
@@ -39,7 +40,7 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
   const userId = await requireDbUserId();
   const { selected: selectedParam } = await searchParams;
   const active = await getActiveWorkoutSession(userId);
-  const selectedIds = parseSelectedIds(selectedParam);
+  const selectedIds = parseSelectedIds(selectedParam, readSessionPlan(active?.note).selectedExerciseIds);
 
   if (!active) {
     return (
@@ -455,11 +456,10 @@ function cleanRiskTitle(value: string) {
   return value.replaceAll("â‰¥", ">=");
 }
 
-function parseSelectedIds(value: string | undefined) {
+function parseSelectedIds(value: string | undefined, persistedIds: string[]) {
   return Array.from(
     new Set(
-      (value ?? "")
-        .split(",")
+      [...(value ?? "").split(","), ...persistedIds]
         .map((item) => item.trim())
         .filter(Boolean)
     )
