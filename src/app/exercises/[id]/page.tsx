@@ -25,6 +25,11 @@ type ExerciseSummary = {
   category: string | null;
 };
 
+type SessionMetric = {
+  label: string;
+  value: string;
+};
+
 const CATEGORY_GUIDANCE: Record<
   string,
   {
@@ -186,53 +191,65 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
   const categoryKey = (exercise.category ?? "").toLowerCase();
   const guidance = CATEGORY_GUIDANCE[categoryKey] ?? {
     title: "Standard strength log",
-    note: "Log the working set that best reflects this exercise. Use pain and RPE to keep the risk signal honest.",
+    note: "Log the working set that best reflects this exercise.",
     repsHint: "Typical rep target",
     weightHint: "Working load",
   };
 
   const backTo = orderedSelectedExercises.length > 0 ? "/workouts/new" : "/exercises";
   const startRedirectTo = `/exercises/${exercise.id}${selectedQuery}`;
+  const sessionMetrics: SessionMetric[] = [
+    { label: "Sets", value: String(sessionSetCount) },
+    { label: "Load", value: sessionTonnage.toFixed(1) },
+    { label: "Signal", value: stressState.title },
+  ];
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="lab-card rounded-2xl p-5 space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/workouts/new"
+            className="rounded-full border border-[rgba(34,197,94,0.35)] bg-[rgba(34,197,94,0.1)] px-3 py-1.5 text-sm text-white"
+          >
+            Workout Flow
+          </Link>
+          <Link
+            href="/workouts"
+            className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white/75 hover:bg-white/[0.06]"
+          >
+            Session Result
+          </Link>
+        </div>
+
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="text-xs uppercase tracking-wide lab-muted">Exercise</div>
+            <div className="text-xs uppercase tracking-wide lab-muted">Current exercise</div>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/95">{exercise.name}</h1>
             <p className="mt-1 text-sm lab-muted">{exercise.category ?? "Uncategorized"}</p>
-            <p className="mt-2 max-w-2xl text-sm text-white/75">
-              Log the current working set, keep the workout moving, and watch volume, effort, and pain in one place.
-            </p>
           </div>
 
-          <div className="min-w-[220px] rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-xs uppercase tracking-wide lab-muted">Session status</div>
-            <div className="mt-2 text-sm font-semibold text-white/90">
-              {activeSession ? "Active session in progress" : "No active session"}
-            </div>
-            <div className="mt-1 text-xs text-white/60">
-              {activeSession
-                ? `Started ${activeSession.startedAt.toLocaleString()}`
-                : "Start a session to unlock logging and exercise flow."}
-            </div>
-            {orderedSelectedExercises.length > 0 ? (
-              <div className="mt-3 text-xs text-white/60">
-                Exercise {currentIndex + 1} of {orderedSelectedExercises.length} selected
-              </div>
-            ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={backTo}
+              className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
+            >
+              Exit to flow
+            </Link>
+            <Link
+              href="/workouts"
+              className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
+            >
+              Session result
+            </Link>
           </div>
         </div>
 
         {orderedSelectedExercises.length > 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-xs uppercase tracking-wide lab-muted">Workout flow</div>
-                <div className="mt-1 text-sm text-white/80">
-                  Move through the selected exercises without losing your place.
-                </div>
+              <div className="text-sm text-white/75">
+                {currentIndex + 1} of {orderedSelectedExercises.length}
               </div>
               <div className="flex flex-wrap gap-2">
                 {previousExercise ? (
@@ -248,16 +265,9 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
                     href={buildExerciseHref(nextExercise.id, orderedSelectedExercises)}
                     className="inline-flex rounded-xl border border-[rgba(34,197,94,0.24)] bg-[rgba(34,197,94,0.1)] px-3 py-2 text-xs font-medium text-white hover:bg-[rgba(34,197,94,0.15)]"
                   >
-                    Next exercise
+                    Next
                   </Link>
-                ) : (
-                  <Link
-                    href="/workouts"
-                    className="inline-flex rounded-xl border border-[rgba(34,197,94,0.24)] bg-[rgba(34,197,94,0.1)] px-3 py-2 text-xs font-medium text-white hover:bg-[rgba(34,197,94,0.15)]"
-                  >
-                    Review session
-                  </Link>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -289,23 +299,23 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-white/90">Log current set</div>
-              <p className="mt-1 text-xs text-white/60">{guidance.note}</p>
+              <p className="mt-1 text-xs text-white/60">{guidance.title}</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
-              <div className="text-[11px] uppercase tracking-wide lab-muted">{guidance.title}</div>
+              <div className="text-[11px] uppercase tracking-wide lab-muted">Last set</div>
               <div className="mt-1 text-xs text-white/65">
-                Reps: {guidance.repsHint} | Load: {guidance.weightHint}
+                {lastSet ? `${lastSet.reps} reps | ${lastSet.weight} load` : "No baseline yet"}
               </div>
             </div>
           </div>
 
           {activeSession ? (
             <div className="rounded-xl border border-[rgba(34,197,94,0.2)] bg-[rgba(34,197,94,0.06)] p-3 text-sm text-white/85">
-              Active session detected. Log into the current workout and use the workout-flow chips above to move between exercises.
+              Active session ready.
             </div>
           ) : (
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
-              <div className="text-sm text-white/85">No active session.</div>
+              <div className="text-sm text-white/85">Start a session to log sets.</div>
               <form action={startWorkoutSession}>
                 <input type="hidden" name="redirectTo" value={startRedirectTo} />
                 <button
@@ -381,17 +391,14 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
                 </label>
               </div>
 
-              {lastSet ? (
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/65">
-                  Last logged set: {lastSet.reps} reps at {lastSet.weight} load
-                  {lastSet.rpe ? `, RPE ${lastSet.rpe}` : ""}
-                  {lastSet.pain !== null && lastSet.pain !== undefined ? `, pain ${lastSet.pain}` : ""}.
-                </div>
-              ) : (
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/65">
-                  No previous set found for this exercise yet. Enter your first working set to establish a baseline.
-                </div>
-              )}
+              <div className="grid gap-2 sm:grid-cols-3">
+                {sessionMetrics.map((metric) => (
+                  <div key={metric.label} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="text-[11px] uppercase tracking-wide lab-muted">{metric.label}</div>
+                    <div className="mt-1 text-sm font-semibold text-white/90">{metric.value}</div>
+                  </div>
+                ))}
+              </div>
 
               <div className="flex flex-wrap items-center gap-2">
                 <button className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]">
@@ -412,41 +419,18 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
 
         <aside className="space-y-6">
           <section className="lab-card rounded-2xl p-5 space-y-4">
-            <div className="text-sm font-semibold text-white/90">Live summary</div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <MetricCard label="This session sets" value={String(sessionSetCount)} help="Sets logged for this exercise in the active session." />
-              <MetricCard label="This session tonnage" value={sessionTonnage.toFixed(1)} help="Reps x weight for this exercise during the current session." />
-              <MetricCard
-                label="Average session RPE"
-                value={averageSessionRpe !== null ? averageSessionRpe.toFixed(1) : "-"}
-                help="Only uses logged RPE values from this session."
-              />
-              <MetricCard
-                label="Max pain this session"
-                value={maxSessionPain !== null ? String(maxSessionPain) : "-"}
-                help="Highest pain score logged for this exercise in the current session."
-              />
-            </div>
+            <div className="text-sm font-semibold text-white/90">Session result</div>
 
             <div className={`rounded-2xl border p-4 ${stressState.classes}`}>
-              <div className="text-xs uppercase tracking-wide text-white/65">Training signal</div>
-              <div className="mt-1 text-sm font-semibold text-white/90">{stressState.title}</div>
-              <div className="mt-1 text-xs text-white/70">{stressState.description}</div>
+              <div className="text-xs uppercase tracking-wide text-white/65">Overall signal</div>
+              <div className="mt-1 text-lg font-semibold text-white/90">{stressState.title}</div>
+              <div className="mt-1 text-sm text-white/70">{stressState.description}</div>
             </div>
-          </section>
-
-          <section className="lab-card rounded-2xl p-5 space-y-4">
-            <div className="text-sm font-semibold text-white/90">Baseline snapshot</div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <MetricCard label="Last 7d tonnage" value={tonnage7d.toFixed(1)} help="Recent accumulated work for this exercise." />
-              <MetricCard label="Last 28d tonnage" value={tonnage28d.toFixed(1)} help="Wider baseline for trend comparison." />
-              <MetricCard
-                label="Last performed"
-                value={lastPerformedAt ? lastPerformedAt.toLocaleString() : "No sets logged"}
-                help="Most recent recorded set for this exercise."
-              />
+              <MetricCard label="Sets here" value={String(sessionSetCount)} help="For this exercise in the current session." />
+              <MetricCard label="Avg RPE" value={averageSessionRpe !== null ? averageSessionRpe.toFixed(1) : "-"} help="Current exercise effort." />
+              <MetricCard label="Max pain" value={maxSessionPain !== null ? String(maxSessionPain) : "-"} help="Current exercise discomfort." />
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -454,13 +438,13 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
                 href={backTo}
                 className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/80 hover:bg-white/[0.06]"
               >
-                Back to {orderedSelectedExercises.length > 0 ? "new workout" : "exercises"}
+                Back to flow
               </Link>
               <Link
                 href="/workouts"
                 className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/80 hover:bg-white/[0.06]"
               >
-                Workout overview
+                Session result
               </Link>
             </div>
           </section>
@@ -470,7 +454,9 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
       <section className="lab-card rounded-2xl p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm font-semibold text-white/90">Recent sets</div>
-          <div className="text-xs text-white/50">Latest 20 entries for this exercise</div>
+          <div className="text-xs text-white/50">
+            {lastPerformedAt ? `Last logged ${lastPerformedAt.toLocaleString()}` : "No recent history"}
+          </div>
         </div>
 
         {recentSets.length === 0 ? (
