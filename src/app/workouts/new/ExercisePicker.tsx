@@ -166,6 +166,21 @@ export default function ExercisePicker({ enabled, initialSelectedExerciseIds }: 
     setSelected((prev) => prev.filter((item) => item.id !== id));
   }
 
+  function moveExercise(id: string, direction: "up" | "down") {
+    setSelected((prev) => {
+      const index = prev.findIndex((item) => item.id === id);
+      if (index === -1) return prev;
+
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+
+      const next = [...prev];
+      const [item] = next.splice(index, 1);
+      next.splice(targetIndex, 0, item);
+      return next;
+    });
+  }
+
   function toggleExercise(exercise: Exercise) {
     if (selectedIds.has(exercise.id)) {
       removeExercise(exercise.id);
@@ -288,26 +303,53 @@ export default function ExercisePicker({ enabled, initialSelectedExerciseIds }: 
 
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-3">
         <div className="text-xs uppercase tracking-wide lab-muted">
-          Selected ({selected.length}/{MAX_SELECTED})
+          Session queue ({selected.length}/{MAX_SELECTED})
         </div>
 
         {selected.length === 0 ? (
-          <div className="text-sm text-white/65">No exercises selected.</div>
+          <div className="text-sm text-white/65">No exercises in the queue yet.</div>
         ) : (
-          <ul className="max-h-44 space-y-2 overflow-y-auto pr-1">
-            {selected.map((exercise) => (
-              <li key={exercise.id} className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-sm text-white/85">{exercise.name}</div>
-                  <div className="text-xs lab-muted">{exercise.category ?? "uncategorized"}</div>
+          <ul className="max-h-56 space-y-2 overflow-y-auto pr-1">
+            {selected.map((exercise, index) => (
+              <li
+                key={exercise.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-[11px] text-white/65">
+                      {index + 1}
+                    </div>
+                    <div className="truncate text-sm text-white/85">{exercise.name}</div>
+                  </div>
+                  <div className="mt-1 text-xs lab-muted">{exercise.category ?? "uncategorized"}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeExercise(exercise.id)}
-                  className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/[0.06]"
-                >
-                  Remove
-                </button>
+
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => moveExercise(exercise.id, "up")}
+                    disabled={index === 0}
+                    className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/[0.06] disabled:opacity-40"
+                  >
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveExercise(exercise.id, "down")}
+                    disabled={index === selected.length - 1}
+                    className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/[0.06] disabled:opacity-40"
+                  >
+                    Down
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeExercise(exercise.id)}
+                    className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/[0.06]"
+                  >
+                    Remove
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -320,8 +362,17 @@ export default function ExercisePicker({ enabled, initialSelectedExerciseIds }: 
             disabled={selected.length === 0}
             className="lab-hover rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
           >
-            Open selected exercises
+            Start queue
           </button>
+          {selected.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setSelected([])}
+              className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
+            >
+              Clear queue
+            </button>
+          ) : null}
         </div>
 
         {selected.length > 1 ? (
