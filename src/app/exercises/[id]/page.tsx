@@ -215,7 +215,7 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
             Workout Flow
           </Link>
           <Link
-            href="/workouts"
+            href={selectedQuery ? `/workouts${selectedQuery}` : "/workouts"}
             className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white/75 hover:bg-white/[0.06]"
           >
             Session Result
@@ -237,7 +237,7 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
               Exit to flow
             </Link>
             <Link
-              href="/workouts"
+              href={selectedQuery ? `/workouts${selectedQuery}` : "/workouts"}
               className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
             >
               Session result
@@ -441,7 +441,7 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
                 Back to flow
               </Link>
               <Link
-                href="/workouts"
+                href={selectedQuery ? `/workouts${selectedQuery}` : "/workouts"}
                 className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/80 hover:bg-white/[0.06]"
               >
                 Session result

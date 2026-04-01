@@ -7,6 +7,10 @@ import { prisma } from "@/app/lib/prisma";
 
 export const runtime = "nodejs";
 
+type PageProps = {
+  searchParams: Promise<{ selected?: string }>;
+};
+
 type SessionSet = {
   id: string;
   exerciseId: string;
@@ -31,9 +35,11 @@ type ExerciseAggregate = {
   maxPain: number | null;
 };
 
-export default async function WorkoutPage() {
+export default async function WorkoutPage({ searchParams }: PageProps) {
   const userId = await requireDbUserId();
+  const { selected: selectedParam } = await searchParams;
   const active = await getActiveWorkoutSession(userId);
+  const selectedIds = parseSelectedIds(selectedParam);
 
   if (!active) {
     return (
@@ -96,9 +102,21 @@ export default async function WorkoutPage() {
       },
     },
   });
+  const selectedExercises = selectedIds.length
+    ? await prisma.exercise.findMany({
+        where: { id: { in: selectedIds } },
+        select: {
+          id: true,
+          name: true,
+          category: true,
+        },
+      })
+    : [];
 
   const riskReasons = await computeSessionRisk(userId, active.id);
   const perExercise = aggregateExercises(sessionSets);
+  const orderedSelectedExercises = sortSelectedExercises(selectedExercises, selectedIds);
+  const selectedQuery = orderedSelectedExercises.length > 0 ? buildSelectedQuery(orderedSelectedExercises) : "";
   const totalSets = sessionSets.length;
   const totalExercises = perExercise.length;
   const totalTonnage = sumTonnage(sessionSets);
@@ -107,13 +125,21 @@ export default async function WorkoutPage() {
   const overallSignal = getOverallSignal({ totalSets, avgRpe, maxPain, riskReasons: riskReasons.length });
   const topExercise = perExercise[0] ?? null;
   const nextMove = getNextMove({ totalSets, totalExercises, maxPain, riskReasons: riskReasons.length });
+  const nextExerciseId =
+    orderedSelectedExercises.find((exercise) => !perExercise.some((item) => item.exerciseId === exercise.id))?.id ??
+    orderedSelectedExercises[0]?.id ??
+    perExercise[0]?.exerciseId ??
+    null;
+  const continueLoggingHref = nextExerciseId
+    ? buildExerciseHref(nextExerciseId, orderedSelectedExercises)
+    : "/workouts/new";
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="lab-card rounded-2xl p-5 space-y-4">
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/workouts/new"
+            href={selectedQuery ? `/workouts/new${selectedQuery}` : "/workouts/new"}
             className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white/75 hover:bg-white/[0.06]"
           >
             Workout Flow
@@ -132,7 +158,7 @@ export default async function WorkoutPage() {
 
           <div className="flex flex-wrap gap-2">
             <Link
-              href="/workouts/new"
+              href={selectedQuery ? `/workouts/new${selectedQuery}` : "/workouts/new"}
               className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
             >
               Back to flow
@@ -162,7 +188,7 @@ export default async function WorkoutPage() {
               <div className="mt-1 text-xs text-white/55">This is the workout-level breakdown, not just individual set history.</div>
             </div>
             <Link
-              href="/workouts/new"
+              href={continueLoggingHref}
               className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/80 hover:bg-white/[0.06]"
             >
               Continue logging
@@ -178,7 +204,7 @@ export default async function WorkoutPage() {
               {perExercise.map((exercise) => (
                 <Link
                   key={exercise.exerciseId}
-                  href={`/exercises/${exercise.exerciseId}`}
+                  href={buildExerciseHref(exercise.exerciseId, orderedSelectedExercises)}
                   className="block rounded-2xl border border-white/10 bg-white/[0.02] p-4 transition hover:bg-white/[0.04]"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-4">
@@ -427,4 +453,39 @@ function getNextMove({
 
 function cleanRiskTitle(value: string) {
   return value.replaceAll("â‰¥", ">=");
+}
+
+function parseSelectedIds(value: string | undefined) {
+  return Array.from(
+    new Set(
+      (value ?? "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function sortSelectedExercises(
+  exercises: { id: string; name: string; category: string | null }[],
+  orderedIds: string[]
+) {
+  const order = new Map(orderedIds.map((item, index) => [item, index]));
+  return [...exercises].sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
+}
+
+function buildSelectedQuery(exercises: { id: string }[]) {
+  const params = new URLSearchParams({
+    selected: exercises.map((item) => item.id).join(","),
+  });
+
+  return `?${params.toString()}`;
+}
+
+function buildExerciseHref(exerciseId: string, selectedExercises: { id: string }[]) {
+  if (selectedExercises.length === 0) {
+    return `/exercises/${exerciseId}`;
+  }
+
+  return `/exercises/${exerciseId}${buildSelectedQuery(selectedExercises)}`;
 }
