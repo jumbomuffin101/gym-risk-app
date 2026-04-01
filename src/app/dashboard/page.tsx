@@ -1,11 +1,10 @@
-// src/app/dashboard/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
+import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { authOptions } from "@/app/lib/auth/authOptions";
 import { prisma } from "@/app/lib/prisma";
-import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import {
   computeAcuteChronicRatio,
   computeSessionLoad,
@@ -16,10 +15,10 @@ import {
 
 import DashboardActions from "./DashboardActions";
 import { KpiCard } from "src/app/dashboard/KpiCard";
+import { LoadPanel } from "src/app/dashboard/LoadPanel";
+import { MuscleHeatmap, type RiskMap } from "src/app/dashboard/MuscleHeatmap";
 import { RiskMeter } from "src/app/dashboard/RiskMeter";
 import { SessionStepper } from "src/app/dashboard/SessionStepper";
-import { MuscleHeatmap, type RiskMap } from "src/app/dashboard/MuscleHeatmap";
-import { LoadPanel } from "src/app/dashboard/LoadPanel";
 import { LabCard } from "src/app/dashboard/components/LabCard";
 import { MetricCard } from "src/app/dashboard/components/MetricCard";
 import { PageShell } from "src/app/dashboard/components/PageShell";
@@ -31,6 +30,17 @@ export const runtime = "nodejs";
 function daysAgo(d: Date) {
   const diff = Date.now() - d.getTime();
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
+function formatSessionLabel(session: {
+  note: string | null;
+  endedAt: Date | null;
+  _count: { sets: number };
+}) {
+  if (session.note) return session.note;
+  if (session.endedAt === null) return "Active session";
+  if (session._count.sets > 0) return `${session._count.sets} sets logged`;
+  return "Session recorded";
 }
 
 export default async function DashboardPage() {
@@ -65,7 +75,10 @@ export default async function DashboardPage() {
     sessionLoad: computeSessionLoad(workout.sets),
   }));
 
-  const activeSession = sessionsWithLoad.find((s) => s.endedAt === null) ?? null;
+  const activeSession = sessionsWithLoad.find((entry) => entry.endedAt === null) ?? null;
+  const loggedSessions = sessionsWithLoad.filter((entry) => entry._count.sets > 0);
+  const completedLoggedSessions = loggedSessions.filter((entry) => entry.endedAt !== null);
+  const analyticsSessions = loggedSessions;
 
   const now = new Date();
   const sevenDaysAgo = new Date(now);
@@ -75,17 +88,29 @@ export default async function DashboardPage() {
   const twentyEightDaysAgo = new Date(now);
   twentyEightDaysAgo.setDate(now.getDate() - 28);
 
-  const weeklyLoad = sumLoadInWindow(sessionsWithLoad, sevenDaysAgo, now);
-  const priorWeeklyLoad = sumLoadInWindow(sessionsWithLoad, fourteenDaysAgo, sevenDaysAgo);
-  const chronic28d = sumLoadInWindow(sessionsWithLoad, twentyEightDaysAgo, now);
+  const weeklyLoad = sumLoadInWindow(analyticsSessions, sevenDaysAgo, now);
+  const priorWeeklyLoad = sumLoadInWindow(analyticsSessions, fourteenDaysAgo, sevenDaysAgo);
+  const chronic28d = sumLoadInWindow(analyticsSessions, twentyEightDaysAgo, now);
   const baseline7d = chronic28d / 4;
   const ratio = computeAcuteChronicRatio(weeklyLoad, chronic28d);
   const wowPct = computeWowPercent(weeklyLoad, priorWeeklyLoad);
 
-  const hasTwoWeekWindow = sessionsWithLoad.some((s) => daysAgo(new Date(s.startedAt)) >= 14);
-  const risk = deriveRiskState(wowPct, ratio);
+  const hasTwoWeekWindow = analyticsSessions.some((entry) => daysAgo(new Date(entry.startedAt)) >= 14);
+  const derivedRisk = deriveRiskState(wowPct, ratio);
+  const risk =
+    analyticsSessions.length === 0
+      ? { state: "Stable" as const, driver: "Log workouts to establish your baseline" }
+      : derivedRisk;
 
-  const fakeRiskScore = risk.state === "High" ? 79 : risk.state === "Monitor" ? 48 : 20;
+  const fakeRiskScore =
+    analyticsSessions.length === 0
+      ? 8
+      : risk.state === "High"
+        ? 79
+        : risk.state === "Monitor"
+          ? 48
+          : 20;
+
   const heatmap: RiskMap = {
     shoulders: "low",
     elbows: ratio >= 1.3 ? "moderate" : "low",
@@ -94,15 +119,22 @@ export default async function DashboardPage() {
     hamstrings: wowPct >= 15 ? "moderate" : "low",
     knees: "low",
   };
-  const elevatedCount = Object.values(heatmap).filter((v) => v !== "low").length;
+  const elevatedCount = Object.values(heatmap).filter((value) => value !== "low").length;
 
-  const trend = sessionsWithLoad
+  const trend = analyticsSessions
     .slice(0, 8)
     .reverse()
-    .map((s) => Number(s.sessionLoad.toFixed(2)));
+    .map((entry) => Number(entry.sessionLoad.toFixed(2)));
 
   const riskEvents: Array<{ when: Date; title: string; detail: string; tone: "danger" | "watch" }> = [];
-  if (wowPct >= 30) {
+  if (analyticsSessions.length === 0) {
+    riskEvents.push({
+      when: now,
+      title: "Baseline building",
+      detail: "Log a few sessions with sets to unlock load trendlines and regional risk signals.",
+      tone: "watch",
+    });
+  } else if (wowPct >= 30) {
     riskEvents.push({
       when: now,
       title: "Week-over-week spike",
@@ -118,27 +150,32 @@ export default async function DashboardPage() {
     });
   }
 
-  if (ratio > 1.5) {
-    riskEvents.push({
-      when: now,
-      title: "Acute:chronic high",
-      detail: `AC ratio ${ratio.toFixed(2)} is above 1.5.`,
-      tone: "danger",
-    });
-  } else if (ratio >= 1.3) {
-    riskEvents.push({
-      when: now,
-      title: "Acute:chronic monitor",
-      detail: `AC ratio ${ratio.toFixed(2)} is in the monitor band.`,
-      tone: "watch",
-    });
+  if (analyticsSessions.length > 0) {
+    if (ratio > 1.5) {
+      riskEvents.push({
+        when: now,
+        title: "Acute:chronic high",
+        detail: `AC ratio ${ratio.toFixed(2)} is above 1.5.`,
+        tone: "danger",
+      });
+    } else if (ratio >= 1.3) {
+      riskEvents.push({
+        when: now,
+        title: "Acute:chronic monitor",
+        detail: `AC ratio ${ratio.toFixed(2)} is in the monitor band.`,
+        tone: "watch",
+      });
+    }
   }
 
-  const lastSessionAgo = sessions.length > 0 ? daysAgo(new Date(sessions[0].startedAt)) : null;
+  const lastMeaningfulSession = loggedSessions[0] ?? activeSession ?? null;
+  const lastSessionAgo = lastMeaningfulSession ? daysAgo(new Date(lastMeaningfulSession.startedAt)) : null;
+  const activeSessionLoggedSets = activeSession?._count.sets ?? 0;
+  const recentSessions = completedLoggedSessions.slice(0, 5);
 
   return (
     <PageShell>
-      <LabCard className="rounded-2xl p-5 overflow-hidden relative" hover={false}>
+      <LabCard className="relative overflow-hidden rounded-2xl p-5" hover={false}>
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-60"
@@ -162,9 +199,11 @@ export default async function DashboardPage() {
                   <div className="text-sm text-white/80">
                     System:{" "}
                     <span className="lab-muted">
-                      {sessions.length === 0
+                      {lastSessionAgo === null
                         ? "No recent training load detected."
-                        : `Last session: ${lastSessionAgo}d ago.`}
+                        : lastSessionAgo === 0
+                          ? "Last session: today."
+                          : `Last session: ${lastSessionAgo}d ago.`}
                     </span>
                   </div>
                 </div>
@@ -187,16 +226,27 @@ export default async function DashboardPage() {
               ? `Started ${new Date(activeSession.startedAt).toLocaleString()}`
               : "No active session. Start a new workout."
           }
-          micro={activeSession ? `${activeSession._count.sets} sets logged` : "Awaiting session start"}
-          microTone={activeSession ? "watch" : "neutral"}
-          progress={activeSession ? 68 : 10}
+          micro={
+            activeSession
+              ? activeSessionLoggedSets > 0
+                ? `${activeSessionLoggedSets} sets logged`
+                : "Session started, no sets logged yet"
+              : "Awaiting session start"
+          }
+          microTone={activeSession ? (activeSessionLoggedSets > 0 ? "watch" : "neutral") : "neutral"}
+          progress={activeSession ? (activeSessionLoggedSets > 0 ? 68 : 18) : 10}
         />
 
         <MetricCard
           eyebrow="Risk status"
           title={risk.state}
           subtitle={risk.driver}
-          actions={<StatusChip label={risk.state} tone={risk.state === "High" ? "danger" : risk.state === "Monitor" ? "watch" : "safe"} />}
+          actions={
+            <StatusChip
+              label={risk.state}
+              tone={risk.state === "High" ? "danger" : risk.state === "Monitor" ? "watch" : "safe"}
+            />
+          }
         >
           <div className="flex items-center justify-between gap-4">
             <div className="text-xs lab-muted">Derived from weekly load change and acute:chronic ratio.</div>
@@ -236,7 +286,7 @@ export default async function DashboardPage() {
         <LabCard className="rounded-2xl p-5">
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-white/90">Recent sessions</div>
-            <div className="text-xs lab-muted">{Math.min(sessionsWithLoad.length, 5)} shown</div>
+            <div className="text-xs lab-muted">{Math.min(recentSessions.length, 5)} shown</div>
           </div>
 
           {sessionsWithLoad.length === 0 ? (
@@ -244,32 +294,50 @@ export default async function DashboardPage() {
               <div className="text-sm text-white/85">No sessions yet</div>
               <div className="mt-1 text-xs lab-muted">Start a workout and log sets to populate your dashboard.</div>
               <div className="mt-3">
-                <a className="btn-primary text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]" href="/workouts">
+                <Link
+                  className="btn-primary text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
+                  href="/workouts"
+                >
                   Go to workouts
-                </a>
+                </Link>
+              </div>
+            </div>
+          ) : recentSessions.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="text-sm text-white/85">No logged sessions yet</div>
+              <div className="mt-1 text-xs lab-muted">
+                You may have an active session, but the dashboard will populate once sets are logged.
+              </div>
+              <div className="mt-3">
+                <Link
+                  className="btn-secondary text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
+                  href="/workouts/new"
+                >
+                  Open workout
+                </Link>
               </div>
             </div>
           ) : (
             <div className="mt-4 space-y-2">
-              {sessionsWithLoad.slice(0, 5).map((s) => (
-                <Link
-                  key={s.id}
-                  href={`/api/sessions/${s.id}`}
-                  className="block rounded-xl border border-white/10 bg-white/[0.02] p-3 hover:bg-white/[0.03] transition"
-                >
+              {recentSessions.map((entry) => (
+                <div key={entry.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium text-white/90">{new Date(s.startedAt).toLocaleString()}</div>
-                    <div className="text-xs lab-muted">{s._count.sets} sets</div>
+                    <div className="text-sm font-medium text-white/90">
+                      {new Date(entry.startedAt).toLocaleString()}
+                    </div>
+                    <div className="text-xs lab-muted">{entry._count.sets} sets</div>
                   </div>
-                  <div className="mt-1 text-xs lab-muted">Session load: {Math.round(s.sessionLoad).toLocaleString()}</div>
-                  {s.note ? <div className="mt-1 text-xs text-white/70">{s.note}</div> : null}
-                </Link>
+                  <div className="mt-1 text-xs lab-muted">
+                    Session load: {Math.round(entry.sessionLoad).toLocaleString()}
+                  </div>
+                  <div className="mt-1 text-xs text-white/70">{formatSessionLabel(entry)}</div>
+                </div>
               ))}
             </div>
           )}
         </LabCard>
 
-        <LabCard className="rounded-2xl p-5 relative overflow-hidden">
+        <LabCard className="relative overflow-hidden rounded-2xl p-5">
           <div
             aria-hidden
             className="pointer-events-none absolute left-0 right-0 top-0 h-px opacity-40"

@@ -1,6 +1,7 @@
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import NewWorkoutClient from "./NewWorkoutClient";
+import StartWorkoutSessionForm from "./StartWorkoutSessionForm";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,7 @@ export default async function NewWorkoutPage() {
             }
           : null
       }
+      startSessionForm={<StartWorkoutSessionForm />}
     />
   );
 }

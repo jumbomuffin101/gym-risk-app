@@ -21,10 +21,10 @@ function StepPill({
     state === "active"
       ? "border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.07)]"
       : state === "done"
-      ? "border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.03)]"
-      : state === "locked"
-      ? "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] opacity-70"
-      : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)]";
+        ? "border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.03)]"
+        : state === "locked"
+          ? "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] opacity-70"
+          : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)]";
 
   const hint =
     state === "active" ? "Current stage" : state === "done" ? "Completed" : state === "locked" ? "Locked" : "Next";
@@ -33,8 +33,8 @@ function StepPill({
     state === "active"
       ? "var(--lab-safe)"
       : state === "done"
-      ? "rgba(230,232,238,0.35)"
-      : "rgba(230,232,238,0.22)";
+        ? "rgba(230,232,238,0.35)"
+        : "rgba(230,232,238,0.22)";
 
   return (
     <div className={`${base} ${styles}`}>
@@ -69,24 +69,14 @@ export function SessionStepper({ active }: { active: boolean }) {
       </div>
 
       <div className="mt-4 space-y-3">
-        <StepPill
-          label="Start session"
-          state={current === 1 ? "active" : "done"}
-        />
-        <StepPill
-          label="Log sets"
-          state={current === 2 ? "active" : "next"}
-        />
-
-        <StepPill
-          label="Risk review"
-          state={active ? "next" : "locked"}
-        />
+        <StepPill label="Start session" state={current === 1 ? "active" : "done"} />
+        <StepPill label="Log sets" state={current === 2 ? "active" : "next"} />
+        <StepPill label="Risk review" state={active ? "next" : "locked"} />
       </div>
 
       <div className="mt-4 text-xs lab-muted">
         {active ? (
-          <>Active session detected — logging sets will update risk signals live.</>
+          <>Active session detected - logging sets will update risk signals live.</>
         ) : (
           <>Start a session to enable live risk tracking and heatmap updates.</>
         )}

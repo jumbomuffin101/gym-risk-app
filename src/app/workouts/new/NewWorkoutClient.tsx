@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import ExercisePicker from "./ExercisePicker";
-import { startWorkoutSession } from "@/app/exercises/actions";
+import { formatSessionStartedAt } from "./formatSessionStartedAt";
 
 type ActiveSession = {
   id: string;
@@ -12,10 +12,17 @@ type ActiveSession = {
 
 export default function NewWorkoutClient({
   initialActiveSession,
+  startSessionForm,
 }: {
   initialActiveSession: ActiveSession | null;
+  startSessionForm: ReactNode;
 }) {
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(initialActiveSession);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,25 +77,14 @@ export default function NewWorkoutClient({
               </div>
             </div>
 
-            <form action={startWorkoutSession}>
-              <input type="hidden" name="redirectTo" value="/workouts/new" />
-              <button
-                className="lab-hover rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black"
-                style={{
-                  boxShadow:
-                    "0 0 0 1px rgba(34,197,94,0.25), 0 18px 55px rgba(34,197,94,0.12)",
-                }}
-              >
-                Start session
-              </button>
-            </form>
+            {startSessionForm}
           </div>
         </div>
       ) : (
         <div className="lab-card rounded-2xl p-5">
           <div className="text-xs uppercase tracking-wide lab-muted">Active session</div>
-          <div className="mt-1 text-sm text-white/80">
-            Started {new Date(activeSession.startedAt).toLocaleString()}
+          <div className="mt-1 text-sm text-white/80" suppressHydrationWarning>
+            Started {isMounted ? formatSessionStartedAt(activeSession.startedAt) : ""}
           </div>
         </div>
       )}
