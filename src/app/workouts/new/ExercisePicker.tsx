@@ -79,6 +79,15 @@ export default function ExercisePicker({ enabled }: Props) {
   }, [debouncedQuery, enabled]);
 
   const selectedIds = useMemo(() => new Set(selected.map((item) => item.id)), [selected]);
+  const selectedQuery = useMemo(() => {
+    if (selected.length === 0) return "";
+
+    const params = new URLSearchParams({
+      selected: selected.map((item) => item.id).join(","),
+    });
+
+    return `?${params.toString()}`;
+  }, [selected]);
 
   function removeExercise(id: string) {
     setSelected((prev) => prev.filter((item) => item.id !== id));
@@ -234,7 +243,7 @@ export default function ExercisePicker({ enabled }: Props) {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => selected[0] && router.push(`/exercises/${selected[0].id}`)}
+            onClick={() => selected[0] && router.push(`/exercises/${selected[0].id}${selectedQuery}`)}
             disabled={selected.length === 0}
             className="lab-hover rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
           >
@@ -247,7 +256,7 @@ export default function ExercisePicker({ enabled }: Props) {
             {selected.map((exercise) => (
               <Link
                 key={`${exercise.id}-link`}
-                href={`/exercises/${exercise.id}`}
+                href={`/exercises/${exercise.id}${selectedQuery}`}
                 className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/80 hover:bg-white/[0.06]"
               >
                 {exercise.name}
