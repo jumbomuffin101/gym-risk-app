@@ -14,7 +14,7 @@ type Props = {
   enabled: boolean;
 };
 
-const MAX_SELECTED = 6;
+const MAX_SELECTED = 10;
 
 export default function ExercisePicker({ enabled }: Props) {
   const router = useRouter();
