@@ -84,20 +84,38 @@ export async function createSetEntryAction(formData: FormData) {
 
   const volume = reps * weight;
 
-  await prisma.setEntry.create({
-    data: {
-      userId,
-      sessionId: session.id,
-      exerciseId,
-      reps,
-      weight,
-      durationSeconds: durationSeconds ?? null,
-      distanceMeters: distanceMeters ?? null,
-      rpe: rpe ?? null,
-      pain: pain ?? null,
-      notes: notes ?? null,
-    },
-  });
+  try {
+    await prisma.setEntry.create({
+      data: {
+        userId,
+        sessionId: session.id,
+        exerciseId,
+        reps,
+        weight,
+        durationSeconds: durationSeconds ?? null,
+        distanceMeters: distanceMeters ?? null,
+        rpe: rpe ?? null,
+        pain: pain ?? null,
+        notes: notes ?? null,
+      },
+    });
+  } catch (error) {
+    if (!isMissingSetEntryColumnError(error)) {
+      throw error;
+    }
+
+    await prisma.setEntry.create({
+      data: {
+        userId,
+        sessionId: session.id,
+        exerciseId,
+        reps,
+        weight,
+        rpe: rpe ?? null,
+        pain: pain ?? null,
+      },
+    });
+  }
 
   revalidatePath(`/exercises/${exerciseId}`);
   revalidatePath("/exercises");
@@ -135,20 +153,38 @@ export async function createExerciseDetailSetEntryAction(formData: FormData) {
     return { ok: false as const, error: "No active session." };
   }
 
-  await prisma.setEntry.create({
-    data: {
-      userId,
-      sessionId: activeSession.id,
-      exerciseId,
-      reps,
-      weight,
-      durationSeconds: durationSeconds ?? null,
-      distanceMeters: distanceMeters ?? null,
-      rpe: rpe ?? null,
-      pain: pain ?? null,
-      notes: notes ?? null,
-    },
-  });
+  try {
+    await prisma.setEntry.create({
+      data: {
+        userId,
+        sessionId: activeSession.id,
+        exerciseId,
+        reps,
+        weight,
+        durationSeconds: durationSeconds ?? null,
+        distanceMeters: distanceMeters ?? null,
+        rpe: rpe ?? null,
+        pain: pain ?? null,
+        notes: notes ?? null,
+      },
+    });
+  } catch (error) {
+    if (!isMissingSetEntryColumnError(error)) {
+      throw error;
+    }
+
+    await prisma.setEntry.create({
+      data: {
+        userId,
+        sessionId: activeSession.id,
+        exerciseId,
+        reps,
+        weight,
+        rpe: rpe ?? null,
+        pain: pain ?? null,
+      },
+    });
+  }
 
   revalidatePath("/exercises");
   revalidatePath(`/exercises/${exerciseId}`);
@@ -157,4 +193,9 @@ export async function createExerciseDetailSetEntryAction(formData: FormData) {
   revalidatePath("/workouts/new");
 
   return { ok: true as const };
+}
+
+function isMissingSetEntryColumnError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.includes("durationSeconds") || message.includes("distanceMeters") || message.includes("notes");
 }

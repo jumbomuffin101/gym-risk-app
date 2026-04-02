@@ -19,8 +19,8 @@ type SessionSet = {
   exerciseId: string;
   reps: number;
   weight: number;
-  durationSeconds: number | null;
-  distanceMeters: number | null;
+  durationSeconds?: number | null;
+  distanceMeters?: number | null;
   rpe: number | null;
   pain: number | null;
   exercise: {
@@ -96,8 +96,6 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
       exerciseId: true,
       reps: true,
       weight: true,
-      durationSeconds: true,
-      distanceMeters: true,
       rpe: true,
       pain: true,
       exercise: {

@@ -33,11 +33,8 @@ export default async function HistorySessionDetailPage({ params }: PageProps) {
           performedAt: true,
           reps: true,
           weight: true,
-          durationSeconds: true,
-          distanceMeters: true,
           rpe: true,
           pain: true,
-          notes: true,
           exercise: {
             select: {
               id: true,
@@ -208,11 +205,11 @@ function groupSessionExercises(
     performedAt: Date;
     reps: number;
     weight: number;
-    durationSeconds: number | null;
-    distanceMeters: number | null;
+    durationSeconds?: number | null;
+    distanceMeters?: number | null;
     rpe: number | null;
     pain: number | null;
-    notes: string | null;
+    notes?: string | null;
     exercise: {
       id: string;
       name: string;
@@ -319,9 +316,9 @@ function formatTime(date: Date) {
 }
 
 function formatSetDetails(set: {
-  durationSeconds: number | null;
-  distanceMeters: number | null;
-  notes: string | null;
+  durationSeconds?: number | null;
+  distanceMeters?: number | null;
+  notes?: string | null;
 }) {
   const parts: string[] = [];
 

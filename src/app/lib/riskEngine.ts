@@ -12,8 +12,8 @@ type RiskSet = {
   sessionId?: string;
   weight: number;
   reps: number;
-  durationSeconds: number | null;
-  distanceMeters: number | null;
+  durationSeconds?: number | null;
+  distanceMeters?: number | null;
   rpe: number | null;
   pain: number | null;
   exercise: {
@@ -186,8 +186,6 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
       sessionId: true,
       weight: true,
       reps: true,
-      durationSeconds: true,
-      distanceMeters: true,
       rpe: true,
       pain: true,
       exercise: { select: { category: true, name: true } },
@@ -213,8 +211,6 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
           sessionId: true,
           weight: true,
           reps: true,
-          durationSeconds: true,
-          distanceMeters: true,
           rpe: true,
           pain: true,
           exercise: { select: { category: true, name: true } },

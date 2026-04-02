@@ -19,11 +19,11 @@ type RecentSet = {
   performedAt: Date;
   reps: number;
   weight: number;
-  durationSeconds: number | null;
-  distanceMeters: number | null;
+  durationSeconds?: number | null;
+  distanceMeters?: number | null;
   rpe: number | null;
   pain: number | null;
-  notes: string | null;
+  notes?: string | null;
 };
 
 type ExerciseSummary = {
@@ -233,11 +233,8 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
         performedAt: true,
         reps: true,
         weight: true,
-        durationSeconds: true,
-        distanceMeters: true,
         rpe: true,
         pain: true,
-        notes: true,
       },
     }),
     selectedIds.length > 0
@@ -272,11 +269,8 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
           performedAt: true,
           reps: true,
           weight: true,
-          durationSeconds: true,
-          distanceMeters: true,
           rpe: true,
           pain: true,
-          notes: true,
         },
       })
     : [];
@@ -497,11 +491,11 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
                     performedAt: lastSet.performedAt.toISOString(),
                     reps: lastSet.reps,
                     weight: lastSet.weight,
-                    durationSeconds: lastSet.durationSeconds,
-                    distanceMeters: lastSet.distanceMeters,
+                    durationSeconds: null,
+                    distanceMeters: null,
                     rpe: lastSet.rpe,
                     pain: lastSet.pain,
-                    notes: lastSet.notes,
+                    notes: null,
                   }
                 : null
             }
@@ -509,11 +503,11 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
               performedAt: set.performedAt.toISOString(),
               reps: set.reps,
               weight: set.weight,
-              durationSeconds: set.durationSeconds,
-              distanceMeters: set.distanceMeters,
+              durationSeconds: null,
+              distanceMeters: null,
               rpe: set.rpe,
               pain: set.pain,
-              notes: set.notes,
+              notes: null,
             }))}
             profile={loggingProfile}
             nextExerciseHref={nextExercise ? buildExerciseHref(nextExercise.id, orderedSelectedExercises) : null}
@@ -594,7 +588,9 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
                     <td className="px-3 py-2 pr-4">{new Date(set.performedAt).toLocaleString()}</td>
                     <td className="py-2 pr-4">{set.reps}</td>
                     <td className="py-2 pr-4">{set.weight}</td>
-                    <td className="py-2 pr-4 text-white/65">{formatSetDetails(set)}</td>
+                    <td className="py-2 pr-4 text-white/65">
+                      {formatSetDetails({ durationSeconds: null, distanceMeters: null, notes: null })}
+                    </td>
                     <td className="py-2 pr-4">{set.rpe ?? "-"}</td>
                     <td className="py-2 pr-4">{set.pain ?? "-"}</td>
                   </tr>
