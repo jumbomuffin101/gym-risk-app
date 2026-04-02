@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
+import { supportsExtendedSetEntryFields } from "@/app/lib/data/setEntrySchema";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import { startWorkoutSession, endWorkoutSessionAction } from "@/app/exercises/actions";
 import { computeSessionRisk, type RiskReason } from "@/app/lib/riskEngine";
@@ -44,6 +45,7 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
   const userId = await requireDbUserId();
   const { selected: selectedParam } = await searchParams;
   const active = await getActiveWorkoutSession(userId);
+  const supportsExtendedFields = await supportsExtendedSetEntryFields();
   const selectedIds = parseSelectedIds(selectedParam, readSessionPlan(active?.note).selectedExerciseIds);
 
   if (!active) {
@@ -96,6 +98,12 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
       exerciseId: true,
       reps: true,
       weight: true,
+      ...(supportsExtendedFields
+        ? {
+            durationSeconds: true,
+            distanceMeters: true,
+          }
+        : {}),
       rpe: true,
       pain: true,
       exercise: {

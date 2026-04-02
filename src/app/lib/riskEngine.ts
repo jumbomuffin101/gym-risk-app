@@ -1,4 +1,5 @@
 import { computeSetLoad } from "@/lib/metrics/load";
+import { supportsExtendedSetEntryFields } from "@/app/lib/data/setEntrySchema";
 import { prisma } from "src/app/lib/prisma";
 
 export type RiskReason = {
@@ -179,6 +180,7 @@ export function deriveRiskReasonsForSets(
  * This is intentionally rule-based and explainable for v0.
  */
 export async function computeSessionRisk(userId: string, sessionId: string): Promise<RiskReason[]> {
+  const supportsExtendedFields = await supportsExtendedSetEntryFields();
   const sets = await prisma.setEntry.findMany({
     where: { sessionId },
     orderBy: { performedAt: "asc" },
@@ -186,6 +188,12 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
       sessionId: true,
       weight: true,
       reps: true,
+      ...(supportsExtendedFields
+        ? {
+            durationSeconds: true,
+            distanceMeters: true,
+          }
+        : {}),
       rpe: true,
       pain: true,
       exercise: { select: { category: true, name: true } },
@@ -211,6 +219,12 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
           sessionId: true,
           weight: true,
           reps: true,
+          ...(supportsExtendedFields
+            ? {
+                durationSeconds: true,
+                distanceMeters: true,
+              }
+            : {}),
           rpe: true,
           pain: true,
           exercise: { select: { category: true, name: true } },

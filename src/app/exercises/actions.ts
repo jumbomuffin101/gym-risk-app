@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getOrCreateDbUserId } from "@/app/lib/auth/getUserId";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
+import {
+  isMissingSetEntryColumnError,
+  markExtendedSetEntryFieldsUnsupported,
+  supportsExtendedSetEntryFields,
+} from "@/app/lib/data/setEntrySchema";
 import { redirect } from "next/navigation";
 
 export async function startWorkoutSession(formData: FormData) {
@@ -83,6 +88,7 @@ export async function createSetEntryAction(formData: FormData) {
   }
 
   const volume = reps * weight;
+  const supportsExtendedFields = await supportsExtendedSetEntryFields();
 
   try {
     await prisma.setEntry.create({
@@ -92,17 +98,23 @@ export async function createSetEntryAction(formData: FormData) {
         exerciseId,
         reps,
         weight,
-        durationSeconds: durationSeconds ?? null,
-        distanceMeters: distanceMeters ?? null,
         rpe: rpe ?? null,
         pain: pain ?? null,
-        notes: notes ?? null,
+        ...(supportsExtendedFields
+          ? {
+              durationSeconds: durationSeconds ?? null,
+              distanceMeters: distanceMeters ?? null,
+              notes: notes ?? null,
+            }
+          : {}),
       },
     });
   } catch (error) {
     if (!isMissingSetEntryColumnError(error)) {
       throw error;
     }
+
+    markExtendedSetEntryFieldsUnsupported();
 
     await prisma.setEntry.create({
       data: {
@@ -148,6 +160,7 @@ export async function createExerciseDetailSetEntryAction(formData: FormData) {
   const { exerciseId, reps, weight, durationSeconds, distanceMeters, rpe, pain, notes } = parsed.data;
   const userId = await getOrCreateDbUserId();
   const activeSession = await getActiveWorkoutSession(userId);
+  const supportsExtendedFields = await supportsExtendedSetEntryFields();
 
   if (!activeSession) {
     return { ok: false as const, error: "No active session." };
@@ -161,17 +174,23 @@ export async function createExerciseDetailSetEntryAction(formData: FormData) {
         exerciseId,
         reps,
         weight,
-        durationSeconds: durationSeconds ?? null,
-        distanceMeters: distanceMeters ?? null,
         rpe: rpe ?? null,
         pain: pain ?? null,
-        notes: notes ?? null,
+        ...(supportsExtendedFields
+          ? {
+              durationSeconds: durationSeconds ?? null,
+              distanceMeters: distanceMeters ?? null,
+              notes: notes ?? null,
+            }
+          : {}),
       },
     });
   } catch (error) {
     if (!isMissingSetEntryColumnError(error)) {
       throw error;
     }
+
+    markExtendedSetEntryFieldsUnsupported();
 
     await prisma.setEntry.create({
       data: {
@@ -193,9 +212,4 @@ export async function createExerciseDetailSetEntryAction(formData: FormData) {
   revalidatePath("/workouts/new");
 
   return { ok: true as const };
-}
-
-function isMissingSetEntryColumnError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  return message.includes("durationSeconds") || message.includes("distanceMeters") || message.includes("notes");
 }

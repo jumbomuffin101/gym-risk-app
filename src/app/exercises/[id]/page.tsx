@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
+import { supportsExtendedSetEntryFields } from "@/app/lib/data/setEntrySchema";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import { readSessionPlan } from "@/app/lib/sessionPlan";
 import { createExerciseDetailSetEntryAction, startWorkoutSession } from "@/app/exercises/actions";
@@ -210,6 +211,7 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
 
   const activeSession = await getActiveWorkoutSession(userId);
   const selectedIds = parseSelectedIds(selectedParam, readSessionPlan(activeSession?.note).selectedExerciseIds, id);
+  const supportsExtendedFields = await supportsExtendedSetEntryFields();
 
   const [exercise, recentSets, selectedExercises, sessionExerciseRefs] = await Promise.all([
     prisma.exercise.findUnique({
@@ -233,6 +235,13 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
         performedAt: true,
         reps: true,
         weight: true,
+        ...(supportsExtendedFields
+          ? {
+              durationSeconds: true,
+              distanceMeters: true,
+              notes: true,
+            }
+          : {}),
         rpe: true,
         pain: true,
       },
@@ -269,6 +278,13 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
           performedAt: true,
           reps: true,
           weight: true,
+          ...(supportsExtendedFields
+            ? {
+                durationSeconds: true,
+                distanceMeters: true,
+                notes: true,
+              }
+            : {}),
           rpe: true,
           pain: true,
         },
@@ -491,11 +507,11 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
                     performedAt: lastSet.performedAt.toISOString(),
                     reps: lastSet.reps,
                     weight: lastSet.weight,
-                    durationSeconds: null,
-                    distanceMeters: null,
+                    durationSeconds: lastSet.durationSeconds ?? null,
+                    distanceMeters: lastSet.distanceMeters ?? null,
                     rpe: lastSet.rpe,
                     pain: lastSet.pain,
-                    notes: null,
+                    notes: lastSet.notes ?? null,
                   }
                 : null
             }
@@ -503,11 +519,11 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
               performedAt: set.performedAt.toISOString(),
               reps: set.reps,
               weight: set.weight,
-              durationSeconds: null,
-              distanceMeters: null,
+              durationSeconds: set.durationSeconds ?? null,
+              distanceMeters: set.distanceMeters ?? null,
               rpe: set.rpe,
               pain: set.pain,
-              notes: null,
+              notes: set.notes ?? null,
             }))}
             profile={loggingProfile}
             nextExerciseHref={nextExercise ? buildExerciseHref(nextExercise.id, orderedSelectedExercises) : null}
@@ -589,7 +605,7 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
                     <td className="py-2 pr-4">{set.reps}</td>
                     <td className="py-2 pr-4">{set.weight}</td>
                     <td className="py-2 pr-4 text-white/65">
-                      {formatSetDetails({ durationSeconds: null, distanceMeters: null, notes: null })}
+                      {formatSetDetails(set)}
                     </td>
                     <td className="py-2 pr-4">{set.rpe ?? "-"}</td>
                     <td className="py-2 pr-4">{set.pain ?? "-"}</td>

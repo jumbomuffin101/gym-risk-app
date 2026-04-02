@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
+import { supportsExtendedSetEntryFields } from "@/app/lib/data/setEntrySchema";
 import { computeSessionRisk } from "@/app/lib/riskEngine";
 import { prisma } from "@/app/lib/prisma";
 import { computeSessionLoad } from "@/lib/metrics/load";
@@ -14,6 +15,7 @@ type PageProps = {
 export default async function HistorySessionDetailPage({ params }: PageProps) {
   const userId = await requireDbUserId();
   const { id } = await params;
+  const supportsExtendedFields = await supportsExtendedSetEntryFields();
 
   const session = await prisma.workoutSession.findFirst({
     where: {
@@ -33,6 +35,13 @@ export default async function HistorySessionDetailPage({ params }: PageProps) {
           performedAt: true,
           reps: true,
           weight: true,
+          ...(supportsExtendedFields
+            ? {
+                durationSeconds: true,
+                distanceMeters: true,
+                notes: true,
+              }
+            : {}),
           rpe: true,
           pain: true,
           exercise: {
