@@ -76,8 +76,11 @@ model SetEntry {
   performedAt DateTime @default(now())
   reps        Int
   weight      Float
+  durationSeconds Int?
+  distanceMeters  Float?
   rpe         Float?
   pain        Int?
+  notes       String?
 
   @@index([exerciseId, performedAt])
   @@index([sessionId])

@@ -17,7 +17,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", protected: true, match: "exact" },
   { href: "/exercises", label: "Exercises", protected: true, match: "exact" },
   { href: "/workouts/new", label: "Workout Flow", protected: true, match: "section", aliases: ["/exercises/"] },
-  { href: "/workouts", label: "Workouts", protected: true, match: "exact" },
+  { href: "/workouts", label: "Session Result", protected: true, match: "exact" },
   { href: "/history", label: "History", protected: true, match: "exact" },
 ];
 

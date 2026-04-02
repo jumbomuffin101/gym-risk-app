@@ -233,162 +233,170 @@ export default function ExercisePicker({ enabled, initialSelectedExerciseIds }: 
   const canCreate = enabled && debouncedQuery.length >= 3 && results.length === 0 && !loading;
 
   return (
-    <div className="lab-card lab-hover rounded-2xl p-5 space-y-4">
-      <div>
-        <div className="text-sm font-semibold text-white/90">Exercise picker</div>
-        <p className="mt-1 text-xs lab-muted">
-          Search the library and pick up to {MAX_SELECTED} exercises for this session.
-        </p>
-        <p className="mt-1 text-xs text-white/55">
-          Showing up to 50 matching exercises. Narrow your search to find more.
-        </p>
-      </div>
-
-      <input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder={enabled ? "Search exercises..." : "Start a session to enable"}
-        disabled={!enabled}
-        className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[rgba(34,197,94,0.35)] disabled:opacity-60"
-      />
-
-      {error ? <div className="text-xs text-rose-300">{error}</div> : null}
-
-      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
-        <div className="text-xs uppercase tracking-wide lab-muted">Results</div>
-        {loading ? <div className="text-sm text-white/70">Loading...</div> : null}
-        {!loading && results.length === 0 ? (
-          <div className="text-sm text-white/65">No matches yet.</div>
-        ) : null}
-
-        <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-          {results.map((exercise) => {
-            const isSelected = selectedIds.has(exercise.id);
-
-            return (
-              <button
-                key={exercise.id}
-                type="button"
-                onClick={() => toggleExercise(exercise)}
-                disabled={!enabled || (!isSelected && selected.length >= MAX_SELECTED)}
-                className="w-full rounded-xl border px-3 py-2 text-left text-sm text-white/85 transition hover:bg-white/[0.06] disabled:opacity-50"
-                style={{
-                  borderColor: isSelected ? "rgba(34,197,94,0.45)" : "rgba(255,255,255,0.1)",
-                  background: isSelected ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.03)",
-                }}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium">{exercise.name}</div>
-                  <div className="text-[11px] uppercase tracking-wide text-white/50">
-                    {isSelected ? "Selected" : "Add"}
-                  </div>
-                </div>
-                <div className="text-xs lab-muted">{exercise.category ?? "uncategorized"}</div>
-              </button>
-            );
-          })}
+    <div className="grid gap-4 lg:grid-cols-[1fr_0.92fr]">
+      <section className="lab-card lab-hover rounded-2xl p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-white/90">Search exercises</div>
+          <div className="text-xs text-white/50">Max {MAX_SELECTED}</div>
         </div>
 
-        {canCreate ? (
-          <button
-            type="button"
-            onClick={createCustomExercise}
-            disabled={creating}
-            className="rounded-xl border border-[rgba(34,197,94,0.3)] bg-[rgba(34,197,94,0.1)] px-3 py-2 text-sm font-medium text-white hover:bg-[rgba(34,197,94,0.15)]"
-          >
-            {creating ? "Creating..." : `Create "${debouncedQuery}"`}
-          </button>
-        ) : null}
-      </div>
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={enabled ? "Search exercises..." : "Start a session to enable"}
+          disabled={!enabled}
+          className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[rgba(34,197,94,0.35)] disabled:opacity-60"
+        />
 
-      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-3">
-        <div className="text-xs uppercase tracking-wide lab-muted">
-          Session queue ({selected.length}/{MAX_SELECTED})
-        </div>
+        {error ? <div className="text-xs text-rose-300">{error}</div> : null}
 
-        {selected.length === 0 ? (
-          <div className="text-sm text-white/65">No exercises in the queue yet.</div>
-        ) : (
-          <ul className="max-h-56 space-y-2 overflow-y-auto pr-1">
-            {selected.map((exercise, index) => (
-              <li
-                key={exercise.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-[11px] text-white/65">
-                      {index + 1}
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
+          <div className="text-xs uppercase tracking-wide lab-muted">Results</div>
+          {loading ? <div className="text-sm text-white/70">Loading matches...</div> : null}
+          {!loading && results.length === 0 ? (
+            <div className="text-sm text-white/65">
+              {debouncedQuery ? "No matches yet." : "Start with a search or pick from the list."}
+            </div>
+          ) : null}
+
+          <div className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
+            {results.map((exercise) => {
+              const isSelected = selectedIds.has(exercise.id);
+
+              return (
+                <button
+                  key={exercise.id}
+                  type="button"
+                  onClick={() => toggleExercise(exercise)}
+                  disabled={!enabled || (!isSelected && selected.length >= MAX_SELECTED)}
+                  className="w-full rounded-xl border px-3 py-2 text-left text-sm text-white/85 transition hover:bg-white/[0.06] disabled:opacity-50"
+                  style={{
+                    borderColor: isSelected ? "rgba(34,197,94,0.45)" : "rgba(255,255,255,0.1)",
+                    background: isSelected ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.03)",
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-medium">{exercise.name}</div>
+                    <div className="text-[11px] uppercase tracking-wide text-white/50">
+                      {isSelected ? "Queued" : "Add"}
                     </div>
-                    <div className="truncate text-sm text-white/85">{exercise.name}</div>
                   </div>
-                  <div className="mt-1 text-xs lab-muted">{exercise.category ?? "uncategorized"}</div>
-                </div>
+                  <div className="text-xs lab-muted">{exercise.category ?? "uncategorized"}</div>
+                </button>
+              );
+            })}
+          </div>
 
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => moveExercise(exercise.id, "up")}
-                    disabled={index === 0}
-                    className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/[0.06] disabled:opacity-40"
-                  >
-                    Up
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveExercise(exercise.id, "down")}
-                    disabled={index === selected.length - 1}
-                    className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/[0.06] disabled:opacity-40"
-                  >
-                    Down
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeExercise(exercise.id)}
-                    className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/[0.06]"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => selected[0] && router.push(`/exercises/${selected[0].id}${selectedQuery}`)}
-            disabled={selected.length === 0}
-            className="lab-hover rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
-          >
-            Start queue
-          </button>
-          {selected.length > 0 ? (
+          {canCreate ? (
             <button
               type="button"
-              onClick={() => setSelected([])}
-              className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
+              onClick={createCustomExercise}
+              disabled={creating}
+              className="rounded-xl border border-[rgba(34,197,94,0.24)] bg-[rgba(34,197,94,0.92)] px-3 py-2 text-sm font-semibold text-black hover:bg-[rgba(34,197,94,0.84)]"
             >
-              Clear queue
+              {creating ? "Creating..." : `Create "${debouncedQuery}"`}
             </button>
           ) : null}
         </div>
+      </section>
 
-        {selected.length > 1 ? (
-          <div className="flex flex-wrap gap-2">
-            {selected.map((exercise) => (
-              <Link
-                key={`${exercise.id}-link`}
-                href={`/exercises/${exercise.id}${selectedQuery}`}
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/80 hover:bg-white/[0.06]"
-              >
-                {exercise.name}
-              </Link>
-            ))}
+      <section className="lab-card rounded-2xl p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-white/90">Session queue</div>
+          <div className="text-xs text-white/50">
+            {selected.length}/{MAX_SELECTED}
           </div>
-        ) : null}
-      </div>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-3">
+          <div className="text-xs uppercase tracking-wide lab-muted">Queue order</div>
+
+          {selected.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm text-white/65">
+              Add a few exercises to build the session.
+            </div>
+          ) : (
+            <ul className="max-h-56 space-y-2 overflow-y-auto pr-1">
+              {selected.map((exercise, index) => (
+                <li
+                  key={exercise.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-[11px] text-white/65">
+                        {index + 1}
+                      </div>
+                      <div className="truncate text-sm text-white/85">{exercise.name}</div>
+                    </div>
+                    <div className="mt-1 text-xs lab-muted">{exercise.category ?? "uncategorized"}</div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => moveExercise(exercise.id, "up")}
+                      disabled={index === 0}
+                      className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/[0.06] disabled:opacity-40"
+                    >
+                      Up
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveExercise(exercise.id, "down")}
+                      disabled={index === selected.length - 1}
+                      className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/[0.06] disabled:opacity-40"
+                    >
+                      Down
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeExercise(exercise.id)}
+                      className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/[0.06]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => selected[0] && router.push(`/exercises/${selected[0].id}${selectedQuery}`)}
+              disabled={selected.length === 0}
+              className="lab-hover rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+            >
+              {selectionReady && initialSelectedExerciseIds.length > 0 ? "Resume queue" : "Start queue"}
+            </button>
+            {selected.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setSelected([])}
+                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
+              >
+                Clear queue
+              </button>
+            ) : null}
+          </div>
+
+          {selected.length > 1 ? (
+            <div className="flex flex-wrap gap-2">
+              {selected.map((exercise) => (
+                <Link
+                  key={`${exercise.id}-link`}
+                  href={`/exercises/${exercise.id}${selectedQuery}`}
+                  className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/80 hover:bg-white/[0.06]"
+                >
+                  {exercise.name}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </section>
     </div>
   );
 }

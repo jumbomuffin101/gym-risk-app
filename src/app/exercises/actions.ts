@@ -46,8 +46,16 @@ const CreateSetSchema = z.object({
   exerciseId: z.string().min(1),
   reps: z.coerce.number().int().min(1),
   weight: z.coerce.number().min(0),
+  durationSeconds: z.coerce.number().int().min(1).optional().or(z.nan().transform(() => undefined)),
+  distanceMeters: z.coerce.number().min(0).optional().or(z.nan().transform(() => undefined)),
   rpe: z.coerce.number().min(1).max(10).optional().or(z.nan().transform(() => undefined)),
   pain: z.coerce.number().int().min(0).max(10).optional().or(z.nan().transform(() => undefined)),
+  notes: z
+    .string()
+    .trim()
+    .max(240)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
 });
 
 export async function createSetEntryAction(formData: FormData) {
@@ -55,15 +63,18 @@ export async function createSetEntryAction(formData: FormData) {
     exerciseId: formData.get("exerciseId"),
     reps: formData.get("reps"),
     weight: formData.get("weight"),
+    durationSeconds: formData.get("durationSeconds"),
+    distanceMeters: formData.get("distanceMeters"),
     rpe: formData.get("rpe"),
     pain: formData.get("pain"),
+    notes: formData.get("notes"),
   });
 
   if (!parsed.success) {
     return { ok: false as const, error: parsed.error.issues.map((i) => i.message).join(", ") };
   }
 
-  const { exerciseId, reps, weight, rpe, pain } = parsed.data;
+  const { exerciseId, reps, weight, durationSeconds, distanceMeters, rpe, pain, notes } = parsed.data;
 
   const userId = await getOrCreateDbUserId();
   let session = await getActiveWorkoutSession(userId);
@@ -80,8 +91,11 @@ export async function createSetEntryAction(formData: FormData) {
       exerciseId,
       reps,
       weight,
+      durationSeconds: durationSeconds ?? null,
+      distanceMeters: distanceMeters ?? null,
       rpe: rpe ?? null,
       pain: pain ?? null,
+      notes: notes ?? null,
     },
   });
 
@@ -99,20 +113,26 @@ export async function createExerciseDetailSetEntryAction(formData: FormData) {
     exerciseId: formData.get("exerciseId"),
     reps: formData.get("reps"),
     weight: formData.get("weight"),
+    durationSeconds: formData.get("durationSeconds"),
+    distanceMeters: formData.get("distanceMeters"),
     rpe: formData.get("rpe"),
     pain: formData.get("pain"),
+    notes: formData.get("notes"),
   });
 
   if (!parsed.success) {
-    return;
+    return {
+      ok: false as const,
+      error: parsed.error.issues.map((issue) => issue.message).join(", ") || "Invalid set input.",
+    };
   }
 
-  const { exerciseId, reps, weight, rpe, pain } = parsed.data;
+  const { exerciseId, reps, weight, durationSeconds, distanceMeters, rpe, pain, notes } = parsed.data;
   const userId = await getOrCreateDbUserId();
   const activeSession = await getActiveWorkoutSession(userId);
 
   if (!activeSession) {
-    return;
+    return { ok: false as const, error: "No active session." };
   }
 
   await prisma.setEntry.create({
@@ -122,12 +142,19 @@ export async function createExerciseDetailSetEntryAction(formData: FormData) {
       exerciseId,
       reps,
       weight,
+      durationSeconds: durationSeconds ?? null,
+      distanceMeters: distanceMeters ?? null,
       rpe: rpe ?? null,
       pain: pain ?? null,
+      notes: notes ?? null,
     },
   });
 
   revalidatePath("/exercises");
   revalidatePath(`/exercises/${exerciseId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/workouts");
+  revalidatePath("/workouts/new");
+
+  return { ok: true as const };
 }

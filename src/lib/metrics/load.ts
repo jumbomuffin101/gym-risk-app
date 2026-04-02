@@ -1,6 +1,8 @@
 export type SetLoadInput = {
   reps: number;
   weight: number;
+  durationSeconds?: number | null;
+  distanceMeters?: number | null;
   rpe?: number | null;
 };
 
@@ -12,7 +14,17 @@ export function computeSetLoad(set: SetLoadInput): number {
       ? 1 + (set.rpe - 6) * 0.05
       : 1;
 
-  return set.weight * set.reps * rpeMultiplier;
+  const resistanceLoad = set.weight * set.reps;
+  const durationLoad =
+    typeof set.durationSeconds === "number" && Number.isFinite(set.durationSeconds)
+      ? set.durationSeconds * Math.max(set.weight, 1) * 0.08
+      : 0;
+  const distanceLoad =
+    typeof set.distanceMeters === "number" && Number.isFinite(set.distanceMeters)
+      ? set.distanceMeters * Math.max(set.weight, 1) * 0.02
+      : 0;
+
+  return (resistanceLoad + durationLoad + distanceLoad) * rpeMultiplier;
 }
 
 export function computeSessionLoad(sets: SetLoadInput[]): number {

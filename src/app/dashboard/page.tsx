@@ -65,7 +65,7 @@ export default async function DashboardPage() {
       startedAt: true,
       endedAt: true,
       note: true,
-      sets: { select: { reps: true, weight: true, rpe: true } },
+      sets: { select: { reps: true, weight: true, durationSeconds: true, distanceMeters: true, rpe: true } },
       _count: { select: { sets: true } },
     },
   });

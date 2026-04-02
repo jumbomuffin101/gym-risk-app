@@ -2,9 +2,11 @@ import Link from "next/link";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import { startWorkoutSession, endWorkoutSessionAction } from "@/app/exercises/actions";
-import { computeSessionRisk } from "@/app/lib/riskEngine";
+import { computeSessionRisk, type RiskReason } from "@/app/lib/riskEngine";
 import { prisma } from "@/app/lib/prisma";
 import { readSessionPlan } from "@/app/lib/sessionPlan";
+import SessionProgressStrip from "@/app/components/SessionProgressStrip";
+import { computeSetLoad } from "@/lib/metrics/load";
 
 export const runtime = "nodejs";
 
@@ -17,6 +19,8 @@ type SessionSet = {
   exerciseId: string;
   reps: number;
   weight: number;
+  durationSeconds: number | null;
+  distanceMeters: number | null;
   rpe: number | null;
   pain: number | null;
   exercise: {
@@ -31,7 +35,7 @@ type ExerciseAggregate = {
   name: string;
   category: string | null;
   sets: number;
-  tonnage: number;
+  sessionLoad: number;
   avgRpe: number | null;
   maxPain: number | null;
 };
@@ -44,8 +48,8 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
 
   if (!active) {
     return (
-      <div className="mx-auto max-w-6xl space-y-6">
-        <header className="lab-card rounded-2xl p-5 space-y-3">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <header className="lab-card rounded-2xl p-4 space-y-2.5">
           <div className="flex flex-wrap gap-2">
             <Link
               href="/workouts/new"
@@ -62,7 +66,7 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
           <p className="text-sm text-white/70">Start a workout flow, select exercises, and this page will summarize the full session.</p>
         </header>
 
-        <div className="lab-card rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="lab-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-white/90">Nothing to summarize yet</div>
             <div className="mt-1 text-xs text-white/60">Once you start logging, this page becomes the whole-session view.</div>
@@ -92,6 +96,8 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
       exerciseId: true,
       reps: true,
       weight: true,
+      durationSeconds: true,
+      distanceMeters: true,
       rpe: true,
       pain: true,
       exercise: {
@@ -120,7 +126,7 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
   const selectedQuery = orderedSelectedExercises.length > 0 ? buildSelectedQuery(orderedSelectedExercises) : "";
   const totalSets = sessionSets.length;
   const totalExercises = perExercise.length;
-  const totalTonnage = sumTonnage(sessionSets);
+  const totalSessionLoad = sumSessionLoad(sessionSets);
   const avgRpe = averageOf(sessionSets.map((set) => set.rpe).filter(isNumber));
   const maxPain = maxOf(sessionSets.map((set) => set.pain).filter(isNumber));
   const overallSignal = getOverallSignal({ totalSets, avgRpe, maxPain, riskReasons: riskReasons.length });
@@ -134,10 +140,29 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
   const continueLoggingHref = nextExerciseId
     ? buildExerciseHref(nextExerciseId, orderedSelectedExercises)
     : "/workouts/new";
+  const completedExerciseIds = new Set(perExercise.map((item) => item.exerciseId));
+  const progressSource =
+    orderedSelectedExercises.length > 0
+      ? orderedSelectedExercises
+      : perExercise.map((item) => ({ id: item.exerciseId, name: item.name, category: item.category }));
+  const progressItems = progressSource.map((item) => ({
+    id: item.id,
+    label: item.name,
+    href:
+      orderedSelectedExercises.length > 0
+        ? buildExerciseHref(item.id, orderedSelectedExercises)
+        : `/exercises/${item.id}`,
+    state:
+      item.id === nextExerciseId
+        ? ("current" as const)
+        : completedExerciseIds.has(item.id)
+          ? ("completed" as const)
+          : ("remaining" as const),
+  }));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <header className="lab-card rounded-2xl p-5 space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
+      <header className="lab-card rounded-2xl p-4 space-y-2.5">
         <div className="flex flex-wrap gap-2">
           <Link
             href={selectedQuery ? `/workouts/new${selectedQuery}` : "/workouts/new"}
@@ -150,11 +175,11 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
           </span>
         </div>
 
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-xs uppercase tracking-wide lab-muted">Workout result</div>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/95">Current session</h1>
-            <p className="mt-1 text-sm text-white/70">One place to see what this workout produced before ending it.</p>
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-white/95">Current session</h1>
+            <p className="mt-1 text-sm text-white/70">See the main takeaway, then decide whether to keep going or end the session.</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -174,19 +199,33 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
         </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Exercises hit" value={String(totalExercises)} detail={topExercise ? `Top volume: ${topExercise.name}` : "No logged exercises yet"} />
-        <SummaryCard label="Total sets" value={String(totalSets)} detail="All logged sets in this session" />
-        <SummaryCard label="Total load" value={totalTonnage.toFixed(1)} detail="Reps x weight across the session" />
-        <SummaryCard label="Overall signal" value={overallSignal.title} detail={overallSignal.description} tone={overallSignal.tone} />
+      <section className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+        <div className={`rounded-2xl border p-4 ${overallSignal.classes}`}>
+          <div className="text-xs uppercase tracking-wide text-white/65">Session read</div>
+          <div className="mt-1 text-2xl font-semibold text-white/90">{overallSignal.title}</div>
+          <div className="mt-2 text-sm text-white/75">{overallSignal.description}</div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <MiniMetric label="Exercises" value={String(totalExercises)} />
+            <MiniMetric label="Sets" value={String(totalSets)} />
+            <MiniMetric label="Session load" value={totalSessionLoad.toFixed(1)} />
+          </div>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+          <MiniMetric label="Most work" value={topExercise ? topExercise.name : "-"} />
+          <MiniMetric label="Avg RPE" value={avgRpe !== null ? avgRpe.toFixed(1) : "-"} />
+          <MiniMetric label="Watchouts" value={String(riskReasons.length)} />
+        </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <section className="lab-card rounded-2xl p-5 space-y-4">
+      <SessionProgressStrip items={progressItems} title="Flow progress" />
+
+      <div className="grid gap-4 lg:grid-cols-[1.12fr_0.88fr]">
+        <section className="lab-card rounded-2xl p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold text-white/90">Session by exercise</div>
-              <div className="mt-1 text-xs text-white/55">This is the workout-level breakdown, not just individual set history.</div>
+              <div className="text-sm font-semibold text-white/90">Exercise breakdown</div>
+              <div className="mt-1 text-xs text-white/55">See where the work in this session landed.</div>
             </div>
             <Link
               href={continueLoggingHref}
@@ -206,7 +245,7 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
                 <Link
                   key={exercise.exerciseId}
                   href={buildExerciseHref(exercise.exerciseId, orderedSelectedExercises)}
-                  className="block rounded-2xl border border-white/10 bg-white/[0.02] p-4 transition hover:bg-white/[0.04]"
+                  className="block rounded-xl border border-white/10 bg-white/[0.02] p-3 transition hover:bg-white/[0.04]"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -216,9 +255,9 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
                     <div className="text-xs text-white/55">Open exercise</div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-4">
                     <MiniMetric label="Sets" value={String(exercise.sets)} />
-                    <MiniMetric label="Load" value={exercise.tonnage.toFixed(1)} />
+                    <MiniMetric label="Session load" value={exercise.sessionLoad.toFixed(1)} />
                     <MiniMetric label="Avg RPE" value={exercise.avgRpe !== null ? exercise.avgRpe.toFixed(1) : "-"} />
                     <MiniMetric label="Max pain" value={exercise.maxPain !== null ? String(exercise.maxPain) : "-"} />
                   </div>
@@ -228,25 +267,10 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
           )}
         </section>
 
-        <aside className="space-y-6">
-          <section className="lab-card rounded-2xl p-5 space-y-4">
-            <div className="text-sm font-semibold text-white/90">Holistic result</div>
-            <div className={`rounded-2xl border p-4 ${overallSignal.classes}`}>
-              <div className="text-xs uppercase tracking-wide text-white/65">Session signal</div>
-              <div className="mt-1 text-lg font-semibold text-white/90">{overallSignal.title}</div>
-              <div className="mt-1 text-sm text-white/70">{overallSignal.description}</div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <MiniMetric label="Avg RPE" value={avgRpe !== null ? avgRpe.toFixed(1) : "-"} />
-              <MiniMetric label="Max pain" value={maxPain !== null ? String(maxPain) : "-"} />
-              <MiniMetric label="Risk flags" value={String(riskReasons.length)} />
-            </div>
-          </section>
-
-          <section className="lab-card rounded-2xl p-5 space-y-4">
-            <div className="text-sm font-semibold text-white/90">What this session means</div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <aside className="space-y-4">
+          <section className="lab-card rounded-2xl p-4 space-y-3">
+            <div className="text-sm font-semibold text-white/90">Coach note</div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
               <div className="text-sm text-white/85">{nextMove.title}</div>
               <div className="mt-1 text-xs text-white/60">{nextMove.detail}</div>
             </div>
@@ -254,17 +278,23 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
             {riskReasons.length > 0 ? (
               <div className="space-y-2">
                 {riskReasons.map((reason) => (
-                  <div key={reason.kind + reason.title} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                    <div className="text-sm text-white/85">{cleanRiskTitle(reason.title)}</div>
-                    <div className="mt-1 text-xs text-white/55">Score {Math.round(reason.score)}</div>
-                  </div>
+                  <RiskReasonCard key={reason.kind + reason.title} reason={reason} />
                 ))}
               </div>
             ) : (
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-white/75">
-                No immediate warning flags in this session so far.
+                No immediate watchouts in this session so far.
               </div>
             )}
+          </section>
+
+          <section className="lab-card rounded-2xl p-4 space-y-3">
+            <div className="text-sm font-semibold text-white/90">Quick stats</div>
+            <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+              <MiniMetric label="Avg RPE" value={avgRpe !== null ? avgRpe.toFixed(1) : "-"} />
+              <MiniMetric label="Max pain" value={maxPain !== null ? String(maxPain) : "-"} />
+              <MiniMetric label="Top exercise" value={topExercise ? topExercise.name : "-"} />
+            </div>
           </section>
         </aside>
       </div>
@@ -272,38 +302,31 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
   );
 }
 
-function SummaryCard({
-  label,
-  value,
-  detail,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: "neutral" | "stable" | "caution";
-}) {
-  const toneClasses =
-    tone === "stable"
-      ? "border-emerald-400/25 bg-emerald-500/10"
-      : tone === "caution"
-        ? "border-amber-300/25 bg-amber-400/10"
-        : "border-white/10 bg-white/[0.03]";
-
+function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`rounded-2xl border p-4 ${toneClasses}`}>
-      <div className="text-xs uppercase tracking-wide lab-muted">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-white/90">{value}</div>
-      <div className="mt-1 text-xs text-white/60">{detail}</div>
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5">
+      <div className="text-[11px] uppercase tracking-wide lab-muted">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-white/90">{value}</div>
     </div>
   );
 }
 
-function MiniMetric({ label, value }: { label: string; value: string }) {
+function RiskReasonCard({ reason }: { reason: RiskReason }) {
+  const meta = getRiskReasonMeta(reason);
+
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-      <div className="text-[11px] uppercase tracking-wide lab-muted">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-white/90">{value}</div>
+    <div className={`rounded-xl border p-3 ${meta.classes}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-white/55">{meta.label}</div>
+          <div className="mt-1 text-sm font-medium text-white/90">{meta.title}</div>
+        </div>
+        <div className="rounded-full border border-white/10 bg-black/10 px-2.5 py-1 text-[11px] text-white/70">
+          {meta.scoreLabel}
+        </div>
+      </div>
+      <div className="mt-2 text-xs text-white/65">{meta.description}</div>
+      {meta.detail ? <div className="mt-2 text-xs text-white/50">{meta.detail}</div> : null}
     </div>
   );
 }
@@ -325,7 +348,7 @@ function aggregateExercises(sessionSets: SessionSet[]): ExerciseAggregate[] {
         name: set.exercise.name,
         category: set.exercise.category,
         sets: 0,
-        tonnage: 0,
+        sessionLoad: 0,
         avgRpe: null,
         maxPain: null,
         rpeSum: 0,
@@ -333,7 +356,7 @@ function aggregateExercises(sessionSets: SessionSet[]): ExerciseAggregate[] {
       };
 
     existing.sets += 1;
-    existing.tonnage += set.reps * set.weight;
+    existing.sessionLoad += computeSetLoad(set);
     if (set.rpe !== null) {
       existing.rpeSum += set.rpe;
       existing.rpeCount += 1;
@@ -347,11 +370,13 @@ function aggregateExercises(sessionSets: SessionSet[]): ExerciseAggregate[] {
 
   return [...map.values()]
     .map(({ rpeSum: _rpeSum, rpeCount: _rpeCount, ...exercise }) => exercise)
-    .sort((a, b) => b.tonnage - a.tonnage);
+    .sort((a, b) => b.sessionLoad - a.sessionLoad);
 }
 
-function sumTonnage(sets: Pick<SessionSet, "reps" | "weight">[]) {
-  return sets.reduce((total, set) => total + set.reps * set.weight, 0);
+function sumSessionLoad(
+  sets: Pick<SessionSet, "reps" | "weight" | "durationSeconds" | "distanceMeters" | "rpe">[]
+) {
+  return sets.reduce((total, set) => total + computeSetLoad(set), 0);
 }
 
 function isNumber(value: number | null): value is number {
@@ -382,7 +407,7 @@ function getOverallSignal({
   if ((maxPain ?? 0) >= 7 || (avgRpe ?? 0) >= 9 || riskReasons >= 2) {
     return {
       title: "High stress",
-      description: "This session is carrying noticeable strain. Review pain and high-effort work before pushing further.",
+      description: "This session is carrying noticeable strain. Review pain and hard efforts before pushing further.",
       tone: "caution" as const,
       classes: "border-rose-400/30 bg-rose-500/10",
     };
@@ -400,7 +425,7 @@ function getOverallSignal({
   if ((maxPain ?? 0) >= 4 || (avgRpe ?? 0) >= 8 || riskReasons >= 1) {
     return {
       title: "Caution",
-      description: "The session looks productive, but at least one signal needs attention.",
+      description: "The session looks productive, but at least one thing needs attention.",
       tone: "caution" as const,
       classes: "border-amber-300/30 bg-amber-400/10",
     };
@@ -408,7 +433,7 @@ function getOverallSignal({
 
   return {
     title: "Stable",
-    description: "The session looks controlled so far with no major warning flags.",
+      description: "The session looks controlled so far with no major watchouts.",
     tone: "stable" as const,
     classes: "border-emerald-400/30 bg-emerald-500/10",
   };
@@ -454,6 +479,87 @@ function getNextMove({
 
 function cleanRiskTitle(value: string) {
   return value.replaceAll("â‰¥", ">=");
+}
+
+function getRiskReasonMeta(reason: RiskReason) {
+  const scoreLabel =
+    reason.score >= 80 ? "High" : reason.score >= 60 ? "Watch" : "Monitor";
+
+  switch (reason.kind) {
+    case "pain_flag": {
+      const maxPain = typeof reason.details.maxPain === "number" ? reason.details.maxPain : null;
+      const count = typeof reason.details.count === "number" ? reason.details.count : null;
+      return {
+        label: "Pain",
+        title: maxPain !== null ? `Pain hit ${maxPain}/10 during the session` : "Pain was flagged during the session",
+        description:
+          "Pain-based watchouts usually matter more than load trends. Reducing intensity or stopping here is reasonable.",
+        detail: count !== null ? `${count} set${count === 1 ? "" : "s"} crossed the pain threshold.` : null,
+        classes: "border-rose-400/25 bg-rose-500/10",
+        scoreLabel,
+      };
+    }
+    case "rpe_spike":
+    case "rpe_warning": {
+      const hardSets = Array.isArray(reason.details.hardSets) ? reason.details.hardSets.length : null;
+      return {
+        label: "Intensity",
+        title: reason.kind === "rpe_spike" ? "Several near-max sets showed up" : "Near-max effort showed up",
+        description:
+          "Effort is running high. If speed or control is dropping, move to easier work or end the session cleanly.",
+        detail: hardSets !== null ? `${hardSets} hard set${hardSets === 1 ? "" : "s"} reached RPE 9 or above.` : null,
+        classes: "border-amber-300/25 bg-amber-400/10",
+        scoreLabel,
+      };
+    }
+    case "conditioning_density": {
+      const duration = typeof reason.details.totalDurationSeconds === "number" ? reason.details.totalDurationSeconds : 0;
+      const distance = typeof reason.details.totalDistanceMeters === "number" ? reason.details.totalDistanceMeters : 0;
+      return {
+        label: "Conditioning",
+        title: "Conditioning strain stacked up quickly",
+        description:
+          "Long or hard bouts drove a higher fatigue signal than a normal strength block would show.",
+        detail: `${Math.round(duration / 60)} min total work and ${Math.round(distance)} m logged.`,
+        classes: "border-sky-400/25 bg-sky-500/10",
+        scoreLabel,
+      };
+    }
+    case "conditioning_load_spike": {
+      const pct = typeof reason.details.pct === "number" ? reason.details.pct : null;
+      return {
+        label: "Conditioning",
+        title: "Conditioning load jumped above your baseline",
+        description:
+          "This session carried more conditioning stress than your recent pattern, even if the set count looks normal.",
+        detail: pct !== null ? `About ${pct}% above the 7-day conditioning average.` : null,
+        classes: "border-cyan-400/25 bg-cyan-500/10",
+        scoreLabel,
+      };
+    }
+    case "volume_spike": {
+      const category = typeof reason.details.category === "string" ? reason.details.category : "this category";
+      const pct = typeof reason.details.pct === "number" ? reason.details.pct : null;
+      return {
+        label: "Load spike",
+        title: `Load climbed fast in ${category}`,
+        description:
+          "The session load in this movement bucket ran ahead of your recent baseline and may need a lighter finish.",
+        detail: pct !== null ? `About ${pct}% above your recent average.` : null,
+        classes: "border-emerald-400/25 bg-emerald-500/10",
+        scoreLabel,
+      };
+    }
+    default:
+      return {
+        label: "Watchout",
+        title: reason.title,
+        description: "This session produced a rule-based watchout worth reviewing before pushing further.",
+        detail: null,
+        classes: "border-white/10 bg-white/[0.03]",
+        scoreLabel,
+      };
+  }
 }
 
 function parseSelectedIds(value: string | undefined, persistedIds: string[]) {
