@@ -67,6 +67,15 @@ export default function ExerciseQuickLogger({
   const [rpe, setRpe] = useState(lastSet?.rpe ? String(lastSet.rpe) : "");
   const [pain, setPain] = useState(lastSet?.pain !== null && lastSet?.pain !== undefined ? String(lastSet.pain) : "");
   const [notes, setNotes] = useState(lastSet?.notes ?? "");
+  const [showAdvanced, setShowAdvanced] = useState(
+    Boolean(
+      lastSet?.durationSeconds !== null ||
+        lastSet?.distanceMeters !== null ||
+        lastSet?.notes ||
+        lastSet?.rpe !== null ||
+        lastSet?.pain !== null
+    )
+  );
 
   function applySet(set: SessionSet) {
     setReps(String(set.reps));
@@ -169,22 +178,6 @@ export default function ExerciseQuickLogger({
           selectedValue={weight}
           onSelect={setWeight}
         />
-        {profile.durationLabel ? (
-          <PresetGroup
-            label={`${profile.durationLabel} presets`}
-            values={profile.quickDurationValues ?? []}
-            selectedValue={durationSeconds}
-            onSelect={setDurationSeconds}
-          />
-        ) : null}
-        {profile.distanceLabel ? (
-          <PresetGroup
-            label={`${profile.distanceLabel} presets`}
-            values={profile.quickDistanceValues ?? []}
-            selectedValue={distanceMeters}
-            onSelect={setDistanceMeters}
-          />
-        ) : null}
       </div>
 
       <form
@@ -224,11 +217,7 @@ export default function ExerciseQuickLogger({
         <input type="hidden" name="exerciseId" value={exerciseId} />
 
         <fieldset disabled={!activeSession || pending} className="space-y-4 disabled:opacity-50">
-          <div
-            className={`grid gap-3 ${
-              profile.durationLabel || profile.distanceLabel ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4"
-            }`}
-          >
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1">
               <div className="text-xs lab-muted">{profile.repsLabel}</div>
               <input
@@ -257,123 +246,170 @@ export default function ExerciseQuickLogger({
                 className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
               />
             </label>
-
-            {profile.durationLabel ? (
-              <label className="space-y-1">
-                <div className="text-xs lab-muted">{profile.durationLabel}</div>
-                <input
-                  name="durationSeconds"
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={durationSeconds}
-                  onChange={(event) => setDurationSeconds(event.target.value)}
-                  placeholder={profile.durationLabel}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
-                />
-              </label>
-            ) : null}
-
-            {profile.distanceLabel ? (
-              <label className="space-y-1">
-                <div className="text-xs lab-muted">{profile.distanceLabel}</div>
-                <input
-                  name="distanceMeters"
-                  type="number"
-                  min={0}
-                  step="1"
-                  value={distanceMeters}
-                  onChange={(event) => setDistanceMeters(event.target.value)}
-                  placeholder={profile.distanceLabel}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
-                />
-              </label>
-            ) : null}
-
-            <label className="space-y-1">
-              <div className="text-xs lab-muted">RPE</div>
-              <input
-                name="rpe"
-                type="number"
-                min={1}
-                max={10}
-                step="0.5"
-                value={rpe}
-                onChange={(event) => setRpe(event.target.value)}
-                placeholder="6-10"
-                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
-              />
-            </label>
-
-            <label className="space-y-1">
-              <div className="text-xs lab-muted">Pain</div>
-              <input
-                name="pain"
-                type="number"
-                min={0}
-                max={10}
-                step={1}
-                value={pain}
-                onChange={(event) => setPain(event.target.value)}
-                placeholder="0-10"
-                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
-              />
-            </label>
           </div>
 
-          {profile.notesPlaceholder ? (
-            <label className="space-y-1">
-              <div className="text-xs lab-muted">Notes</div>
-              <textarea
-                name="notes"
-                rows={3}
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder={profile.notesPlaceholder}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
-              />
-            </label>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((value) => !value)}
+            className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/80 hover:bg-white/[0.06]"
+          >
+            {showAdvanced ? "Hide extra fields" : "More fields"}
+          </button>
 
-          <div className="space-y-2">
-            <div className="text-[11px] uppercase tracking-wide lab-muted">RPE quick picks</div>
-            <div className="flex flex-wrap gap-2">
-              {[6, 7, 8, 9, 10].map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setRpe(String(value))}
-                  className={`rounded-xl border px-3 py-1.5 text-xs ${
-                    rpe === String(value)
-                      ? "border-[rgba(34,197,94,0.35)] bg-[rgba(34,197,94,0.12)] text-white"
-                      : "border-white/10 bg-white/[0.03] text-white/75 hover:bg-white/[0.06]"
-                  }`}
-                >
-                  {value}
-                </button>
-              ))}
+          {showAdvanced ? (
+            <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+              <div className="grid gap-3 lg:grid-cols-2">
+                {profile.durationLabel ? (
+                  <PresetGroup
+                    label={`${profile.durationLabel} presets`}
+                    values={profile.quickDurationValues ?? []}
+                    selectedValue={durationSeconds}
+                    onSelect={setDurationSeconds}
+                  />
+                ) : null}
+                {profile.distanceLabel ? (
+                  <PresetGroup
+                    label={`${profile.distanceLabel} presets`}
+                    values={profile.quickDistanceValues ?? []}
+                    selectedValue={distanceMeters}
+                    onSelect={setDistanceMeters}
+                  />
+                ) : null}
+              </div>
+
+              <div
+                className={`grid gap-3 ${
+                  profile.durationLabel || profile.distanceLabel ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2"
+                }`}
+              >
+                {profile.durationLabel ? (
+                  <label className="space-y-1">
+                    <div className="text-xs lab-muted">{profile.durationLabel}</div>
+                    <input
+                      name="durationSeconds"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={durationSeconds}
+                      onChange={(event) => setDurationSeconds(event.target.value)}
+                      placeholder={profile.durationLabel}
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
+                    />
+                  </label>
+                ) : null}
+
+                {profile.distanceLabel ? (
+                  <label className="space-y-1">
+                    <div className="text-xs lab-muted">{profile.distanceLabel}</div>
+                    <input
+                      name="distanceMeters"
+                      type="number"
+                      min={0}
+                      step="1"
+                      value={distanceMeters}
+                      onChange={(event) => setDistanceMeters(event.target.value)}
+                      placeholder={profile.distanceLabel}
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
+                    />
+                  </label>
+                ) : null}
+
+                <label className="space-y-1">
+                  <div className="text-xs lab-muted">RPE</div>
+                  <input
+                    name="rpe"
+                    type="number"
+                    min={1}
+                    max={10}
+                    step="0.5"
+                    value={rpe}
+                    onChange={(event) => setRpe(event.target.value)}
+                    placeholder="6-10"
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <div className="text-xs lab-muted">Pain</div>
+                  <input
+                    name="pain"
+                    type="number"
+                    min={0}
+                    max={10}
+                    step={1}
+                    value={pain}
+                    onChange={(event) => setPain(event.target.value)}
+                    placeholder="0-10"
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
+                  />
+                </label>
+              </div>
+
+              {profile.notesPlaceholder ? (
+                <label className="space-y-1">
+                  <div className="text-xs lab-muted">Notes</div>
+                  <textarea
+                    name="notes"
+                    rows={3}
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    placeholder={profile.notesPlaceholder}
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/35"
+                  />
+                </label>
+              ) : null}
+
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="text-[11px] uppercase tracking-wide lab-muted">RPE quick picks</div>
+                  <div className="flex flex-wrap gap-2">
+                    {[6, 7, 8, 9, 10].map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setRpe(String(value))}
+                        className={`rounded-xl border px-3 py-1.5 text-xs ${
+                          rpe === String(value)
+                            ? "border-[rgba(34,197,94,0.35)] bg-[rgba(34,197,94,0.12)] text-white"
+                            : "border-white/10 bg-white/[0.03] text-white/75 hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-[11px] uppercase tracking-wide lab-muted">Pain quick picks</div>
+                  <div className="flex flex-wrap gap-2">
+                    {[0, 2, 4, 6, 8].map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setPain(String(value))}
+                        className={`rounded-xl border px-3 py-1.5 text-xs ${
+                          pain === String(value)
+                            ? "border-[rgba(34,197,94,0.35)] bg-[rgba(34,197,94,0.12)] text-white"
+                            : "border-white/10 bg-white/[0.03] text-white/75 hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-[11px] uppercase tracking-wide lab-muted">Pain quick picks</div>
-            <div className="flex flex-wrap gap-2">
-              {[0, 2, 4, 6, 8].map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setPain(String(value))}
-                  className={`rounded-xl border px-3 py-1.5 text-xs ${
-                    pain === String(value)
-                      ? "border-[rgba(34,197,94,0.35)] bg-[rgba(34,197,94,0.12)] text-white"
-                      : "border-white/10 bg-white/[0.03] text-white/75 hover:bg-white/[0.06]"
-                  }`}
-                >
-                  {value}
-                </button>
-              ))}
-            </div>
-          </div>
+          ) : (
+            <>
+              <input type="hidden" name="rpe" value={rpe} />
+              <input type="hidden" name="pain" value={pain} />
+              <input type="hidden" name="durationSeconds" value={durationSeconds} />
+              <input type="hidden" name="distanceMeters" value={distanceMeters} />
+              <input type="hidden" name="notes" value={notes} />
+            </>
+          )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button className="lab-hover rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black disabled:opacity-50">

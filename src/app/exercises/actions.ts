@@ -12,6 +12,13 @@ import {
 } from "@/app/lib/data/setEntrySchema";
 import { redirect } from "next/navigation";
 
+const optionalNumber = (schema: z.ZodType<number>) =>
+  z.preprocess((value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === "string" && value.trim() === "") return undefined;
+    return value;
+  }, schema.optional());
+
 export async function startWorkoutSession(formData: FormData) {
   const userId = await getOrCreateDbUserId();
 
@@ -51,10 +58,10 @@ const CreateSetSchema = z.object({
   exerciseId: z.string().min(1),
   reps: z.coerce.number().int().min(1),
   weight: z.coerce.number().min(0),
-  durationSeconds: z.coerce.number().int().min(1).optional().or(z.nan().transform(() => undefined)),
-  distanceMeters: z.coerce.number().min(0).optional().or(z.nan().transform(() => undefined)),
-  rpe: z.coerce.number().min(1).max(10).optional().or(z.nan().transform(() => undefined)),
-  pain: z.coerce.number().int().min(0).max(10).optional().or(z.nan().transform(() => undefined)),
+  durationSeconds: optionalNumber(z.coerce.number().int().min(1)),
+  distanceMeters: optionalNumber(z.coerce.number().min(0)),
+  rpe: optionalNumber(z.coerce.number().min(1).max(10)),
+  pain: optionalNumber(z.coerce.number().int().min(0).max(10)),
   notes: z
     .string()
     .trim()

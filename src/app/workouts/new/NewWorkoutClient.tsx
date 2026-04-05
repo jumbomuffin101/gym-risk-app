@@ -65,6 +65,7 @@ export default function NewWorkoutClient({
           <div>
             <div className="text-xs uppercase tracking-wide lab-muted">Workout Flow</div>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-white/95">Build session queue</h1>
+            <p className="mt-1 text-sm text-white/65">Pick exercises, order them, then start the queue.</p>
           </div>
 
           <Link
@@ -86,11 +87,11 @@ export default function NewWorkoutClient({
       </header>
 
       {!activeSession ? (
-        <div className="lab-card lab-hover rounded-2xl p-4">
+        <div className="lab-card lab-hover rounded-2xl p-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold text-white/90">No active session</div>
-              <div className="mt-1 text-xs lab-muted">Start a session to unlock the queue.</div>
+              <div className="text-sm font-semibold text-white/90">Start a session first</div>
+              <div className="mt-1 text-xs lab-muted">The queue opens after the session starts.</div>
             </div>
 
             {startSessionForm}
@@ -108,13 +109,8 @@ export default function NewWorkoutClient({
       ) : null}
 
       {!activeSession ? (
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/workouts"
-            className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
-          >
-            Back to workouts
-          </Link>
+        <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm text-white/65">
+          Once a session is active, this page becomes the queue builder for the whole workout.
         </div>
       ) : null}
     </div>

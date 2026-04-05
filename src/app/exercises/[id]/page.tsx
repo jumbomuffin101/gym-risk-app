@@ -61,41 +61,6 @@ type LoggingProfile = {
   notesPlaceholder?: string;
 };
 
-const CATEGORY_GUIDANCE: Record<
-  string,
-  {
-    title: string;
-    note: string;
-    repsHint: string;
-    weightHint: string;
-  }
-> = {
-  core: {
-    title: "Core control focus",
-    note: "Use smooth reps and log external load only if you added resistance.",
-    repsHint: "8-20 controlled reps",
-    weightHint: "Bodyweight or added load",
-  },
-  cardio: {
-    title: "Conditioning proxy",
-    note: "This logger still uses reps and weight, so treat reps like intervals and weight like resistance.",
-    repsHint: "Intervals or work bouts",
-    weightHint: "Resistance level",
-  },
-  mobility: {
-    title: "Mobility proxy",
-    note: "Use reps for passes or holds. Keep pain honest so recovery signals stay useful.",
-    repsHint: "Reps or holds",
-    weightHint: "Band tension or load",
-  },
-  accessory: {
-    title: "Accessory volume",
-    note: "Use this to accumulate clean volume without pushing pain or RPE too early.",
-    repsHint: "8-15 reps",
-    weightHint: "Working load",
-  },
-};
-
 const CATEGORY_LOGGING_PROFILES: Record<string, LoggingProfile> = {
   squat: {
     name: "Strength set",
@@ -337,12 +302,6 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
   });
 
   const categoryKey = (exercise.category ?? "").toLowerCase();
-  const guidance = CATEGORY_GUIDANCE[categoryKey] ?? {
-    title: "Standard strength log",
-    note: "Log the working set that best reflects this exercise.",
-    repsHint: "Typical rep target",
-    weightHint: "Working load",
-  };
   const loggingProfile = CATEGORY_LOGGING_PROFILES[categoryKey] ?? {
     name: "Standard set",
     summary: "Use reps, load, effort, and optional notes to log a clean working set for this exercise.",
@@ -458,7 +417,7 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-white/90">Log current set</div>
-              <p className="mt-1 text-xs text-white/60">{guidance.title}</p>
+              <p className="mt-1 text-xs text-white/60">{loggingProfile.name}</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
               <div className="text-[11px] uppercase tracking-wide lab-muted">Last set</div>
@@ -535,7 +494,7 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
             <div className="text-sm font-semibold text-white/90">Quick read</div>
 
             <div className={`rounded-2xl border p-4 ${stressState.classes}`}>
-              <div className="text-xs uppercase tracking-wide text-white/65">How this exercise looks</div>
+              <div className="text-xs uppercase tracking-wide text-white/65">Current state</div>
               <div className="mt-1 text-lg font-semibold text-white/90">{stressState.title}</div>
               <div className="mt-1 text-sm text-white/70">{stressState.description}</div>
             </div>
@@ -550,9 +509,9 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
             </div>
 
             <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
-              <MetricCard label="Sets here" value={String(sessionSetCount)} help="For this exercise in the current session." />
-              <MetricCard label="Avg RPE" value={averageSessionRpe !== null ? averageSessionRpe.toFixed(1) : "-"} help="Current exercise effort." />
-              <MetricCard label="Max pain" value={maxSessionPain !== null ? String(maxSessionPain) : "-"} help="Current exercise discomfort." />
+              <MetricCard label="Sets here" value={String(sessionSetCount)} />
+              <MetricCard label="Avg RPE" value={averageSessionRpe !== null ? averageSessionRpe.toFixed(1) : "-"} tone={averageSessionRpe !== null && averageSessionRpe >= 8 ? "watch" : "neutral"} />
+              <MetricCard label="Max pain" value={maxSessionPain !== null ? String(maxSessionPain) : "-"} tone={maxSessionPain !== null && maxSessionPain >= 7 ? "danger" : maxSessionPain !== null && maxSessionPain >= 4 ? "watch" : "neutral"} />
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -623,17 +582,22 @@ export default async function ExerciseDetailPage({ params, searchParams }: PageP
 function MetricCard({
   label,
   value,
-  help,
+  tone = "neutral",
 }: {
   label: string;
   value: string;
-  help: string;
+  tone?: "danger" | "watch" | "neutral";
 }) {
+  const toneClass =
+    tone === "danger"
+      ? "border-rose-400/20 bg-rose-500/[0.08]"
+      : tone === "watch"
+        ? "border-amber-300/20 bg-amber-400/[0.08]"
+        : "border-white/10 bg-white/[0.03]";
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+    <div className={`rounded-xl border p-3 ${toneClass}`}>
       <div className="text-xs lab-muted">{label}</div>
       <div className="mt-1 text-base font-semibold text-white/90">{value}</div>
-      <div className="mt-1 text-[11px] text-white/50">{help}</div>
     </div>
   );
 }

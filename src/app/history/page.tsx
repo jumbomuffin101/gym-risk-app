@@ -36,7 +36,7 @@ export default async function HistoryPage() {
   const sessions = await prisma.workoutSession.findMany({
     where: { userId },
     orderBy: { startedAt: "desc" },
-    take: 16,
+    take: 24,
     select: {
       id: true,
       startedAt: true,
@@ -108,7 +108,7 @@ export default async function HistoryPage() {
         <div className="text-xs uppercase tracking-wide lab-muted">History</div>
         <h1 className="text-2xl font-semibold tracking-tight text-white/95">Session timeline</h1>
         <p className="text-sm text-white/70">
-          Review finished sessions, see where load clustered, and spot which sessions carried the most watchouts.
+          Keep the list lightweight here. Open a session to see the full set breakdown.
         </p>
       </header>
 
@@ -127,7 +127,7 @@ export default async function HistoryPage() {
         <div className="lab-card rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold text-white/90">Recent sessions</div>
+              <div className="text-sm font-semibold text-white/90">Past sessions</div>
               <div className="mt-1 text-xs text-white/55">Newest completed sessions first.</div>
             </div>
             <Link
@@ -140,21 +140,21 @@ export default async function HistoryPage() {
 
           {sessionsWithSummary.length === 0 ? (
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-white/75">
-              No finished sessions yet. Complete a session and it will show up here with load and watchout summaries.
+              No finished sessions yet. Complete a session and it will show up here.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="max-h-[34rem] space-y-3 overflow-y-auto pr-1">
               {sessionsWithSummary.map((session) => (
                 <Link
                   key={session.id}
                   href={`/history/${session.id}`}
-                  className="block rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-3 transition hover:bg-white/[0.04]"
+                  className={`block rounded-2xl border p-4 space-y-3 transition hover:bg-white/[0.04] ${session.signal.cardClasses}`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold text-white/90">{formatSessionDateTime(session.startedAt)}</div>
                       <div className="mt-1 text-xs text-white/55">
-                        {session.durationLabel} • {session.setCount} sets • {session.exerciseCount} exercises
+                        {session.durationLabel} | {session.setCount} sets | {session.exerciseCount} exercises
                       </div>
                     </div>
                     <div className={`rounded-full border px-2.5 py-1 text-[11px] ${session.signal.classes}`}>
@@ -162,42 +162,16 @@ export default async function HistoryPage() {
                     </div>
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-4">
+                  <div className="grid gap-2 sm:grid-cols-3">
                     <HistoryMetric label="Session load" value={session.sessionLoad.toFixed(1)} compact />
-                    <HistoryMetric label="Avg RPE" value={session.avgRpe !== null ? session.avgRpe.toFixed(1) : "-"} compact />
-                    <HistoryMetric label="Max pain" value={session.maxPain !== null ? String(session.maxPain) : "-"} compact />
                     <HistoryMetric label="Watchouts" value={String(session.watchouts.length)} compact />
+                    <HistoryMetric label="Top signal" value={session.summaryLabel} compact />
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {session.exercises.map((exercise) => (
-                      <span
-                        key={`${session.id}-${exercise.name}`}
-                        className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/75"
-                      >
-                        {exercise.name}
-                      </span>
-                    ))}
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <div className="text-white/65">{session.summaryText}</div>
+                    <div className="text-white/45">Open</div>
                   </div>
-
-                  {session.watchouts.length > 0 ? (
-                    <div className="space-y-2">
-                      {session.watchouts.slice(0, 2).map((watchout) => (
-                        <div
-                          key={`${session.id}-${watchout.kind}-${watchout.title}`}
-                          className="rounded-xl border border-white/10 bg-black/10 p-3"
-                        >
-                          <div className="text-xs uppercase tracking-wide text-white/50">{watchout.label}</div>
-                          <div className="mt-1 text-sm text-white/85">{watchout.title}</div>
-                          <div className="mt-1 text-xs text-white/55">{watchout.detail}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-white/10 bg-black/10 p-3 text-sm text-white/70">
-                      No major watchouts were flagged in this session.
-                    </div>
-                  )}
                 </Link>
               ))}
             </div>
@@ -234,10 +208,9 @@ export default async function HistoryPage() {
           </section>
 
           <section className="lab-card rounded-2xl p-4 space-y-3">
-            <div className="text-sm font-semibold text-white/90">History note</div>
+            <div className="text-sm font-semibold text-white/90">How to use this page</div>
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-white/75">
-              Use this page to look for session-level patterns, not single-set decisions. The goal is to spot how load,
-              effort, and pain changed across finished workouts.
+              Scan the list for session read, load, and watchouts. Open a row only when you want the full detail.
             </div>
           </section>
         </aside>
@@ -272,6 +245,7 @@ function buildSessionSummary(session: SessionListItem, reasons: Awaited<ReturnTy
   const maxPain = maxOf(session.sets.map((set) => set.pain).filter(isNumber));
   const exercises = Array.from(new Set(session.sets.map((set) => set.exercise.name))).slice(0, 5);
   const signal = getSessionSignal({ reasonsCount: reasons.length, avgRpe, maxPain });
+  const watchouts = reasons.map(mapHistoryWatchout);
 
   return {
     id: session.id,
@@ -283,8 +257,14 @@ function buildSessionSummary(session: SessionListItem, reasons: Awaited<ReturnTy
     maxPain,
     durationLabel: formatSessionDuration(session.startedAt, session.endedAt),
     exercises: exercises.map((name) => ({ name })),
-    watchouts: reasons.map(mapHistoryWatchout),
+    watchouts,
     signal,
+    summaryLabel: watchouts[0]?.label ?? (avgRpe !== null ? `RPE ${avgRpe.toFixed(1)}` : "Steady"),
+    summaryText:
+      watchouts[0]?.title ??
+      (maxPain !== null && maxPain > 0
+        ? `Pain topped out at ${maxPain}/10 in this session.`
+        : `${exercises[0] ?? "This session"} carried the main load.`),
   };
 }
 
@@ -301,6 +281,7 @@ function getSessionSignal({
     return {
       label: "High stress",
       classes: "border-rose-400/25 bg-rose-500/10 text-white/85",
+      cardClasses: "border-rose-400/20 bg-rose-500/[0.07]",
     };
   }
 
@@ -308,12 +289,14 @@ function getSessionSignal({
     return {
       label: "Watch",
       classes: "border-amber-300/25 bg-amber-400/10 text-white/85",
+      cardClasses: "border-amber-300/20 bg-amber-400/[0.06]",
     };
   }
 
   return {
     label: "Stable",
     classes: "border-emerald-400/25 bg-emerald-500/10 text-white/85",
+    cardClasses: "border-emerald-400/20 bg-emerald-500/[0.06]",
   };
 }
 
@@ -335,9 +318,10 @@ function mapHistoryWatchout(reason: Awaited<ReturnType<typeof computeSessionRisk
         kind: reason.kind,
         label: "Conditioning",
         title: "Conditioning drove most of the strain",
-        detail: typeof reason.details.pct === "number"
-          ? `Conditioning load ran about ${reason.details.pct}% above baseline.`
-          : "Long or dense conditioning work pushed fatigue higher.",
+        detail:
+          typeof reason.details.pct === "number"
+            ? `Conditioning load ran about ${reason.details.pct}% above baseline.`
+            : "Long or dense conditioning work pushed fatigue higher.",
       };
     case "volume_spike":
       return {

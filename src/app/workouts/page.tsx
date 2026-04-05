@@ -218,9 +218,21 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
         </div>
 
         <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
-          <MiniMetric label="Most work" value={topExercise ? topExercise.name : "-"} />
-          <MiniMetric label="Avg RPE" value={avgRpe !== null ? avgRpe.toFixed(1) : "-"} />
-          <MiniMetric label="Watchouts" value={String(riskReasons.length)} />
+          <MiniMetric
+            label="Most work"
+            value={topExercise ? topExercise.name : "-"}
+            tone={topExercise ? "accent" : "neutral"}
+          />
+          <MiniMetric
+            label="Avg RPE"
+            value={avgRpe !== null ? avgRpe.toFixed(1) : "-"}
+            tone={avgRpe !== null && avgRpe >= 8 ? "watch" : "neutral"}
+          />
+          <MiniMetric
+            label="Watchouts"
+            value={String(riskReasons.length)}
+            tone={riskReasons.length >= 2 ? "danger" : riskReasons.length >= 1 ? "watch" : "safe"}
+          />
         </div>
       </section>
 
@@ -276,7 +288,7 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
         <aside className="space-y-4">
           <section className="lab-card rounded-2xl p-4 space-y-3">
             <div className="text-sm font-semibold text-white/90">Coach note</div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div className={`rounded-2xl border p-4 ${overallSignal.noteClasses}`}>
               <div className="text-sm text-white/85">{nextMove.title}</div>
               <div className="mt-1 text-xs text-white/60">{nextMove.detail}</div>
             </div>
@@ -308,9 +320,27 @@ export default async function WorkoutPage({ searchParams }: PageProps) {
   );
 }
 
-function MiniMetric({ label, value }: { label: string; value: string }) {
+function MiniMetric({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "safe" | "watch" | "danger" | "neutral" | "accent";
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "border-rose-400/20 bg-rose-500/[0.08]"
+      : tone === "watch"
+        ? "border-amber-300/20 bg-amber-400/[0.08]"
+        : tone === "safe"
+          ? "border-emerald-400/20 bg-emerald-500/[0.08]"
+          : tone === "accent"
+            ? "border-sky-400/20 bg-sky-500/[0.08]"
+            : "border-white/10 bg-white/[0.03]";
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5">
+    <div className={`rounded-xl border p-2.5 ${toneClass}`}>
       <div className="text-[11px] uppercase tracking-wide lab-muted">{label}</div>
       <div className="mt-1 text-sm font-semibold text-white/90">{value}</div>
     </div>
@@ -416,6 +446,7 @@ function getOverallSignal({
       description: "This session is carrying noticeable strain. Review pain and hard efforts before pushing further.",
       tone: "caution" as const,
       classes: "border-rose-400/30 bg-rose-500/10",
+      noteClasses: "border-rose-400/25 bg-rose-500/[0.08]",
     };
   }
 
@@ -425,6 +456,7 @@ function getOverallSignal({
       description: "Log a set and this page will turn into a full session summary.",
       tone: "neutral" as const,
       classes: "border-white/10 bg-white/[0.03]",
+      noteClasses: "border-white/10 bg-white/[0.03]",
     };
   }
 
@@ -434,6 +466,7 @@ function getOverallSignal({
       description: "The session looks productive, but at least one thing needs attention.",
       tone: "caution" as const,
       classes: "border-amber-300/30 bg-amber-400/10",
+      noteClasses: "border-amber-300/25 bg-amber-400/[0.08]",
     };
   }
 
@@ -442,6 +475,7 @@ function getOverallSignal({
       description: "The session looks controlled so far with no major watchouts.",
     tone: "stable" as const,
     classes: "border-emerald-400/30 bg-emerald-500/10",
+    noteClasses: "border-emerald-400/25 bg-emerald-500/[0.08]",
   };
 }
 

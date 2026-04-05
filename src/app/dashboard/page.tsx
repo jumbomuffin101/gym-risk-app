@@ -197,12 +197,11 @@ export default async function DashboardPage() {
                   </div>
                   <div className="h-4 w-px bg-white/10" />
                   <div className="text-sm text-white/80">
-                    System:{" "}
                     <span className="lab-muted">
                       {lastSessionAgo === null
-                        ? "No recent training load detected."
+                        ? "No recent training detected."
                         : lastSessionAgo === 0
-                          ? "Last session: today."
+                          ? "Last session today."
                           : `Last session: ${lastSessionAgo}d ago.`}
                     </span>
                   </div>
@@ -224,14 +223,14 @@ export default async function DashboardPage() {
           subline={
             activeSession
               ? `Started ${new Date(activeSession.startedAt).toLocaleString()}`
-              : "No active session. Start a new workout."
+              : "Start a new workout when ready."
           }
           micro={
             activeSession
               ? activeSessionLoggedSets > 0
                 ? `${activeSessionLoggedSets} sets logged`
-                : "Session started, no sets logged yet"
-              : "Awaiting session start"
+                : "No sets logged yet"
+              : "Ready to start"
           }
           microTone={activeSession ? (activeSessionLoggedSets > 0 ? "watch" : "neutral") : "neutral"}
           progress={activeSession ? (activeSessionLoggedSets > 0 ? 68 : 18) : 10}
@@ -249,7 +248,7 @@ export default async function DashboardPage() {
           }
         >
           <div className="flex items-center justify-between gap-4">
-            <div className="text-xs lab-muted">Derived from weekly load change and acute:chronic ratio.</div>
+            <div className="text-xs lab-muted">Weekly change and load ratio.</div>
             <RiskMeter score={fakeRiskScore} />
           </div>
         </MetricCard>
@@ -259,7 +258,7 @@ export default async function DashboardPage() {
           value={elevatedCount === 0 ? "No hot zones" : `${elevatedCount} elevated`}
           badge={elevatedCount === 0 ? "Stable" : "Watch"}
           badgeTone={elevatedCount === 0 ? "safe" : "watch"}
-          subline="Load concentration from current stress profile."
+          subline="Where strain looks concentrated."
           micro={elevatedCount === 0 ? "Even distribution" : "Concentration detected"}
           microTone={elevatedCount === 0 ? "neutral" : "watch"}
           progress={elevatedCount === 0 ? 18 : 54}
@@ -292,7 +291,7 @@ export default async function DashboardPage() {
           {sessionsWithLoad.length === 0 ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
               <div className="text-sm text-white/85">No sessions yet</div>
-              <div className="mt-1 text-xs lab-muted">Start a workout and log sets to populate your dashboard.</div>
+              <div className="mt-1 text-xs lab-muted">Log a workout to populate this dashboard.</div>
               <div className="mt-3">
                 <Link
                   className="btn-primary text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
@@ -306,7 +305,7 @@ export default async function DashboardPage() {
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
               <div className="text-sm text-white/85">No logged sessions yet</div>
               <div className="mt-1 text-xs lab-muted">
-                You may have an active session, but the dashboard will populate once sets are logged.
+                An active session exists, but this view fills in after the first logged set.
               </div>
               <div className="mt-3">
                 <Link
@@ -348,13 +347,13 @@ export default async function DashboardPage() {
           />
 
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-white/90">Risk feed</div>
+            <div className="text-sm font-medium text-white/90">Watchouts</div>
             <div className="text-xs lab-muted">Derived</div>
           </div>
 
           {riskEvents.length === 0 ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="text-sm text-white/85">No active risk events</div>
+              <div className="text-sm text-white/85">No active watchouts</div>
               <div className="mt-1 text-xs lab-muted">Current load and ratio are inside stable bands.</div>
             </div>
           ) : (

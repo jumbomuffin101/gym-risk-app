@@ -231,13 +231,14 @@ export default function ExercisePicker({ enabled, initialSelectedExerciseIds }: 
   }
 
   const canCreate = enabled && debouncedQuery.length >= 3 && results.length === 0 && !loading;
+  const primaryActionLabel = selectionReady && initialSelectedExerciseIds.length > 0 ? "Resume queue" : "Start queue";
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_0.92fr]">
       <section className="lab-card lab-hover rounded-2xl p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-white/90">Search exercises</div>
-          <div className="text-xs text-white/50">Max {MAX_SELECTED}</div>
+          <div className="text-xs text-white/50">{selected.length} selected</div>
         </div>
 
         <input
@@ -251,11 +252,11 @@ export default function ExercisePicker({ enabled, initialSelectedExerciseIds }: 
         {error ? <div className="text-xs text-rose-300">{error}</div> : null}
 
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
-          <div className="text-xs uppercase tracking-wide lab-muted">Results</div>
+          <div className="text-xs uppercase tracking-wide lab-muted">Matches</div>
           {loading ? <div className="text-sm text-white/70">Loading matches...</div> : null}
           {!loading && results.length === 0 ? (
             <div className="text-sm text-white/65">
-              {debouncedQuery ? "No matches yet." : "Start with a search or pick from the list."}
+              {debouncedQuery ? "No matches yet." : "Search to start building the queue."}
             </div>
           ) : null}
 
@@ -278,7 +279,7 @@ export default function ExercisePicker({ enabled, initialSelectedExerciseIds }: 
                   <div className="flex items-center justify-between gap-3">
                     <div className="font-medium">{exercise.name}</div>
                     <div className="text-[11px] uppercase tracking-wide text-white/50">
-                      {isSelected ? "Queued" : "Add"}
+                      {isSelected ? "Selected" : "Add"}
                     </div>
                   </div>
                   <div className="text-xs lab-muted">{exercise.category ?? "uncategorized"}</div>
@@ -302,18 +303,33 @@ export default function ExercisePicker({ enabled, initialSelectedExerciseIds }: 
 
       <section className="lab-card rounded-2xl p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-white/90">Session queue</div>
+          <div>
+            <div className="text-sm font-semibold text-white/90">Session queue</div>
+            <div className="mt-1 text-xs text-white/55">This is the order you will move through.</div>
+          </div>
           <div className="text-xs text-white/50">
             {selected.length}/{MAX_SELECTED}
           </div>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-3">
-          <div className="text-xs uppercase tracking-wide lab-muted">Queue order</div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[rgba(34,197,94,0.18)] bg-[rgba(34,197,94,0.06)] px-3 py-2">
+            <div className="text-sm text-white/85">
+              {selected.length === 0 ? "No exercises queued yet." : `${selected.length} exercise${selected.length === 1 ? "" : "s"} ready.`}
+            </div>
+            <button
+              type="button"
+              onClick={() => selected[0] && router.push(`/exercises/${selected[0].id}${selectedQuery}`)}
+              disabled={selected.length === 0}
+              className="lab-hover rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+            >
+              {primaryActionLabel}
+            </button>
+          </div>
 
           {selected.length === 0 ? (
             <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm text-white/65">
-              Add a few exercises to build the session.
+              Add a few exercises from the left to build the session.
             </div>
           ) : (
             <ul className="max-h-56 space-y-2 overflow-y-auto pr-1">
@@ -363,14 +379,6 @@ export default function ExercisePicker({ enabled, initialSelectedExerciseIds }: 
           )}
 
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => selected[0] && router.push(`/exercises/${selected[0].id}${selectedQuery}`)}
-              disabled={selected.length === 0}
-              className="lab-hover rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
-            >
-              {selectionReady && initialSelectedExerciseIds.length > 0 ? "Resume queue" : "Start queue"}
-            </button>
             {selected.length > 0 ? (
               <button
                 type="button"
