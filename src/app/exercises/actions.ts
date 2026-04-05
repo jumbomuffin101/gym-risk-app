@@ -95,46 +95,18 @@ export async function createSetEntryAction(formData: FormData) {
   }
 
   const volume = reps * weight;
-  const supportsExtendedFields = await supportsExtendedSetEntryFields();
-
-  try {
-    await prisma.setEntry.create({
-      data: {
-        userId,
-        sessionId: session.id,
-        exerciseId,
-        reps,
-        weight,
-        rpe: rpe ?? null,
-        pain: pain ?? null,
-        ...(supportsExtendedFields
-          ? {
-              durationSeconds: durationSeconds ?? null,
-              distanceMeters: distanceMeters ?? null,
-              notes: notes ?? null,
-            }
-          : {}),
-      },
-    });
-  } catch (error) {
-    if (!isMissingSetEntryColumnError(error)) {
-      throw error;
-    }
-
-    markExtendedSetEntryFieldsUnsupported();
-
-    await prisma.setEntry.create({
-      data: {
-        userId,
-        sessionId: session.id,
-        exerciseId,
-        reps,
-        weight,
-        rpe: rpe ?? null,
-        pain: pain ?? null,
-      },
-    });
-  }
+  await createSetEntryWithFallback({
+    userId,
+    sessionId: session.id,
+    exerciseId,
+    reps,
+    weight,
+    durationSeconds,
+    distanceMeters,
+    rpe,
+    pain,
+    notes,
+  });
 
   revalidatePath(`/exercises/${exerciseId}`);
   revalidatePath("/exercises");
@@ -173,44 +145,19 @@ export async function createExerciseDetailSetEntryAction(formData: FormData) {
     return { ok: false as const, error: "No active session." };
   }
 
-  try {
-    await prisma.setEntry.create({
-      data: {
-        userId,
-        sessionId: activeSession.id,
-        exerciseId,
-        reps,
-        weight,
-        rpe: rpe ?? null,
-        pain: pain ?? null,
-        ...(supportsExtendedFields
-          ? {
-              durationSeconds: durationSeconds ?? null,
-              distanceMeters: distanceMeters ?? null,
-              notes: notes ?? null,
-            }
-          : {}),
-      },
-    });
-  } catch (error) {
-    if (!isMissingSetEntryColumnError(error)) {
-      throw error;
-    }
-
-    markExtendedSetEntryFieldsUnsupported();
-
-    await prisma.setEntry.create({
-      data: {
-        userId,
-        sessionId: activeSession.id,
-        exerciseId,
-        reps,
-        weight,
-        rpe: rpe ?? null,
-        pain: pain ?? null,
-      },
-    });
-  }
+  await createSetEntryWithFallback({
+    userId,
+    sessionId: activeSession.id,
+    exerciseId,
+    reps,
+    weight,
+    durationSeconds,
+    distanceMeters,
+    rpe,
+    pain,
+    notes,
+    supportsExtendedFields,
+  });
 
   revalidatePath("/exercises");
   revalidatePath(`/exercises/${exerciseId}`);
@@ -219,4 +166,70 @@ export async function createExerciseDetailSetEntryAction(formData: FormData) {
   revalidatePath("/workouts/new");
 
   return { ok: true as const };
+}
+
+async function createSetEntryWithFallback({
+  userId,
+  sessionId,
+  exerciseId,
+  reps,
+  weight,
+  durationSeconds,
+  distanceMeters,
+  rpe,
+  pain,
+  notes,
+  supportsExtendedFields: knownSupport,
+}: {
+  userId: string;
+  sessionId: string;
+  exerciseId: string;
+  reps: number;
+  weight: number;
+  durationSeconds?: number;
+  distanceMeters?: number;
+  rpe?: number;
+  pain?: number;
+  notes?: string;
+  supportsExtendedFields?: boolean;
+}) {
+  const supportsExtendedFields = knownSupport ?? (await supportsExtendedSetEntryFields());
+  const baseData = {
+    userId,
+    sessionId,
+    exerciseId,
+    reps,
+    weight,
+    rpe: rpe ?? null,
+    pain: pain ?? null,
+  };
+
+  if (!supportsExtendedFields) {
+    await prisma.setEntry.create({ data: baseData });
+    return;
+  }
+
+  try {
+    await prisma.setEntry.create({
+      data: {
+        ...baseData,
+        durationSeconds: durationSeconds ?? null,
+        distanceMeters: distanceMeters ?? null,
+        notes: notes ?? null,
+      },
+    });
+  } catch (error) {
+    markExtendedSetEntryFieldsUnsupported();
+
+    try {
+      await prisma.setEntry.create({ data: baseData });
+      return;
+    } catch (fallbackError) {
+      if (isMissingSetEntryColumnError(error) || isMissingSetEntryColumnError(fallbackError)) {
+        throw fallbackError;
+      }
+
+      throw error;
+    }
+  }
 }
