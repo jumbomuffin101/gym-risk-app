@@ -1,21 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import ExercisePicker from "./ExercisePicker";
-import { startWorkoutSession } from "@/app/exercises/actions";
+import { formatSessionStartedAt } from "./formatSessionStartedAt";
 
 type ActiveSession = {
   id: string;
   startedAt: string;
+  selectedExerciseIds: string[];
 };
 
 export default function NewWorkoutClient({
   initialActiveSession,
+  startSessionForm,
 }: {
   initialActiveSession: ActiveSession | null;
+  startSessionForm: ReactNode;
 }) {
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(initialActiveSession);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,58 +59,60 @@ export default function NewWorkoutClient({
   }, [initialActiveSession]);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <header className="lab-card rounded-2xl p-5">
-        <div className="text-xs uppercase tracking-wide lab-muted">Workouts</div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/95">New workout</h1>
-        <p className="mt-1 text-sm lab-muted">
-          Start a session, then select exercises to open and log sets.
-        </p>
+    <div className="mx-auto max-w-5xl space-y-4">
+      <header className="lab-card rounded-2xl p-4 space-y-2.5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-wide lab-muted">Workout Flow</div>
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-white/95">Build session queue</h1>
+            <p className="mt-1 text-sm text-white/65">Pick exercises, order them, then start the queue.</p>
+          </div>
+
+          <Link
+            href="/workouts"
+            className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
+          >
+            Session result
+          </Link>
+        </div>
+
+        {activeSession ? (
+          <div className="inline-flex rounded-full border border-[rgba(34,197,94,0.22)] bg-[rgba(34,197,94,0.08)] px-3 py-1.5 text-xs text-white/75">
+            Active session
+            <span className="ml-2" suppressHydrationWarning>
+              {isMounted ? formatSessionStartedAt(activeSession.startedAt) : ""}
+            </span>
+          </div>
+        ) : null}
       </header>
 
       {!activeSession ? (
         <div className="lab-card lab-hover rounded-2xl p-5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold text-white/90">No active session</div>
-              <div className="mt-1 text-xs lab-muted">
-                Start a session to unlock exercise search and selection.
-              </div>
+              <div className="text-sm font-semibold text-white/90">Start a session first</div>
+              <div className="mt-1 text-xs lab-muted">The queue opens after the session starts.</div>
             </div>
 
-            <form action={startWorkoutSession}>
-              <input type="hidden" name="redirectTo" value="/workouts/new" />
-              <button
-                className="lab-hover rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black"
-                style={{
-                  boxShadow:
-                    "0 0 0 1px rgba(34,197,94,0.25), 0 18px 55px rgba(34,197,94,0.12)",
-                }}
-              >
-                Start session
-              </button>
-            </form>
+            {startSessionForm}
           </div>
         </div>
-      ) : (
-        <div className="lab-card rounded-2xl p-5">
-          <div className="text-xs uppercase tracking-wide lab-muted">Active session</div>
-          <div className="mt-1 text-sm text-white/80">
-            Started {new Date(activeSession.startedAt).toLocaleString()}
-          </div>
+      ) : null}
+
+      {activeSession ? (
+        <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+          <ExercisePicker
+            enabled={Boolean(activeSession)}
+            initialSelectedExerciseIds={activeSession?.selectedExerciseIds ?? []}
+          />
         </div>
-      )}
+      ) : null}
 
-      <ExercisePicker enabled={Boolean(activeSession)} />
-
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/workouts"
-          className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
-        >
-          Back to workouts
-        </Link>
-      </div>
+      {!activeSession ? (
+        <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm text-white/65">
+          Once a session is active, this page becomes the queue builder for the whole workout.
+        </div>
+      ) : null}
     </div>
   );
 }

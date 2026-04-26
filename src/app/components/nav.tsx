@@ -5,17 +5,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 
-type NavItem = { href: string; label: string; protected?: boolean; match?: "exact" | "section" };
+type NavItem = {
+  href: string;
+  label: string;
+  protected?: boolean;
+  match?: "exact" | "section";
+  aliases?: string[];
+};
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", protected: true, match: "exact" },
   { href: "/exercises", label: "Exercises", protected: true, match: "exact" },
-  { href: "/workouts/new", label: "New Workout", protected: true, match: "exact" },
-  { href: "/workouts", label: "Workouts", protected: true, match: "exact" },
+  { href: "/workouts/new", label: "Workout Flow", protected: true, match: "section", aliases: ["/exercises/"] },
+  { href: "/workouts", label: "Session Result", protected: true, match: "exact" },
   { href: "/history", label: "History", protected: true, match: "exact" },
 ];
 
-function isActive(pathname: string, href: string, match: "exact" | "section" = "exact") {
+function isActive(pathname: string, href: string, match: "exact" | "section" = "exact", aliases: string[] = []) {
+  if (pathname === href || aliases.some((alias) => pathname.startsWith(alias))) {
+    return true;
+  }
+
   if (match === "exact") return pathname === href;
   return pathname === href || pathname.startsWith(href + "/");
 }
@@ -42,6 +52,7 @@ export default function Nav() {
   const pathname = usePathname();
   const { status } = useSession();
   const isAuthed = status === "authenticated";
+  const isLoading = status === "loading";
   const hideNav = pathname === "/signin" || pathname === "/signup";
 
   if (hideNav) {
@@ -66,27 +77,29 @@ export default function Nav() {
           gym-risk
         </Link>
 
-        <nav className="flex flex-wrap gap-2 rounded-full border border-white/10 bg-white/[0.03] p-1">
-          {isAuthed ? (
-            navItems.map((item) => {
-              const active = isActive(pathname, item.href, item.match ?? "exact");
-              return (
-                <Link key={item.href} href={item.href} className={pillClass(active)}>
-                  {item.label}
+        {isLoading ? null : (
+          <nav className="flex flex-wrap gap-2 rounded-full border border-white/10 bg-white/[0.03] p-1">
+            {isAuthed ? (
+              navItems.map((item) => {
+                const active = isActive(pathname, item.href, item.match ?? "exact", item.aliases);
+                return (
+                  <Link key={item.href} href={item.href} className={pillClass(active)}>
+                    {item.label}
+                  </Link>
+                );
+              })
+            ) : (
+              <>
+                <Link href="/signin" className={pillClass(isActive(pathname, "/signin", "exact"))}>
+                  Sign in
                 </Link>
-              );
-            })
-          ) : (
-            <>
-              <Link href="/signin" className={pillClass(isActive(pathname, "/signin", "exact"))}>
-                Sign in
-              </Link>
-              <Link href="/signup" className={pillClass(isActive(pathname, "/signup", "exact"))}>
-                Create account
-              </Link>
-            </>
-          )}
-        </nav>
+                <Link href="/signup" className={pillClass(isActive(pathname, "/signup", "exact"))}>
+                  Create account
+                </Link>
+              </>
+            )}
+          </nav>
+        )}
       </div>
     </header>
   );

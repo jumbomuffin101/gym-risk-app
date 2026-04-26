@@ -1,10 +1,14 @@
 import "./globals.css";
+import type { Viewport } from "next";
 import { Providers } from "./providers";
 import Nav from "src/app/components/nav";
 
 export const metadata = {
   title: "Gym Risk",
   description: "Track training load and detect injury risk",
+};
+
+export const viewport: Viewport = {
   themeColor: "#0b0f14",
 };
 

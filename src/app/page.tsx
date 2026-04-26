@@ -297,7 +297,7 @@ export default function WelcomePage() {
     () => [
       {
         title: "Acute Load (7d)",
-        description: "Σ session load over last 7 days (AU).",
+        description: "Total session load across the last 7 days (AU).",
       },
       {
         title: "Chronic Load (28d)",
@@ -309,7 +309,7 @@ export default function WelcomePage() {
       },
       {
         title: "Risk Index",
-        description: "f(ratio, trend, thresholds).",
+        description: "Combined view of load ratio, trend, and thresholds.",
       },
     ],
     []
@@ -476,7 +476,8 @@ export default function WelcomePage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-xs font-semibold text-[var(--lab-analytics)]">Dashboard preview</div>
-                  <div className="mt-1 text-sm font-semibold text-white/90">Strength cycle · Week 6</div>
+                  <div className="mt-1 text-sm font-semibold text-white/90">Strength cycle | Week 6</div>
+                  <div className="mt-1 text-xs text-white/55">A cleaner look at load, strain, and weekly trend.</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={chipClass}>Sample week</span>
@@ -519,109 +520,123 @@ export default function WelcomePage() {
                 </div>
               </div>
 
-              <div className="mt-5 grid auto-rows-fr gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
-                  <div className="flex items-center justify-between text-xs font-medium text-white/60">
-                    <span>Risk Index</span>
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneClass[activeData.riskStateTone]}`}
-                    >
-                      State: {activeData.riskState}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex items-end justify-between">
-                    <div className="text-3xl font-semibold text-white/90">
-                      {animatedRisk}
-                      <span className="text-sm font-medium text-white/50">/100</span>
+              <div className="mt-5 grid auto-rows-fr gap-3 md:grid-cols-2">
+                <div className="flex min-h-[15.5rem] flex-col justify-between rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3 text-xs font-medium text-white/60">
+                      <span>Risk Index</span>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneClass[activeData.riskStateTone]}`}
+                      >
+                        State: {activeData.riskState}
+                      </span>
                     </div>
-                    <span className="text-xs text-white/65">f(ratio, trend, thresholds)</span>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
-                    <div
-                      className="h-full rounded-full bg-[rgba(125,211,252,0.45)] transition-all duration-500 motion-reduce:transition-none"
-                      style={{ width: `${activeData.risk}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
-                  <div className="flex items-center justify-between text-xs font-medium text-white/60">
-                    <span>Weekly Load</span>
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneClass[activeData.weeklyStatusTone]}`}
-                    >
-                      Status: {activeData.weeklyStatus}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex items-end justify-between">
-                    <div className="text-3xl font-semibold text-white/90">
-                      {animatedLoad}
-                      <span className="text-sm font-medium text-white/50"> AU</span>
-                    </div>
-                    <span className="text-xs text-white/70">{activeData.loadDelta}</span>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-white/65">
-                    <div className="rounded-lg border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-2.5 py-2">
-                      7d total
-                    </div>
-                    <div className="rounded-lg border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] px-2.5 py-2 text-right">
-                      AU scale
+                    <div className="flex items-end justify-between gap-3">
+                      <div className="text-3xl font-semibold text-white/90">
+                        {animatedRisk}
+                        <span className="text-sm font-medium text-white/50">/100</span>
+                      </div>
+                      <span className="max-w-[8rem] text-right text-xs text-white/65">Load balance + trend</span>
                     </div>
                   </div>
-                </div>
-
-                <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
-                  <div className="flex items-center justify-between text-xs font-medium text-white/60">
-                    <span>Acute:Chronic</span>
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneClass[activeData.ratioThresholdTone]}`}
-                    >
-                      Threshold: {activeData.ratioThreshold}
-                    </span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-3 items-end gap-3">
-                    <div>
-                      <div className="text-[10px] font-medium uppercase tracking-wide text-white/45">Acute</div>
-                      <div className="mt-1 text-xl font-semibold text-white/90">{activeData.acuteLoad}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-medium uppercase tracking-wide text-white/45">Chronic</div>
-                      <div className="mt-1 text-xl font-semibold text-white/90">{activeData.chronicLoad}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] font-medium uppercase tracking-wide text-white/45">Ratio</div>
-                      <div className="mt-1 text-2xl font-semibold text-white/90">{activeData.ratio}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface)] p-4">
-                  <div className="flex items-center justify-between text-xs font-medium text-white/60">
-                    <span>Load analytics</span>
-                    <span className={chipClass}>Model: Rolling</span>
-                  </div>
-                  <div className="mt-4 rounded-xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] p-3">
-                    <div className="flex items-center justify-between text-[11px] font-medium text-white/60">
-                      <span>Session trend</span>
-                      <span>Mon → Sun</span>
-                    </div>
-                    <svg viewBox="0 0 150 64" className="mt-3 h-16 w-full">
-                      <path
-                        d="M2,58 L2,58 146,58"
-                        stroke="rgba(255,255,255,0.08)"
-                        strokeWidth="2"
-                        fill="none"
+                  <div className="space-y-3">
+                    <div className="h-2 overflow-hidden rounded-full bg-white/5">
+                      <div
+                        className="h-full rounded-full bg-[rgba(125,211,252,0.45)] transition-all duration-500 motion-reduce:transition-none"
+                        style={{ width: `${activeData.risk}%` }}
                       />
-                      <path
-                        d={activeData.graph}
-                        stroke="var(--lab-analytics)"
-                        strokeWidth="3"
-                        fill="none"
-                        className="transition-all duration-500 motion-reduce:transition-none"
-                      />
-                    </svg>
+                    </div>
+                    <div className="text-xs text-white/50">Higher values mean the week needs closer attention.</div>
                   </div>
-                  <p className="mt-3 text-xs text-white/60">Preview computed from sample session set.</p>
+                </div>
+
+                <div className="flex min-h-[15.5rem] flex-col justify-between rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3 text-xs font-medium text-white/60">
+                      <span>Weekly Load</span>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneClass[activeData.weeklyStatusTone]}`}
+                      >
+                        Status: {activeData.weeklyStatus}
+                      </span>
+                    </div>
+                    <div className="flex items-end justify-between gap-3">
+                      <div className="text-3xl font-semibold text-white/90">
+                        {animatedLoad}
+                        <span className="text-sm font-medium text-white/50"> AU</span>
+                      </div>
+                      <span className="max-w-[7rem] text-right text-xs text-white/70">{activeData.loadDelta}</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-white/65">
+                    <div className="rounded-lg border border-[color:var(--lab-accent-border)] bg-[rgba(255,255,255,0.02)] px-2.5 py-2">
+                      This week
+                    </div>
+                    <span
+                      className="rounded-lg border border-[color:var(--lab-accent-border)] bg-[rgba(255,255,255,0.02)] px-2.5 py-2 text-right"
+                    >
+                      Load scale
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex min-h-[15.5rem] flex-col justify-between rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3 text-xs font-medium text-white/60">
+                      <span>Acute:Chronic</span>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneClass[activeData.ratioThresholdTone]}`}
+                      >
+                        Threshold: {activeData.ratioThreshold}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 items-end gap-3">
+                      <div>
+                        <div className="text-[10px] font-medium uppercase tracking-wide text-white/45">Acute</div>
+                        <div className="mt-1 text-xl font-semibold text-white/90">{activeData.acuteLoad}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-medium uppercase tracking-wide text-white/45">Chronic</div>
+                        <div className="mt-1 text-xl font-semibold text-white/90">{activeData.chronicLoad}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] font-medium uppercase tracking-wide text-white/45">Ratio</div>
+                        <div className="mt-1 text-2xl font-semibold text-white/90">{activeData.ratio}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-white/50">Used to compare short-term load against your rolling baseline.</div>
+                </div>
+
+                <div className="flex min-h-[15.5rem] flex-col justify-between rounded-2xl border border-[color:var(--lab-accent-border)] bg-[var(--lab-surface-2)] p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3 text-xs font-medium text-white/60">
+                      <span>Load analytics</span>
+                      <span className={chipClass}>Model: Rolling</span>
+                    </div>
+                    <div className="rounded-xl border border-[color:var(--lab-accent-border)] bg-[rgba(255,255,255,0.02)] p-3">
+                      <div className="flex items-center justify-between text-[11px] font-medium text-white/60">
+                        <span>Session trend</span>
+                        <span>Mon to Sun</span>
+                      </div>
+                      <svg viewBox="0 0 150 64" className="mt-3 h-16 w-full">
+                        <path
+                          d="M2,58 L2,58 146,58"
+                          stroke="rgba(255,255,255,0.08)"
+                          strokeWidth="2"
+                          fill="none"
+                        />
+                        <path
+                          d={activeData.graph}
+                          stroke="var(--lab-analytics)"
+                          strokeWidth="3"
+                          fill="none"
+                          className="transition-all duration-500 motion-reduce:transition-none"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="text-xs text-white/60">Preview computed from sample session data.</p>
                 </div>
               </div>
             </div>
@@ -661,7 +676,7 @@ export default function WelcomePage() {
       <section id="how-it-works" className="mt-16">
         <div className="text-xs font-semibold text-[var(--lab-analytics)]">How it works</div>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white/90">
-          A tight loop from log → load → action.
+          A tight loop from log to load to action.
         </h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {howItWorks.map((step) => (
@@ -818,7 +833,7 @@ export default function WelcomePage() {
             <p className="mt-2 text-xs text-white/45">Created by Aryan Rawat.</p>
           </div>
           <div className="flex flex-wrap gap-4 text-sm text-white/60">
-            <Link href="https://github.com" className="hover:text-white">
+            <Link href="https://github.com/jumbomuffin101/gym-risk-app" className="hover:text-white">
               GitHub
             </Link>
             <Link href="/docs" className="hover:text-white">
