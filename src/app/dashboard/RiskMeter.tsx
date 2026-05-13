@@ -60,12 +60,11 @@ export function RiskMeter({ score }: { score: number }) {
             className="h-2 w-2 rounded-full"
             style={{
               background: color,
-              boxShadow: `0 0 18px ${color}`,
-              animation: "lab-soft-pulse 1.8s ease-in-out infinite",
+              boxShadow: `0 0 12px ${color}`,
             }}
           />
         </div>
-        <div className="mt-1 text-xs lab-muted">Updates as sets are logged</div>
+        <div className="mt-1 text-xs lab-muted">Current score</div>
       </div>
     </div>
   );

@@ -9,9 +9,9 @@ export default function WelcomePage() {
           <Image
             src="/brand/gym-risk-icon-v2.svg"
             alt="Gym-Risk logo"
-            width={32}
-            height={32}
-            className="h-8 w-8 object-contain"
+            width={40}
+            height={40}
+            className="h-10 w-10 object-contain"
           />
           Gym-Risk
         </Link>
@@ -87,7 +87,10 @@ export default function WelcomePage() {
         </div>
       </section>
 
-      <footer className="pb-2 text-xs text-white/35">Gym-Risk provides training signals, not medical advice.</footer>
+      <footer className="flex flex-wrap justify-between gap-2 pb-2 text-xs text-white/35">
+        <span>Gym-Risk provides training signals, not medical advice.</span>
+        <span>Created by Aryan Rawat</span>
+      </footer>
     </main>
   );
 }

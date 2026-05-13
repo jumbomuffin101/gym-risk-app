@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth/authOptions";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
+import { computeSessionRisk } from "@/app/lib/riskEngine";
 
 import DashboardActions from "./DashboardActions";
 import { KpiCard } from "src/app/dashboard/KpiCard";
@@ -23,6 +24,42 @@ export const runtime = "nodejs";
 function daysAgo(d: Date) {
   const diff = Date.now() - d.getTime();
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
+function setLoad(set: { reps: number; weight: number; rpe: number | null }) {
+  return set.reps * set.weight * (set.rpe ?? 1);
+}
+
+function formatLoad(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.round(value).toLocaleString();
+}
+
+function cleanSessionNote(note: string | null) {
+  const value = note?.trim();
+  if (!value) return null;
+
+  const lower = value.toLowerCase();
+  const looksMachineGenerated =
+    value.startsWith("{") ||
+    value.startsWith("[") ||
+    value.includes("[object Object]") ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower.includes('"') ||
+    lower.includes("=>") ||
+    lower.includes("\u00e2") ||
+    lower.includes("\u00c3");
+
+  if (looksMachineGenerated) return null;
+  return value.length > 120 ? `${value.slice(0, 117)}...` : value;
+}
+
+function cleanDisplayText(value: string) {
+  return value
+    .replaceAll("\u00e2\u2030\u00a5", ">=")
+    .replaceAll("\u00e2\u20ac\u201c", "-")
+    .replaceAll("\u00e2\u20ac\u201d", "-");
 }
 
 export default async function DashboardPage() {
@@ -48,6 +85,7 @@ export default async function DashboardPage() {
       endedAt: true,
       note: true,
       _count: { select: { sets: true } },
+      sets: { select: { reps: true, weight: true, rpe: true } },
     },
   });
 
@@ -56,8 +94,26 @@ export default async function DashboardPage() {
     select: { id: true, startedAt: true },
   });
 
-  // --- Placeholder but "alive" dashboard signals (you can replace with real model later)
-  const fakeRiskScore = activeSession ? 38 : 12;
+  const recentRiskReasons = (
+    await Promise.all(
+      sessions
+        .filter((s) => s._count.sets > 0)
+        .slice(0, 4)
+        .map(async (s) => {
+          const reasons = await computeSessionRisk(user.id, s.id);
+          return reasons.map((reason) => ({
+            ...reason,
+            sessionId: s.id,
+            startedAt: s.startedAt,
+          }));
+        })
+    )
+  )
+    .flat()
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+
+  const riskScore = recentRiskReasons[0]?.score ?? (activeSession ? 24 : 8);
   const heatmap: RiskMap = {
     shoulders: "low",
     elbows: "low",
@@ -67,11 +123,23 @@ export default async function DashboardPage() {
     knees: "low",
   };
 
-  const elevatedCount = Object.values(heatmap).filter((v) => v !== "low").length;
-
-  // placeholder load analytics
-  const today = activeSession ? 12450 : 0;
-  const baseline = 9800;
+  const referenceTime = sessions[0] ? new Date(sessions[0].startedAt).getTime() : 0;
+  const recentSessions = sessions.filter(
+    (s) => referenceTime - new Date(s.startedAt).getTime() <= 7 * 24 * 60 * 60 * 1000
+  );
+  const sessionLoads = sessions.map((s) => ({
+    id: s.id,
+    load: s.sets.reduce((sum, set) => sum + setLoad(set), 0),
+  }));
+  const today = recentSessions.reduce(
+    (sum, session) => sum + session.sets.reduce((load, set) => load + setLoad(set), 0),
+    0
+  );
+  const completedSessionLoads = sessionLoads.filter((s) => s.load > 0).map((s) => s.load);
+  const baseline =
+    completedSessionLoads.length > 0
+      ? completedSessionLoads.reduce((sum, load) => sum + load, 0) / completedSessionLoads.length
+      : 0;
   const deltaPct = baseline ? Math.round(((today - baseline) / baseline) * 100) : 0;
 
   const lastSessionAgo =
@@ -79,18 +147,8 @@ export default async function DashboardPage() {
 
   return (
     <PageShell>
-      {/* HERO */}
-      <LabCard className="rounded-2xl p-5 overflow-hidden relative" hover={false}>
-        {/* subtle divider gradient + ambient */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-60"
-          style={{
-            background:
-              "radial-gradient(800px 240px at 20% 30%, rgba(34,197,94,0.10), transparent 55%), radial-gradient(600px 220px at 80% 20%, rgba(56,189,248,0.06), transparent 55%)",
-          }}
-        />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+      <LabCard className="rounded-2xl p-5" hover={false}>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <SectionHeader
               eyebrow="Dashboard"
@@ -103,10 +161,9 @@ export default async function DashboardPage() {
                   </div>
                   <div className="h-4 w-px bg-white/10" />
                   <div className="text-sm text-white/80">
-                    System:{" "}
                     <span className="lab-muted">
                       {sessions.length === 0
-                        ? "No recent training load detected."
+                        ? "No sessions logged yet."
                         : `Last session: ${lastSessionAgo}d ago.`}
                     </span>
                   </div>
@@ -119,55 +176,51 @@ export default async function DashboardPage() {
         </div>
       </LabCard>
 
-      {/* TOP GRID */}
       <section className="grid gap-4 md:grid-cols-3">
         <KpiCard
-          title="Session flow"
+          title="Active session"
           value={activeSession ? "In progress" : "Idle"}
           badge={activeSession ? "Active" : "Ready"}
           badgeTone={activeSession ? "watch" : "safe"}
-          subline={activeSession ? "Logging sets updates risk live." : "Start a session to enable signals."}
-          micro={activeSession ? "Live signals enabled" : "Awaiting session start"}
+          subline={activeSession ? "Sets logged here update the dashboard." : "Start a workout to begin tracking."}
+          micro={activeSession ? "Tracking current work" : undefined}
           microTone={activeSession ? "watch" : "neutral"}
           progress={activeSession ? 62 : 12}
         />
 
         <MetricCard
           eyebrow="Risk status"
-          title={activeSession ? "Adaptive estimate" : "Baseline estimate"}
+          title={recentRiskReasons.length > 0 ? "Latest signal" : "No flags"}
           subtitle={
             sessions.length === 0
-              ? "No data yet, risk starts stable."
-              : "Computed from volume, RPE, recovery."
+              ? "Log sets to generate risk signals."
+              : "Based on recent volume, RPE, and pain."
           }
           actions={
             <StatusChip
-              label={activeSession ? "Adaptive" : "Baseline"}
-              tone={activeSession ? "accent" : "neutral"}
+              label={riskScore >= 70 ? "High" : riskScore >= 40 ? "Watch" : "Low"}
+              tone={riskScore >= 70 ? "danger" : riskScore >= 40 ? "watch" : "safe"}
             />
           }
         >
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-xs lab-muted">
-              {activeSession ? "Live updates while logging sets." : "Static estimate until a session starts."}
+          <div className="flex items-center justify-between gap-4 min-h-24">
+            <div className="text-sm lab-muted">
+              {recentRiskReasons[0]?.title ? cleanDisplayText(recentRiskReasons[0].title) : "No recent risk events."}
             </div>
-            <RiskMeter score={fakeRiskScore} />
+            <RiskMeter score={riskScore} />
           </div>
         </MetricCard>
 
         <KpiCard
-          title="Muscle heatmap"
-          value={elevatedCount === 0 ? "No hot zones" : `${elevatedCount} elevated`}
-          badge={elevatedCount === 0 ? "Stable" : "Watch"}
-          badgeTone={elevatedCount === 0 ? "safe" : "watch"}
-          subline="Click zones for explainable drivers."
-          micro={elevatedCount === 0 ? "Even distribution" : "Concentration detected"}
-          microTone={elevatedCount === 0 ? "neutral" : "watch"}
-          progress={elevatedCount === 0 ? 18 : 54}
+          title="7-day load"
+          value={formatLoad(today) ?? "0"}
+          badge={baseline ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "New"}
+          badgeTone={!baseline ? "neutral" : deltaPct >= 20 ? "danger" : deltaPct >= 12 ? "watch" : "safe"}
+          subline={baseline ? "Compared with recent session average." : "No baseline yet."}
+          progress={baseline ? Math.min(100, Math.max(8, (today / baseline) * 50)) : 8}
         />
       </section>
 
-      {/* BIG PANELS */}
       <section className="grid gap-4 lg:grid-cols-2">
         <SessionStepper active={Boolean(activeSession)} />
         <LoadPanel today={today} baseline={baseline} deltaPct={deltaPct} active={Boolean(activeSession)} />
@@ -175,7 +228,6 @@ export default async function DashboardPage() {
 
       <MuscleHeatmap risk={heatmap} active={Boolean(activeSession)} />
 
-      {/* RECENT SESSIONS + RISK FEED (still placeholder) */}
       <section className="grid gap-4 md:grid-cols-2">
         <LabCard className="rounded-2xl p-5">
           <div className="flex items-center justify-between">
@@ -200,51 +252,72 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="mt-4 space-y-2">
-              {sessions.map((s) => (
-                <div
-                  key={s.id}
-                  className="rounded-xl border border-white/10 bg-white/[0.02] p-3 hover:bg-white/[0.03] transition"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium text-white/90">
-                      {new Date(s.startedAt).toLocaleString()}
+              {sessions.map((s) => {
+                const load = formatLoad(s.sets.reduce((sum, set) => sum + setLoad(set), 0));
+                const note = cleanSessionNote(s.note);
+
+                return (
+                  <div
+                    key={s.id}
+                    className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-medium text-white/90">
+                        {new Date(s.startedAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </div>
+                      <div className="text-xs lab-muted">
+                        {s._count.sets} sets{load ? ` · ${load} load` : ""}
+                      </div>
                     </div>
-                    <div className="text-xs lab-muted">{s._count.sets} sets</div>
+                    {note ? <div className="mt-1 text-xs text-white/65">{note}</div> : null}
                   </div>
-                  {s.note ? <div className="mt-1 text-xs text-white/70">{s.note}</div> : null}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </LabCard>
 
-        <LabCard className="rounded-2xl p-5 relative overflow-hidden">
-          {/* faint animated line hint (alive micro-indicator) */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute left-0 right-0 top-0 h-px opacity-40"
-            style={{
-              background:
-                "linear-gradient(90deg, transparent, rgba(34,197,94,0.45), transparent)",
-              animation: "lab-scan 3.6s ease-in-out infinite",
-            }}
-          />
-
+        <LabCard className="rounded-2xl p-5">
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-white/90">Risk feed</div>
-            <div className="text-xs lab-muted">v0</div>
+            <div className="text-xs lab-muted">{recentRiskReasons.length} events</div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-sm text-white/85">No risk events yet</div>
-            <div className="mt-1 text-xs lab-muted">
-              Status: <span className="text-white/75">Last spike: 3 days ago</span>
-              {" "} (placeholder)
+          {recentRiskReasons.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="text-sm text-white/85">No risk events</div>
+              <div className="mt-1 text-xs lab-muted">
+                Recent sessions have not triggered a pain, RPE, or load flag.
+              </div>
             </div>
-            <div className="mt-3 text-xs lab-muted">
-              Quick test: log sets with high RPE or pain.
+          ) : (
+            <div className="mt-4 space-y-2">
+              {recentRiskReasons.map((reason, index) => (
+                <div key={`${reason.sessionId}-${reason.kind}-${index}`} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-white/90">{cleanDisplayText(reason.title)}</div>
+                      <div className="mt-1 text-xs lab-muted">
+                        {new Date(reason.startedAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </div>
+                    </div>
+                    <StatusChip
+                      label={`${reason.score}`}
+                      tone={reason.score >= 70 ? "danger" : reason.score >= 40 ? "watch" : "safe"}
+                      showDot={false}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+          )}
         </LabCard>
       </section>
     </PageShell>

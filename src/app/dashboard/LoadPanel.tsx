@@ -15,7 +15,7 @@ export function LoadPanel({
   active: boolean;
 }) {
   const tone =
-    deltaPct >= 20 ? "danger" : deltaPct >= 12 ? "watch" : "safe";
+    baseline <= 0 ? "neutral" : deltaPct >= 20 ? "danger" : deltaPct >= 12 ? "watch" : "safe";
 
   const color =
     tone === "danger"
@@ -23,90 +23,75 @@ export function LoadPanel({
       : tone === "watch"
       ? "var(--lab-watch)"
       : "var(--lab-safe)";
-  const activityOpacity = active ? 0.75 : 0.45;
+  const activityOpacity = active ? 0.75 : 0.5;
 
   return (
     <MetricCard
       title="Load analytics"
-      subtitle="Rolling 7-day load vs baseline with spike detection."
+      subtitle="Recent set load compared with your session baseline."
       actions={
         <StatusChip
           label={
-            tone === "danger"
-              ? "Spike flagged"
+            baseline <= 0
+              ? "No baseline"
+              : tone === "danger"
+              ? "Spike"
               : tone === "watch"
-              ? "Watch zone"
-              : "Stable trend"
+              ? "Watch"
+              : "Stable"
           }
           tone={tone}
         />
       }
     >
-      <div className="flex flex-wrap gap-2 text-xs">
-        <StatusChip
-          label={`Today: ${today.toLocaleString()}`}
-          tone="neutral"
-          showDot={false}
-          className="lab-num text-[rgba(230,232,238,0.92)]"
-        />
-        <StatusChip
-          label={`Baseline: ${baseline.toLocaleString()}`}
-          tone="neutral"
-          showDot={false}
-          className="lab-num text-[rgba(230,232,238,0.92)]"
-        />
-        <StatusChip
-          label={`${deltaPct >= 0 ? "+" : ""}${deltaPct}% vs baseline`}
-          tone={tone}
-          showDot={false}
-          className="text-[rgba(230,232,238,0.92)]"
-        />
-      </div>
-
-      {/* Minimal chart placeholder that still feels analytical */}
-      <div className="mt-5 overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[rgba(15,21,32,0.6)]">
-        <div className="p-4">
-          <div className="flex items-center justify-between text-xs lab-muted">
-            <span>7-day rolling</span>
-            <span className="lab-num">baseline + trend</span>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div>
+          <div className="text-xs lab-muted">7-day load</div>
+          <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
+            {Math.round(today).toLocaleString()}
           </div>
-
-          <div className="mt-3 h-36 rounded-xl bg-[rgba(255,255,255,0.02)]">
-            <div className="relative h-full w-full">
-              <div className="absolute inset-0 opacity-[0.35]">
-                <div className="h-full w-full lab-gridline opacity-[0.30]" />
-              </div>
-
-              {/* “glowing line” vibe */}
-              <div
-                className="absolute left-4 top-[56%] h-0.5 w-[78%]"
-                style={{
-                  background: "rgba(230,232,238,0.16)",
-                }}
-              />
-              <div
-                className="absolute left-4 top-[48%] h-0.5 w-[70%]"
-                style={{
-                  background: color,
-                  boxShadow: `0 0 20px ${color}`,
-                  opacity: activityOpacity,
-                }}
-              />
-
-              <div className="absolute bottom-3 left-4 text-xs lab-muted">
-                {tone === "danger"
-                  ? "Spike detected (+threshold)"
-                  : tone === "watch"
-                  ? "Approaching threshold"
-                  : "Within baseline range"}
-              </div>
-            </div>
+        </div>
+        <div>
+          <div className="text-xs lab-muted">Baseline</div>
+          <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
+            {baseline > 0 ? Math.round(baseline).toLocaleString() : "-"}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs lab-muted">Change</div>
+          <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
+            {baseline > 0 ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "-"}
           </div>
         </div>
       </div>
 
-      <div className="mt-3 text-xs lab-muted">
-        Charts will be wired to your real session/set data next — this panel is the dashboard shell.
+      <div className="mt-5 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] p-4">
+        <div className="flex items-center justify-between text-xs lab-muted">
+          <span>Load trend</span>
+          <span className="lab-num">{active ? "Active session" : "Recent sessions"}</span>
+        </div>
+
+        <svg viewBox="0 0 260 80" className="mt-4 h-24 w-full" aria-hidden="true">
+          <path d="M8 58H252" stroke="rgba(255,255,255,0.10)" strokeWidth="2" />
+          <path
+            d="M10 54C38 50 55 42 80 44C110 47 124 31 151 34C181 37 192 25 218 23C234 22 244 24 252 20"
+            fill="none"
+            stroke={color}
+            strokeLinecap="round"
+            strokeWidth="3"
+            opacity={activityOpacity}
+          />
+        </svg>
+
+        <div className="text-xs lab-muted">
+          {baseline <= 0
+            ? "More completed sessions will establish a baseline."
+            : tone === "danger"
+            ? "Recent load is materially above baseline."
+            : tone === "watch"
+            ? "Recent load is above baseline."
+            : "Recent load is within baseline range."}
+        </div>
       </div>
     </MetricCard>
   );
