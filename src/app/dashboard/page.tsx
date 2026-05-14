@@ -5,13 +5,14 @@ import { authOptions } from "@/app/lib/auth/authOptions";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { computeSessionRisk } from "@/app/lib/riskEngine";
+import { buildMuscleRegionRisks, computeDashboardRiskSignal } from "@/app/lib/dashboardRisk";
 import { cleanWorkoutName, formatLoad, setLoad, summarizeWorkoutSets } from "@/app/lib/workouts";
 
 import DashboardActions from "./DashboardActions";
 import { DashboardWorkoutSelector } from "./DashboardWorkoutSelector";
 import { KpiCard } from "src/app/dashboard/KpiCard";
 import { RiskMeter } from "src/app/dashboard/RiskMeter";
-import { MuscleHeatmap, type RiskMap } from "src/app/dashboard/MuscleHeatmap";
+import { MuscleHeatmap } from "src/app/dashboard/MuscleHeatmap";
 import { LoadPanel } from "src/app/dashboard/LoadPanel";
 import { LabCard } from "src/app/dashboard/components/LabCard";
 import { MetricCard } from "src/app/dashboard/components/MetricCard";
@@ -35,60 +36,6 @@ function cleanDisplayText(value: string) {
     .replaceAll("\u00e2\u2030\u00a5", ">=")
     .replaceAll("\u00e2\u20ac\u201c", "-")
     .replaceAll("\u00e2\u20ac\u201d", "-");
-}
-
-function reasonCategories(reason: DashboardRiskReason) {
-  const categories = new Set<string>();
-  const category = reason.details.category;
-  if (typeof category === "string") categories.add(category);
-
-  for (const key of ["examples", "hardSets"]) {
-    const rows = reason.details[key];
-    if (!Array.isArray(rows)) continue;
-
-    rows.forEach((row) => {
-      if (row && typeof row === "object" && "category" in row) {
-        const rowCategory = (row as { category?: unknown }).category;
-        if (typeof rowCategory === "string") categories.add(rowCategory);
-      }
-    });
-  }
-
-  return Array.from(categories);
-}
-
-function buildHeatmap(reasons: DashboardRiskReason[]): RiskMap {
-  const risk: RiskMap = {
-    shoulders: "low",
-    elbows: "low",
-    lowerBack: "low",
-    quads: "low",
-    hamstrings: "low",
-    knees: "low",
-  };
-
-  const apply = (regions: Array<keyof RiskMap>, score: number) => {
-    const level = score >= 70 ? "high" : score >= 40 ? "moderate" : "low";
-    if (level === "low") return;
-
-    regions.forEach((region) => {
-      if (risk[region] === "high") return;
-      risk[region] = level;
-    });
-  };
-
-  reasons.forEach((reason) => {
-    const categories = reasonCategories(reason);
-    categories.forEach((category) => {
-      if (category === "squat") apply(["quads", "knees", "lowerBack"], reason.score);
-      if (category === "hinge") apply(["hamstrings", "lowerBack"], reason.score);
-      if (category === "push") apply(["shoulders", "elbows"], reason.score);
-      if (category === "pull") apply(["shoulders", "elbows"], reason.score);
-      if (category === "core") apply(["lowerBack"], reason.score);
-    });
-  });
-
-  return risk;
 }
 
 function formatWorkoutDateTime(startedAt: Date) {
@@ -140,31 +87,50 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const params = searchParams ? await searchParams : {};
   const rawWorkoutId = params.workoutId;
   const requestedWorkoutId = Array.isArray(rawWorkoutId) ? rawWorkoutId[0] : rawWorkoutId;
+  const now = new Date();
+  const metricsSince = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000);
 
-  const sessions = await prisma.workoutSession.findMany({
-    where: {
-      userId,
-      endedAt: { not: null },
-      sets: { some: {} },
-    },
-    orderBy: { startedAt: "desc" },
-    take: 12,
-    select: {
-      id: true,
-      startedAt: true,
-      note: true,
-      _count: { select: { sets: true } },
-      sets: {
-        select: {
-          exerciseId: true,
-          reps: true,
-          weight: true,
-          rpe: true,
-          pain: true,
+  const [sessions, metricSets] = await Promise.all([
+    prisma.workoutSession.findMany({
+      where: {
+        userId,
+        endedAt: { not: null },
+        sets: { some: {} },
+      },
+      orderBy: { startedAt: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        startedAt: true,
+        note: true,
+        _count: { select: { sets: true } },
+        sets: {
+          select: {
+            exerciseId: true,
+            reps: true,
+            weight: true,
+            rpe: true,
+            pain: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.setEntry.findMany({
+      where: {
+        userId,
+        performedAt: { gte: metricsSince, lte: now },
+        session: { endedAt: { not: null } },
+      },
+      select: {
+        performedAt: true,
+        reps: true,
+        weight: true,
+        rpe: true,
+        pain: true,
+        exercise: { select: { name: true, category: true } },
+      },
+    }),
+  ]);
 
   const selectedWorkout =
     sessions.find((workout) => workout.id === requestedWorkoutId) ?? sessions[0] ?? null;
@@ -197,8 +163,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     .slice(0, 4);
   const selectedRiskReasons: DashboardRiskReason[] = selectedRiskReasonList;
 
-  const riskScore = recentRiskReasons[0]?.score ?? 8;
-  const heatmap = buildHeatmap(recentRiskReasons);
+  const riskSignal = computeDashboardRiskSignal(metricSets, now);
+  const riskTone =
+    riskSignal.state === "high" ? "danger" : riskSignal.state === "monitor" ? "watch" : "safe";
+  const heatmap = buildMuscleRegionRisks(metricSets, now);
   const sessionLoads = sessions.map((workout) => ({
     id: workout.id,
     load: workout.sets.reduce((sum, set) => sum + setLoad(set), 0),
@@ -229,7 +197,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const selectedWorkoutName = selectedWorkout
     ? cleanWorkoutName(selectedWorkout.note) ?? "Untitled workout"
     : "No completed workout";
-  const selectedRiskScore = selectedRiskReasons[0]?.score ?? 8;
+  const selectedRiskScore = selectedRiskReasons[0]?.score ?? 25;
   const selectedBaselineLoads = sessionLoads
     .filter((workout) => workout.id !== selectedWorkout?.id && workout.load > 0)
     .map((workout) => workout.load)
@@ -291,24 +259,25 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         <MetricCard
           eyebrow="Risk status"
-          title={recentRiskReasons.length > 0 ? "Latest signal" : "No flags"}
-          subtitle={
-            sessions.length === 0
-              ? "Save workouts to generate risk signals."
-              : "Based on recent volume, RPE, and pain."
-          }
+          title={`${riskSignal.stateLabel} workload signal`}
+          subtitle="Formula-based signal from weekly load, acute:chronic ratio, high RPE, and pain flags."
           actions={
             <StatusChip
-              label={riskScore >= 70 ? "High" : riskScore >= 40 ? "Watch" : "Low"}
-              tone={riskScore >= 70 ? "danger" : riskScore >= 40 ? "watch" : "safe"}
+              label={riskSignal.stateLabel}
+              tone={riskTone}
             />
           }
         >
           <div className="flex min-h-24 items-center justify-between gap-4">
-            <div className="text-sm lab-muted">
-              {recentRiskReasons[0]?.title ? cleanDisplayText(recentRiskReasons[0].title) : "No recent risk events."}
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-white/90">
+                {riskSignal.topDriver}
+              </div>
+              <div className="mt-2 text-xs leading-5 lab-muted">
+                {riskSignal.explanation}
+              </div>
             </div>
-            <RiskMeter score={riskScore} />
+            <RiskMeter score={riskSignal.score} />
           </div>
         </MetricCard>
 
@@ -454,7 +423,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         )}
       </MetricCard>
 
-      <MuscleHeatmap risk={heatmap} hasWorkouts={sessions.length > 0} />
+      <MuscleHeatmap regions={heatmap} hasWorkouts={sessions.length > 0} />
 
       <section className="grid gap-4 md:grid-cols-2">
         <LabCard className="rounded-2xl p-5">

@@ -16,8 +16,8 @@ function toneToColor(tone: "safe" | "watch" | "danger") {
 
 function toneLabel(tone: "safe" | "watch" | "danger") {
   if (tone === "danger") return "HIGH";
-  if (tone === "watch") return "MODERATE";
-  return "LOW";
+  if (tone === "watch") return "MONITOR";
+  return "STABLE";
 }
 
 export function RiskMeter({ score }: { score: number }) {
