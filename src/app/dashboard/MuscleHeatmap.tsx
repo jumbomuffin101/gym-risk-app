@@ -32,12 +32,12 @@ function regionLabel(region: keyof RiskMap) {
   return region.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
 
-function explain(region: keyof RiskMap, level: RiskLevel, active: boolean) {
-  if (!active) {
+function explain(region: keyof RiskMap, level: RiskLevel, hasWorkouts: boolean) {
+  if (!hasWorkouts) {
     return {
       title: regionLabel(region),
-      detail: "No active session. Start logging sets to update this zone.",
-      rec: "Use this as a quick regional summary after training is logged.",
+      detail: "No saved workouts yet. Save workouts to update this zone.",
+      rec: "Use this as a quick regional summary after workouts are logged.",
     };
   }
 
@@ -109,11 +109,11 @@ function Region({ id, label, x, y, w, h, risk, selected, onSelect }: RegionProps
   );
 }
 
-export function MuscleHeatmap({ risk, active }: { risk: RiskMap; active: boolean }) {
+export function MuscleHeatmap({ risk, hasWorkouts }: { risk: RiskMap; hasWorkouts: boolean }) {
   const [selected, setSelected] = useState<keyof RiskMap>("hamstrings");
   const selectedLevel = risk[selected];
   const selectedColor = levelColor(selectedLevel);
-  const panel = useMemo(() => explain(selected, selectedLevel, active), [selected, selectedLevel, active]);
+  const panel = useMemo(() => explain(selected, selectedLevel, hasWorkouts), [selected, selectedLevel, hasWorkouts]);
 
   return (
     <MetricCard

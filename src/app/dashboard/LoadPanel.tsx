@@ -4,15 +4,13 @@ import { MetricCard } from "./components/MetricCard";
 import { StatusChip } from "./components/StatusChip";
 
 export function LoadPanel({
-  today,
+  recentLoad,
   baseline,
   deltaPct,
-  active,
 }: {
-  today: number;
+  recentLoad: number;
   baseline: number;
   deltaPct: number;
-  active: boolean;
 }) {
   const tone =
     baseline <= 0 ? "neutral" : deltaPct >= 20 ? "danger" : deltaPct >= 12 ? "watch" : "safe";
@@ -23,12 +21,12 @@ export function LoadPanel({
       : tone === "watch"
       ? "var(--lab-watch)"
       : "var(--lab-safe)";
-  const activityOpacity = active ? 0.75 : 0.5;
+  const activityOpacity = baseline > 0 ? 0.75 : 0.5;
 
   return (
     <MetricCard
       title="Load analytics"
-      subtitle="Recent set load compared with your session baseline."
+      subtitle="Saved workout load compared with your workout baseline."
       actions={
         <StatusChip
           label={
@@ -48,7 +46,7 @@ export function LoadPanel({
         <div>
           <div className="text-xs lab-muted">7-day load</div>
           <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
-            {Math.round(today).toLocaleString()}
+            {Math.round(recentLoad).toLocaleString()}
           </div>
         </div>
         <div>
@@ -68,7 +66,7 @@ export function LoadPanel({
       <div className="mt-5 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <div className="flex items-center justify-between text-xs lab-muted">
           <span>Load trend</span>
-          <span className="lab-num">{active ? "Active session" : "Recent sessions"}</span>
+          <span className="lab-num">Saved workouts</span>
         </div>
 
         <svg viewBox="0 0 260 80" className="mt-4 h-24 w-full" aria-hidden="true">
@@ -85,7 +83,7 @@ export function LoadPanel({
 
         <div className="text-xs lab-muted">
           {baseline <= 0
-            ? "More completed sessions will establish a baseline."
+            ? "More saved workouts will establish a baseline."
             : tone === "danger"
             ? "Recent load is materially above baseline."
             : tone === "watch"

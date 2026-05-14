@@ -7,7 +7,7 @@ import { getOrCreateDbUserId } from "@/app/lib/auth/getUserId";
 import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
 import { redirect } from "next/navigation";
 
-export async function startWorkoutSession(_formData: FormData) {
+export async function startWorkoutSession() {
   const userId = await getOrCreateDbUserId();
 
   const existing = await getActiveWorkoutSession(userId);
@@ -19,7 +19,6 @@ export async function startWorkoutSession(_formData: FormData) {
 
   revalidatePath("/workouts");
   revalidatePath("/dashboard");
-  revalidatePath("/history");
   revalidatePath("/exercises");
 
   redirect("/workouts");
@@ -64,7 +63,6 @@ export async function createSetEntryAction(formData: FormData) {
   // Ensure we have a real DB user
   const userId = await getOrCreateDbUserId();
 
-  // Ensure we have an active session (endedAt = null)
   let session = await getActiveWorkoutSession(userId);
   if (!session) {
     session = await prisma.workoutSession.create({ data: { userId } });
@@ -88,7 +86,6 @@ export async function createSetEntryAction(formData: FormData) {
   revalidatePath("/exercises");
   revalidatePath("/workouts");
   revalidatePath("/dashboard");
-  revalidatePath("/history");
 
   return { ok: true as const, volume, risk: 0, label: "Logged" };
 }

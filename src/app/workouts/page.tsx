@@ -1,79 +1,140 @@
+import Link from "next/link";
+
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
-import { getActiveWorkoutSession } from "@/app/lib/data/workoutSession";
-import { startWorkoutSession, endWorkoutSessionAction } from "@/app/exercises/actions";
+import { prisma } from "@/app/lib/prisma";
 
 export const runtime = "nodejs";
 
+function setLoad(set: { reps: number; weight: number; rpe: number | null }) {
+  return set.reps * set.weight * (set.rpe ?? 1);
+}
+
+function formatLoad(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.round(value).toLocaleString();
+}
+
+function cleanSessionNote(note: string | null) {
+  const value = note?.trim();
+  if (!value) return null;
+
+  const lower = value.toLowerCase();
+  const looksInternal =
+    value.startsWith("{") ||
+    value.startsWith("[") ||
+    value.includes("[object Object]") ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower.includes('"') ||
+    lower.includes("=>") ||
+    lower.includes("\u00e2") ||
+    lower.includes("\u00c3");
+
+  if (looksInternal) return null;
+  return value.length > 140 ? `${value.slice(0, 137)}...` : value;
+}
+
 export default async function WorkoutPage() {
   const userId = await requireDbUserId();
-  const active = await getActiveWorkoutSession(userId);
+
+  const workouts = await prisma.workoutSession.findMany({
+    where: {
+      userId,
+      sets: { some: {} },
+    },
+    orderBy: { startedAt: "desc" },
+    take: 30,
+    select: {
+      id: true,
+      startedAt: true,
+      note: true,
+      sets: {
+        select: {
+          exerciseId: true,
+          reps: true,
+          weight: true,
+          rpe: true,
+        },
+      },
+      _count: { select: { sets: true } },
+    },
+  });
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="lab-card rounded-2xl p-5">
         <div className="text-xs uppercase tracking-wide lab-muted">Workouts</div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/95">
-          Workout session
-        </h1>
-        <p className="mt-1 text-sm lab-muted">
-          Start a session, then log sets from an exercise page. Risk updates as you log.
-        </p>
+        <div className="mt-1 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-white/95">
+              Workout history
+            </h1>
+            <p className="mt-1 text-sm lab-muted">
+              Past saved workouts, set counts, and session load.
+            </p>
+          </div>
+          <Link href="/workouts/new" className="btn-primary text-sm">
+            Create workout
+          </Link>
+        </div>
       </header>
 
-      {active ? (
-        <div className="lab-card lab-hover rounded-2xl p-5 space-y-3">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-white/90">Active session</div>
-              <div className="mt-1 text-xs lab-muted">
-                Started {new Date(active.startedAt).toLocaleString()}
-              </div>
-            </div>
-
-            <form action={endWorkoutSessionAction}>
-              <input type="hidden" name="sessionId" value={active.id} />
-              <button
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/80 hover:bg-white/[0.06]"
-              >
-                End session
-              </button>
-            </form>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-            <div className="text-xs uppercase tracking-wide lab-muted">Session id</div>
-            <div className="mt-1 text-xs text-white/70 font-mono break-all">{active.id}</div>
-          </div>
-
-          <div className="rounded-xl border border-[rgba(34,197,94,0.18)] bg-[rgba(34,197,94,0.06)] p-3">
-            <div className="text-xs uppercase tracking-wide text-white/70">
-              Next move
-            </div>
-            <div className="mt-1 text-sm text-white/80">
-              Open an exercise and log sets to drive risk signals.
-            </div>
-          </div>
+      {workouts.length === 0 ? (
+        <div className="lab-card rounded-2xl p-6">
+          <div className="text-sm font-medium text-white/90">No workouts logged yet.</div>
+          <p className="mt-2 text-sm lab-muted">Create one from New Workout.</p>
+          <Link href="/workouts/new" className="btn-secondary mt-5">
+            New Workout
+          </Link>
         </div>
       ) : (
-        <div className="lab-card lab-hover rounded-2xl p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-white/90">No active session</div>
-              <div className="mt-1 text-xs lab-muted">Start one to begin logging.</div>
-            </div>
+        <div className="space-y-3">
+          {workouts.map((workout) => {
+            const sessionLoad = workout.sets.reduce((sum, set) => sum + setLoad(set), 0);
+            const exerciseCount = new Set(workout.sets.map((set) => set.exerciseId)).size;
+            const note = cleanSessionNote(workout.note);
+            const load = formatLoad(sessionLoad);
 
-            <form action={startWorkoutSession}>
-              <button
-                className="lab-hover rounded-xl bg-[rgba(34,197,94,0.92)] px-4 py-2 text-sm font-semibold text-black"
-                style={{
-                  boxShadow:
-                    "0 0 0 1px rgba(34,197,94,0.25), 0 18px 55px rgba(34,197,94,0.12)",
-                }}
-              >
-                Start session
-              </button>
-            </form>
-          </div>
+            return (
+              <article key={workout.id} className="lab-card rounded-2xl p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-white/92">
+                      {new Date(workout.startedAt).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </h2>
+                    {note ? <p className="mt-2 text-sm lab-muted">{note}</p> : null}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 text-right">
+                    <div>
+                      <div className="text-xs lab-muted">Sets</div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">
+                        {workout._count.sets}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs lab-muted">Exercises</div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">
+                        {exerciseCount}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs lab-muted">Load</div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">
+                        {load ?? "-"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

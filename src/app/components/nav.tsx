@@ -9,10 +9,9 @@ type NavItem = { href: string; label: string; protected?: boolean; match?: "exac
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", protected: true, match: "exact" },
-  { href: "/exercises", label: "Exercises", protected: true, match: "exact" },
+  { href: "/exercises", label: "Exercises", protected: true, match: "section" },
   { href: "/workouts/new", label: "New Workout", protected: true, match: "exact" },
   { href: "/workouts", label: "Workouts", protected: true, match: "exact" },
-  { href: "/history", label: "History", protected: true, match: "exact" },
 ];
 
 function isActive(pathname: string, href: string, match: "exact" | "section" = "exact") {

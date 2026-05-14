@@ -1,4 +1,3 @@
-// src/app/dashboard/page.tsx
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
@@ -10,7 +9,6 @@ import { computeSessionRisk } from "@/app/lib/riskEngine";
 import DashboardActions from "./DashboardActions";
 import { KpiCard } from "src/app/dashboard/KpiCard";
 import { RiskMeter } from "src/app/dashboard/RiskMeter";
-import { SessionStepper } from "src/app/dashboard/SessionStepper";
 import { MuscleHeatmap, type RiskMap } from "src/app/dashboard/MuscleHeatmap";
 import { LoadPanel } from "src/app/dashboard/LoadPanel";
 import { LabCard } from "src/app/dashboard/components/LabCard";
@@ -21,10 +19,14 @@ import { StatusChip } from "src/app/dashboard/components/StatusChip";
 
 export const runtime = "nodejs";
 
-function daysAgo(d: Date) {
-  const diff = Date.now() - d.getTime();
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
-}
+type DashboardRiskReason = {
+  kind: string;
+  title: string;
+  score: number;
+  details: Record<string, unknown>;
+  sessionId: string;
+  startedAt: Date;
+};
 
 function setLoad(set: { reps: number; weight: number; rpe: number | null }) {
   return set.reps * set.weight * (set.rpe ?? 1);
@@ -62,6 +64,60 @@ function cleanDisplayText(value: string) {
     .replaceAll("\u00e2\u20ac\u201d", "-");
 }
 
+function reasonCategories(reason: DashboardRiskReason) {
+  const categories = new Set<string>();
+  const category = reason.details.category;
+  if (typeof category === "string") categories.add(category);
+
+  for (const key of ["examples", "hardSets"]) {
+    const rows = reason.details[key];
+    if (!Array.isArray(rows)) continue;
+
+    rows.forEach((row) => {
+      if (row && typeof row === "object" && "category" in row) {
+        const rowCategory = (row as { category?: unknown }).category;
+        if (typeof rowCategory === "string") categories.add(rowCategory);
+      }
+    });
+  }
+
+  return Array.from(categories);
+}
+
+function buildHeatmap(reasons: DashboardRiskReason[]): RiskMap {
+  const risk: RiskMap = {
+    shoulders: "low",
+    elbows: "low",
+    lowerBack: "low",
+    quads: "low",
+    hamstrings: "low",
+    knees: "low",
+  };
+
+  const apply = (regions: Array<keyof RiskMap>, score: number) => {
+    const level = score >= 70 ? "high" : score >= 40 ? "moderate" : "low";
+    if (level === "low") return;
+
+    regions.forEach((region) => {
+      if (risk[region] === "high") return;
+      risk[region] = level;
+    });
+  };
+
+  reasons.forEach((reason) => {
+    const categories = reasonCategories(reason);
+    categories.forEach((category) => {
+      if (category === "squat") apply(["quads", "knees", "lowerBack"], reason.score);
+      if (category === "hinge") apply(["hamstrings", "lowerBack"], reason.score);
+      if (category === "push") apply(["shoulders", "elbows"], reason.score);
+      if (category === "pull") apply(["shoulders", "elbows"], reason.score);
+      if (category === "core") apply(["lowerBack"], reason.score);
+    });
+  });
+
+  return risk;
+}
+
 export default async function DashboardPage() {
   await requireDbUserId();
 
@@ -76,74 +132,68 @@ export default async function DashboardPage() {
   if (!user) redirect("/signin?callbackUrl=/dashboard");
 
   const sessions = await prisma.workoutSession.findMany({
-    where: { userId: user.id },
+    where: {
+      userId: user.id,
+      sets: { some: {} },
+    },
     orderBy: { startedAt: "desc" },
     take: 8,
     select: {
       id: true,
       startedAt: true,
-      endedAt: true,
       note: true,
       _count: { select: { sets: true } },
-      sets: { select: { reps: true, weight: true, rpe: true } },
+      sets: {
+        select: {
+          exerciseId: true,
+          reps: true,
+          weight: true,
+          rpe: true,
+        },
+      },
     },
   });
 
-  const activeSession = await prisma.workoutSession.findFirst({
-    where: { userId: user.id, endedAt: null },
-    select: { id: true, startedAt: true },
-  });
-
-  const recentRiskReasons = (
+  const recentRiskReasons: DashboardRiskReason[] = (
     await Promise.all(
-      sessions
-        .filter((s) => s._count.sets > 0)
-        .slice(0, 4)
-        .map(async (s) => {
-          const reasons = await computeSessionRisk(user.id, s.id);
-          return reasons.map((reason) => ({
-            ...reason,
-            sessionId: s.id,
-            startedAt: s.startedAt,
-          }));
-        })
+      sessions.slice(0, 4).map(async (workout) => {
+        const reasons = await computeSessionRisk(user.id, workout.id);
+        return reasons.map((reason) => ({
+          ...reason,
+          sessionId: workout.id,
+          startedAt: workout.startedAt,
+        }));
+      })
     )
   )
     .flat()
     .sort((a, b) => b.score - a.score)
     .slice(0, 4);
 
-  const riskScore = recentRiskReasons[0]?.score ?? (activeSession ? 24 : 8);
-  const heatmap: RiskMap = {
-    shoulders: "low",
-    elbows: "low",
-    lowerBack: activeSession ? "moderate" : "low",
-    quads: "low",
-    hamstrings: activeSession ? "moderate" : "low",
-    knees: "low",
-  };
-
+  const riskScore = recentRiskReasons[0]?.score ?? 8;
+  const heatmap = buildHeatmap(recentRiskReasons);
+  const sessionLoads = sessions.map((workout) => ({
+    id: workout.id,
+    load: workout.sets.reduce((sum, set) => sum + setLoad(set), 0),
+  }));
   const referenceTime = sessions[0] ? new Date(sessions[0].startedAt).getTime() : 0;
   const recentSessions = sessions.filter(
-    (s) => referenceTime - new Date(s.startedAt).getTime() <= 7 * 24 * 60 * 60 * 1000
+    (workout) => referenceTime - new Date(workout.startedAt).getTime() <= 7 * 24 * 60 * 60 * 1000
   );
-  const sessionLoads = sessions.map((s) => ({
-    id: s.id,
-    load: s.sets.reduce((sum, set) => sum + setLoad(set), 0),
-  }));
-  const today = recentSessions.reduce(
-    (sum, session) => sum + session.sets.reduce((load, set) => load + setLoad(set), 0),
+  const recentLoad = recentSessions.reduce(
+    (sum, workout) => sum + workout.sets.reduce((load, set) => load + setLoad(set), 0),
     0
   );
-  const completedSessionLoads = sessionLoads.filter((s) => s.load > 0).map((s) => s.load);
+  const completedLoads = sessionLoads.filter((workout) => workout.load > 0).map((workout) => workout.load);
   const baseline =
-    completedSessionLoads.length > 0
-      ? completedSessionLoads.reduce((sum, load) => sum + load, 0) / completedSessionLoads.length
+    completedLoads.length > 0
+      ? completedLoads.reduce((sum, load) => sum + load, 0) / completedLoads.length
       : 0;
-  const deltaPct = baseline ? Math.round(((today - baseline) / baseline) * 100) : 0;
-
-  const lastSessionAgo =
-    sessions.length > 0 ? daysAgo(new Date(sessions[0].startedAt)) : null;
+  const deltaPct = baseline ? Math.round(((recentLoad - baseline) / baseline) * 100) : 0;
+  const lastWorkout = sessions[0] ?? null;
+  const lastWorkoutLoad = lastWorkout
+    ? lastWorkout.sets.reduce((sum, set) => sum + setLoad(set), 0)
+    : 0;
 
   return (
     <PageShell>
@@ -160,12 +210,8 @@ export default async function DashboardPage() {
                     Logged in as <span className="text-white/80">{email}</span>
                   </div>
                   <div className="h-4 w-px bg-white/10" />
-                  <div className="text-sm text-white/80">
-                    <span className="lab-muted">
-                      {sessions.length === 0
-                        ? "No sessions logged yet."
-                        : `Last session: ${lastSessionAgo}d ago.`}
-                    </span>
+                  <div className="text-sm lab-muted">
+                    Workout load updates after saving workouts.
                   </div>
                 </div>
               }
@@ -178,14 +224,19 @@ export default async function DashboardPage() {
 
       <section className="grid gap-4 md:grid-cols-3">
         <KpiCard
-          title="Active session"
-          value={activeSession ? "In progress" : "Idle"}
-          badge={activeSession ? "Active" : "Ready"}
-          badgeTone={activeSession ? "watch" : "safe"}
-          subline={activeSession ? "Sets logged here update the dashboard." : "Start a workout to begin tracking."}
-          micro={activeSession ? "Tracking current work" : undefined}
-          microTone={activeSession ? "watch" : "neutral"}
-          progress={activeSession ? 62 : 12}
+          title="Last workout"
+          value={
+            lastWorkout
+              ? new Date(lastWorkout.startedAt).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                })
+              : "None"
+          }
+          badge={lastWorkout ? `${lastWorkout._count.sets} sets` : "New"}
+          badgeTone={lastWorkout ? "safe" : "neutral"}
+          subline={lastWorkout ? `${formatLoad(lastWorkoutLoad) ?? "0"} load` : "Create a workout to begin tracking."}
+          progress={lastWorkout && baseline ? Math.min(100, Math.max(8, (lastWorkoutLoad / baseline) * 50)) : 8}
         />
 
         <MetricCard
@@ -193,7 +244,7 @@ export default async function DashboardPage() {
           title={recentRiskReasons.length > 0 ? "Latest signal" : "No flags"}
           subtitle={
             sessions.length === 0
-              ? "Log sets to generate risk signals."
+              ? "Save workouts to generate risk signals."
               : "Based on recent volume, RPE, and pain."
           }
           actions={
@@ -203,7 +254,7 @@ export default async function DashboardPage() {
             />
           }
         >
-          <div className="flex items-center justify-between gap-4 min-h-24">
+          <div className="flex min-h-24 items-center justify-between gap-4">
             <div className="text-sm lab-muted">
               {recentRiskReasons[0]?.title ? cleanDisplayText(recentRiskReasons[0].title) : "No recent risk events."}
             </div>
@@ -213,64 +264,53 @@ export default async function DashboardPage() {
 
         <KpiCard
           title="7-day load"
-          value={formatLoad(today) ?? "0"}
+          value={formatLoad(recentLoad) ?? "0"}
           badge={baseline ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "New"}
           badgeTone={!baseline ? "neutral" : deltaPct >= 20 ? "danger" : deltaPct >= 12 ? "watch" : "safe"}
-          subline={baseline ? "Compared with recent session average." : "No baseline yet."}
-          progress={baseline ? Math.min(100, Math.max(8, (today / baseline) * 50)) : 8}
+          subline={baseline ? "Compared with session baseline." : "No baseline yet."}
+          progress={baseline ? Math.min(100, Math.max(8, (recentLoad / baseline) * 50)) : 8}
         />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <SessionStepper active={Boolean(activeSession)} />
-        <LoadPanel today={today} baseline={baseline} deltaPct={deltaPct} active={Boolean(activeSession)} />
-      </section>
+      <LoadPanel recentLoad={recentLoad} baseline={baseline} deltaPct={deltaPct} />
 
-      <MuscleHeatmap risk={heatmap} active={Boolean(activeSession)} />
+      <MuscleHeatmap risk={heatmap} hasWorkouts={sessions.length > 0} />
 
       <section className="grid gap-4 md:grid-cols-2">
         <LabCard className="rounded-2xl p-5">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-white/90">Recent sessions</div>
+            <div className="text-sm font-medium text-white/90">Recent workouts</div>
             <div className="text-xs lab-muted">{sessions.length} shown</div>
           </div>
 
           {sessions.length === 0 ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="text-sm text-white/85">No sessions yet</div>
+              <div className="text-sm text-white/85">No workouts yet</div>
               <div className="mt-1 text-xs lab-muted">
-                Start a workout and log sets to populate your dashboard.
-              </div>
-              <div className="mt-3">
-                <a
-                  className="btn-primary text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
-                  href="/workouts"
-                >
-                  Go to workouts
-                </a>
+                Save a workout to populate your dashboard.
               </div>
             </div>
           ) : (
             <div className="mt-4 space-y-2">
-              {sessions.map((s) => {
-                const load = formatLoad(s.sets.reduce((sum, set) => sum + setLoad(set), 0));
-                const note = cleanSessionNote(s.note);
+              {sessions.map((workout) => {
+                const load = formatLoad(workout.sets.reduce((sum, set) => sum + setLoad(set), 0));
+                const note = cleanSessionNote(workout.note);
 
                 return (
                   <div
-                    key={s.id}
+                    key={workout.id}
                     className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-sm font-medium text-white/90">
-                        {new Date(s.startedAt).toLocaleDateString(undefined, {
+                        {new Date(workout.startedAt).toLocaleDateString(undefined, {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
                         })}
                       </div>
                       <div className="text-xs lab-muted">
-                        {s._count.sets} sets{load ? ` · ${load} load` : ""}
+                        {workout._count.sets} sets{load ? ` - ${load} load` : ""}
                       </div>
                     </div>
                     {note ? <div className="mt-1 text-xs text-white/65">{note}</div> : null}
@@ -291,7 +331,7 @@ export default async function DashboardPage() {
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
               <div className="text-sm text-white/85">No risk events</div>
               <div className="mt-1 text-xs lab-muted">
-                Recent sessions have not triggered a pain, RPE, or load flag.
+                Recent workouts have not triggered a pain, RPE, or load flag.
               </div>
             </div>
           ) : (
