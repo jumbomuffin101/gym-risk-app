@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 
-import { saveWorkoutAction } from "./actions";
+import { saveWorkoutBuilderAction } from "./actions";
 
 type ExerciseOption = {
   id: string;
@@ -22,19 +22,33 @@ type BuilderExercise = ExerciseOption & {
   sets: BuilderSet[];
 };
 
-function newSet(): BuilderSet {
+type PreviousWorkout = {
+  id: string;
+  label: string;
+  name: string;
+  exercises: BuilderExercise[];
+};
+
+function newSet(values?: Partial<Omit<BuilderSet, "id">>): BuilderSet {
   return {
     id: crypto.randomUUID(),
-    reps: "",
-    weight: "",
-    rpe: "",
-    pain: "",
+    reps: values?.reps ?? "",
+    weight: values?.weight ?? "",
+    rpe: values?.rpe ?? "",
+    pain: values?.pain ?? "",
   };
 }
 
-export function WorkoutBuilder({ exercises }: { exercises: ExerciseOption[] }) {
+export function WorkoutBuilder({
+  exercises,
+  previousWorkouts,
+}: {
+  exercises: ExerciseOption[];
+  previousWorkouts: PreviousWorkout[];
+}) {
   const [query, setQuery] = useState("");
-  const [note, setNote] = useState("");
+  const [workoutName, setWorkoutName] = useState("");
+  const [previousWorkoutId, setPreviousWorkoutId] = useState("");
   const [selected, setSelected] = useState<BuilderExercise[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -74,6 +88,27 @@ export function WorkoutBuilder({ exercises }: { exercises: ExerciseOption[] }) {
     );
   }
 
+  function duplicateSet(exerciseId: string, setId: string) {
+    setSelected((current) =>
+      current.map((exercise) => {
+        if (exercise.id !== exerciseId) return exercise;
+        const setIndex = exercise.sets.findIndex((set) => set.id === setId);
+        if (setIndex < 0) return exercise;
+
+        const source = exercise.sets[setIndex];
+        const duplicate = newSet({
+          reps: source.reps,
+          weight: source.weight,
+          rpe: source.rpe,
+          pain: source.pain,
+        });
+        const nextSets = [...exercise.sets];
+        nextSets.splice(setIndex + 1, 0, duplicate);
+        return { ...exercise, sets: nextSets };
+      })
+    );
+  }
+
   function removeSet(exerciseId: string, setId: string) {
     setSelected((current) =>
       current.map((exercise) => {
@@ -96,12 +131,38 @@ export function WorkoutBuilder({ exercises }: { exercises: ExerciseOption[] }) {
     );
   }
 
+  function usePreviousWorkout() {
+    const workout = previousWorkouts.find((item) => item.id === previousWorkoutId);
+    if (!workout) return;
+
+    const hasCurrentWork = selected.length > 0 || workoutName.trim().length > 0;
+    if (hasCurrentWork && !window.confirm("Replace the current workout builder with this previous workout?")) {
+      return;
+    }
+
+    setWorkoutName(workout.name);
+    setSelected(
+      workout.exercises.map((exercise) => ({
+        ...exercise,
+        sets: exercise.sets.map((set) =>
+          newSet({
+            reps: set.reps,
+            weight: set.weight,
+            rpe: set.rpe,
+            pain: set.pain,
+          })
+        ),
+      }))
+    );
+    setError(null);
+  }
+
   function saveWorkout() {
     setError(null);
 
     startTransition(async () => {
-      const result = await saveWorkoutAction({
-        note,
+      const result = await saveWorkoutBuilderAction({
+        workoutName,
         exercises: selected.map((exercise) => ({
           exerciseId: exercise.id,
           sets: exercise.sets.map((set) => ({
@@ -179,16 +240,47 @@ export function WorkoutBuilder({ exercises }: { exercises: ExerciseOption[] }) {
           </button>
         </div>
 
-        <label className="mt-5 block">
-          <span className="text-xs uppercase tracking-wide lab-muted">Workout note</span>
-          <input
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="Optional note"
-            maxLength={500}
-            className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
-          />
-        </label>
+        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <label className="block">
+            <span className="text-xs uppercase tracking-wide lab-muted">Workout name</span>
+            <input
+              value={workoutName}
+              onChange={(event) => setWorkoutName(event.target.value)}
+              placeholder="Workout name, e.g. Push B or Heavy Squat Day"
+              maxLength={120}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs uppercase tracking-wide lab-muted">Use previous workout</span>
+            <div className="mt-2 flex gap-2">
+              <select
+                value={previousWorkoutId}
+                onChange={(event) => setPreviousWorkoutId(event.target.value)}
+                disabled={previousWorkouts.length === 0}
+                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0f1722] px-3 py-3 text-sm text-white/90 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:border-[rgba(34,197,94,0.35)]"
+              >
+                <option value="">
+                  {previousWorkouts.length === 0 ? "No previous workouts" : "Select workout"}
+                </option>
+                {previousWorkouts.map((workout) => (
+                  <option key={workout.id} value={workout.id}>
+                    {workout.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={usePreviousWorkout}
+                disabled={!previousWorkoutId}
+                className="rounded-xl border border-white/10 px-4 py-2 text-sm text-white/75 hover:bg-white/[0.04] hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Use
+              </button>
+            </div>
+          </label>
+        </div>
 
         {error ? (
           <div className="mt-4 rounded-xl border border-[rgba(239,68,68,0.25)] bg-[rgba(239,68,68,0.08)] p-3 text-sm text-white/85">
@@ -220,7 +312,7 @@ export function WorkoutBuilder({ exercises }: { exercises: ExerciseOption[] }) {
 
                 <div className="mt-4 space-y-3">
                   {exercise.sets.map((set, index) => (
-                    <div key={set.id} className="grid gap-3 md:grid-cols-[48px_repeat(4,minmax(0,1fr))_auto] md:items-end">
+                    <div key={set.id} className="grid gap-3 md:grid-cols-[48px_repeat(4,minmax(0,1fr))_150px] md:items-end">
                       <div className="text-xs lab-muted md:pb-3">Set {index + 1}</div>
                       <NumberField
                         label="Reps"
@@ -254,13 +346,22 @@ export function WorkoutBuilder({ exercises }: { exercises: ExerciseOption[] }) {
                         value={set.pain}
                         onChange={(value) => updateSet(exercise.id, set.id, "pain", value)}
                       />
-                      <button
-                        type="button"
-                        onClick={() => removeSet(exercise.id, set.id)}
-                        className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/65 hover:bg-white/[0.04] hover:text-white/85"
-                      >
-                        Remove
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => duplicateSet(exercise.id, set.id)}
+                          className="flex-1 rounded-lg border border-white/10 px-3 py-2 text-xs text-white/65 hover:bg-white/[0.04] hover:text-white/85"
+                        >
+                          Duplicate
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeSet(exercise.id, set.id)}
+                          className="flex-1 rounded-lg border border-white/10 px-3 py-2 text-xs text-white/65 hover:bg-white/[0.04] hover:text-white/85"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

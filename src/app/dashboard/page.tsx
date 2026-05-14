@@ -5,8 +5,10 @@ import { authOptions } from "@/app/lib/auth/authOptions";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { computeSessionRisk } from "@/app/lib/riskEngine";
+import { cleanWorkoutName, formatLoad, setLoad, summarizeWorkoutSets } from "@/app/lib/workouts";
 
 import DashboardActions from "./DashboardActions";
+import { DashboardWorkoutSelector } from "./DashboardWorkoutSelector";
 import { KpiCard } from "src/app/dashboard/KpiCard";
 import { RiskMeter } from "src/app/dashboard/RiskMeter";
 import { MuscleHeatmap, type RiskMap } from "src/app/dashboard/MuscleHeatmap";
@@ -27,35 +29,6 @@ type DashboardRiskReason = {
   sessionId: string;
   startedAt: Date;
 };
-
-function setLoad(set: { reps: number; weight: number; rpe: number | null }) {
-  return set.reps * set.weight * (set.rpe ?? 1);
-}
-
-function formatLoad(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return Math.round(value).toLocaleString();
-}
-
-function cleanSessionNote(note: string | null) {
-  const value = note?.trim();
-  if (!value) return null;
-
-  const lower = value.toLowerCase();
-  const looksMachineGenerated =
-    value.startsWith("{") ||
-    value.startsWith("[") ||
-    value.includes("[object Object]") ||
-    lower === "null" ||
-    lower === "undefined" ||
-    lower.includes('"') ||
-    lower.includes("=>") ||
-    lower.includes("\u00e2") ||
-    lower.includes("\u00c3");
-
-  if (looksMachineGenerated) return null;
-  return value.length > 120 ? `${value.slice(0, 117)}...` : value;
-}
 
 function cleanDisplayText(value: string) {
   return value
@@ -118,26 +91,64 @@ function buildHeatmap(reasons: DashboardRiskReason[]): RiskMap {
   return risk;
 }
 
-export default async function DashboardPage() {
-  await requireDbUserId();
+function formatWorkoutDateTime(startedAt: Date) {
+  return new Date(startedAt).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatWorkoutOptionLabel(workout: { startedAt: Date; note: string | null }) {
+  const date = formatWorkoutDateTime(workout.startedAt);
+  const name = cleanWorkoutName(workout.note, 56);
+
+  return name ? `${date} - ${name}` : date;
+}
+
+function AnalysisMetric({
+  label,
+  value,
+  subline,
+}: {
+  label: string;
+  value: string;
+  subline?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="text-xs lab-muted">{label}</div>
+      <div className="mt-1 text-xl font-semibold lab-num text-white/90">{value}</div>
+      {subline ? <div className="mt-1 text-xs lab-muted">{subline}</div> : null}
+    </div>
+  );
+}
+
+type DashboardPageProps = {
+  searchParams?: Promise<{ workoutId?: string | string[] }>;
+};
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const userId = await requireDbUserId();
 
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? null;
   if (!email) redirect("/signin?callbackUrl=/dashboard");
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, email: true },
-  });
-  if (!user) redirect("/signin?callbackUrl=/dashboard");
+  const params = searchParams ? await searchParams : {};
+  const rawWorkoutId = params.workoutId;
+  const requestedWorkoutId = Array.isArray(rawWorkoutId) ? rawWorkoutId[0] : rawWorkoutId;
 
   const sessions = await prisma.workoutSession.findMany({
     where: {
-      userId: user.id,
+      userId,
+      endedAt: { not: null },
       sets: { some: {} },
     },
     orderBy: { startedAt: "desc" },
-    take: 8,
+    take: 12,
     select: {
       id: true,
       startedAt: true,
@@ -149,26 +160,42 @@ export default async function DashboardPage() {
           reps: true,
           weight: true,
           rpe: true,
+          pain: true,
         },
       },
     },
   });
 
-  const recentRiskReasons: DashboardRiskReason[] = (
-    await Promise.all(
+  const selectedWorkout =
+    sessions.find((workout) => workout.id === requestedWorkoutId) ?? sessions[0] ?? null;
+
+  const [recentRiskReasonGroups, selectedRiskReasonList] = await Promise.all([
+    Promise.all(
       sessions.slice(0, 4).map(async (workout) => {
-        const reasons = await computeSessionRisk(user.id, workout.id);
+        const reasons = await computeSessionRisk(userId, workout.id);
         return reasons.map((reason) => ({
           ...reason,
           sessionId: workout.id,
           startedAt: workout.startedAt,
         }));
       })
-    )
-  )
+    ),
+    selectedWorkout
+      ? computeSessionRisk(userId, selectedWorkout.id).then((reasons) =>
+          reasons.map((reason) => ({
+            ...reason,
+            sessionId: selectedWorkout.id,
+            startedAt: selectedWorkout.startedAt,
+          }))
+        )
+      : Promise.resolve([]),
+  ]);
+
+  const recentRiskReasons: DashboardRiskReason[] = recentRiskReasonGroups
     .flat()
     .sort((a, b) => b.score - a.score)
     .slice(0, 4);
+  const selectedRiskReasons: DashboardRiskReason[] = selectedRiskReasonList;
 
   const riskScore = recentRiskReasons[0]?.score ?? 8;
   const heatmap = buildHeatmap(recentRiskReasons);
@@ -194,6 +221,29 @@ export default async function DashboardPage() {
   const lastWorkoutLoad = lastWorkout
     ? lastWorkout.sets.reduce((sum, set) => sum + setLoad(set), 0)
     : 0;
+  const workoutOptions = sessions.map((workout) => ({
+    id: workout.id,
+    label: formatWorkoutOptionLabel(workout),
+  }));
+  const selectedSummary = selectedWorkout ? summarizeWorkoutSets(selectedWorkout.sets) : null;
+  const selectedWorkoutName = selectedWorkout
+    ? cleanWorkoutName(selectedWorkout.note) ?? "Untitled workout"
+    : "No completed workout";
+  const selectedRiskScore = selectedRiskReasons[0]?.score ?? 8;
+  const selectedBaselineLoads = sessionLoads
+    .filter((workout) => workout.id !== selectedWorkout?.id && workout.load > 0)
+    .map((workout) => workout.load)
+    .slice(0, 7);
+  const selectedBaseline =
+    selectedBaselineLoads.length > 0
+      ? selectedBaselineLoads.reduce((sum, load) => sum + load, 0) / selectedBaselineLoads.length
+      : 0;
+  const selectedDeltaPct =
+    selectedSummary && selectedBaseline
+      ? Math.round(((selectedSummary.sessionLoad - selectedBaseline) / selectedBaseline) * 100)
+      : 0;
+  const selectedLoadTone =
+    !selectedBaseline ? "neutral" : selectedDeltaPct >= 20 ? "danger" : selectedDeltaPct >= 12 ? "watch" : "safe";
 
   return (
     <PageShell>
@@ -274,6 +324,136 @@ export default async function DashboardPage() {
 
       <LoadPanel recentLoad={recentLoad} baseline={baseline} deltaPct={deltaPct} />
 
+      <MetricCard
+        eyebrow="Selected workout analysis"
+        title={selectedWorkoutName}
+        subtitle={
+          selectedWorkout
+            ? `${formatWorkoutDateTime(selectedWorkout.startedAt)}. Workout-level load, risk, and effort signals.`
+            : "Save a completed workout to analyze a specific session."
+        }
+        actions={
+          <DashboardWorkoutSelector
+            options={workoutOptions}
+            selectedId={selectedWorkout?.id ?? null}
+          />
+        }
+      >
+        {selectedWorkout && selectedSummary ? (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <AnalysisMetric
+                label="Session load"
+                value={formatLoad(selectedSummary.sessionLoad) ?? "0"}
+                subline={
+                  selectedBaseline
+                    ? `${selectedDeltaPct >= 0 ? "+" : ""}${selectedDeltaPct}% vs recent baseline`
+                    : "No baseline yet"
+                }
+              />
+              <AnalysisMetric label="Sets" value={String(selectedSummary.setCount)} />
+              <AnalysisMetric label="Exercises" value={String(selectedSummary.exerciseCount)} />
+              <AnalysisMetric
+                label="RPE / pain"
+                value={
+                  selectedSummary.averageRpe === null
+                    ? "No RPE"
+                    : `${selectedSummary.averageRpe.toFixed(1)} avg`
+                }
+                subline={
+                  selectedSummary.maxPain === null
+                    ? "No pain logged"
+                    : `${selectedSummary.maxPain}/10 max pain`
+                }
+              />
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm font-medium text-white/90">Load and effort signals</div>
+                  <StatusChip
+                    label={
+                      !selectedBaseline
+                        ? "No baseline"
+                        : selectedDeltaPct >= 20
+                        ? "Load spike"
+                        : selectedDeltaPct >= 12
+                        ? "Above baseline"
+                        : "In range"
+                    }
+                    tone={selectedLoadTone}
+                  />
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <div className="text-xs lab-muted">Recent baseline</div>
+                    <div className="mt-1 text-sm font-semibold lab-num text-white/90">
+                      {selectedBaseline ? formatLoad(selectedBaseline) ?? "0" : "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs lab-muted">High RPE sets</div>
+                    <div className="mt-1 text-sm font-semibold lab-num text-white/90">
+                      {selectedSummary.highRpeSetCount}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs lab-muted">Pain entries</div>
+                    <div className="mt-1 text-sm font-semibold lab-num text-white/90">
+                      {selectedSummary.painSetCount}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs lab-muted">Risk events</div>
+                    <div className="mt-1 text-sm font-semibold lab-num text-white/90">
+                      {selectedRiskReasons.length}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <RiskMeter score={selectedRiskScore} />
+                <div className="mt-3 text-xs lab-muted">Selected workout risk</div>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <div className="text-sm font-medium text-white/90">Selected workout risk feed</div>
+              {selectedRiskReasons.length === 0 ? (
+                <div className="mt-3 text-sm lab-muted">
+                  No pain, RPE, or load flags for this workout.
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {selectedRiskReasons.slice(0, 4).map((reason, index) => (
+                    <div
+                      key={`${reason.sessionId}-${reason.kind}-${index}`}
+                      className="flex items-start justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3"
+                    >
+                      <div className="text-sm text-white/85">{cleanDisplayText(reason.title)}</div>
+                      <StatusChip
+                        label={`${reason.score}`}
+                        tone={reason.score >= 70 ? "danger" : reason.score >= 40 ? "watch" : "safe"}
+                        showDot={false}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="text-sm text-white/85">No completed workouts yet</div>
+            <div className="mt-1 text-xs lab-muted">
+              Create and save a workout to analyze its load, set count, RPE, pain, and risk.
+            </div>
+          </div>
+        )}
+      </MetricCard>
+
       <MuscleHeatmap risk={heatmap} hasWorkouts={sessions.length > 0} />
 
       <section className="grid gap-4 md:grid-cols-2">
@@ -294,7 +474,12 @@ export default async function DashboardPage() {
             <div className="mt-4 space-y-2">
               {sessions.map((workout) => {
                 const load = formatLoad(workout.sets.reduce((sum, set) => sum + setLoad(set), 0));
-                const note = cleanSessionNote(workout.note);
+                const workoutName = cleanWorkoutName(workout.note, 80);
+                const date = new Date(workout.startedAt).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
 
                 return (
                   <div
@@ -303,17 +488,13 @@ export default async function DashboardPage() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-sm font-medium text-white/90">
-                        {new Date(workout.startedAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
+                        {workoutName ?? date}
                       </div>
                       <div className="text-xs lab-muted">
                         {workout._count.sets} sets{load ? ` - ${load} load` : ""}
                       </div>
                     </div>
-                    {note ? <div className="mt-1 text-xs text-white/65">{note}</div> : null}
+                    {workoutName ? <div className="mt-1 text-xs text-white/65">{date}</div> : null}
                   </div>
                 );
               })}

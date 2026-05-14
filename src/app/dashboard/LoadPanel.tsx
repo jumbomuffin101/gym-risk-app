@@ -25,8 +25,8 @@ export function LoadPanel({
 
   return (
     <MetricCard
-      title="Load analytics"
-      subtitle="Saved workout load compared with your workout baseline."
+      title="Overall recent training load"
+      subtitle="Seven-day saved workout load compared with your recent session baseline."
       actions={
         <StatusChip
           label={

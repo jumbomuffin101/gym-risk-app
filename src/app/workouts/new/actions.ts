@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
+import { normalizeWorkoutName } from "@/app/lib/workouts";
 
 type SaveWorkoutResult = {
   ok: false;
@@ -34,11 +35,11 @@ const WorkoutExerciseSchema = z.object({
 });
 
 const SaveWorkoutSchema = z.object({
-  note: z.string().trim().max(500).optional(),
+  workoutName: z.string().trim().max(120, "Workout name must be 120 characters or fewer.").optional(),
   exercises: z.array(WorkoutExerciseSchema).min(1, "Select at least one exercise."),
 });
 
-export async function saveWorkoutAction(input: unknown): Promise<SaveWorkoutResult> {
+export async function saveWorkoutBuilderAction(input: unknown): Promise<SaveWorkoutResult> {
   const parsed = SaveWorkoutSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -60,7 +61,7 @@ export async function saveWorkoutAction(input: unknown): Promise<SaveWorkoutResu
   }
 
   const now = new Date();
-  const note = parsed.data.note?.trim() || null;
+  const note = normalizeWorkoutName(parsed.data.workoutName);
 
   await prisma.$transaction(async (tx) => {
     const session = await tx.workoutSession.create({
@@ -98,4 +99,8 @@ export async function saveWorkoutAction(input: unknown): Promise<SaveWorkoutResu
   }
 
   redirect("/workouts");
+}
+
+export async function saveWorkoutAction(input: unknown): Promise<SaveWorkoutResult> {
+  return saveWorkoutBuilderAction(input);
 }

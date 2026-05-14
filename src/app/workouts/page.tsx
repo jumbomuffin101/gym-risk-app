@@ -2,37 +2,10 @@ import Link from "next/link";
 
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { prisma } from "@/app/lib/prisma";
+import { cleanWorkoutName, formatLoad, setLoad } from "@/app/lib/workouts";
+import { WorkoutHistoryActions } from "./WorkoutHistoryActions";
 
 export const runtime = "nodejs";
-
-function setLoad(set: { reps: number; weight: number; rpe: number | null }) {
-  return set.reps * set.weight * (set.rpe ?? 1);
-}
-
-function formatLoad(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return Math.round(value).toLocaleString();
-}
-
-function cleanSessionNote(note: string | null) {
-  const value = note?.trim();
-  if (!value) return null;
-
-  const lower = value.toLowerCase();
-  const looksInternal =
-    value.startsWith("{") ||
-    value.startsWith("[") ||
-    value.includes("[object Object]") ||
-    lower === "null" ||
-    lower === "undefined" ||
-    lower.includes('"') ||
-    lower.includes("=>") ||
-    lower.includes("\u00e2") ||
-    lower.includes("\u00c3");
-
-  if (looksInternal) return null;
-  return value.length > 140 ? `${value.slice(0, 137)}...` : value;
-}
 
 export default async function WorkoutPage() {
   const userId = await requireDbUserId();
@@ -40,6 +13,7 @@ export default async function WorkoutPage() {
   const workouts = await prisma.workoutSession.findMany({
     where: {
       userId,
+      endedAt: { not: null },
       sets: { some: {} },
     },
     orderBy: { startedAt: "desc" },
@@ -92,26 +66,27 @@ export default async function WorkoutPage() {
           {workouts.map((workout) => {
             const sessionLoad = workout.sets.reduce((sum, set) => sum + setLoad(set), 0);
             const exerciseCount = new Set(workout.sets.map((set) => set.exerciseId)).size;
-            const note = cleanSessionNote(workout.note);
+            const workoutName = cleanWorkoutName(workout.note);
             const load = formatLoad(sessionLoad);
+            const startedAt = new Date(workout.startedAt).toLocaleString(undefined, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            });
 
             return (
               <article key={workout.id} className="lab-card rounded-2xl p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-white/92">
-                      {new Date(workout.startedAt).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
+                      {workoutName ?? "Untitled workout"}
                     </h2>
-                    {note ? <p className="mt-2 text-sm lab-muted">{note}</p> : null}
+                    <p className="mt-2 text-sm lab-muted">{startedAt}</p>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 text-right">
+                  <div className="grid grid-cols-3 gap-3 text-left md:text-right">
                     <div>
                       <div className="text-xs lab-muted">Sets</div>
                       <div className="mt-1 text-sm font-semibold text-white/90">
@@ -131,6 +106,9 @@ export default async function WorkoutPage() {
                       </div>
                     </div>
                   </div>
+                </div>
+                <div className="mt-4 flex justify-start md:justify-end">
+                  <WorkoutHistoryActions workoutId={workout.id} initialName={workoutName ?? ""} />
                 </div>
               </article>
             );

@@ -172,9 +172,14 @@ export default async function ExerciseDetailPage({
               {exercise.category ?? "Uncategorized"} - {exercise._count.sets} sets logged
             </p>
           </div>
-          <Link href="/workouts/new" className="btn-primary text-sm">
-            Log in new workout
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/exercises" className="btn-secondary text-sm">
+              Back to exercises
+            </Link>
+            <Link href="/workouts/new" className="btn-primary text-sm">
+              Log in new workout
+            </Link>
+          </div>
         </div>
       </header>
 
