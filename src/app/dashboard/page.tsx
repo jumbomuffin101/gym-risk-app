@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
@@ -30,6 +31,8 @@ type DashboardRiskReason = {
   sessionId: string;
   startedAt: Date;
 };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function cleanDisplayText(value: string) {
   return value
@@ -88,37 +91,48 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const rawWorkoutId = params.workoutId;
   const requestedWorkoutId = Array.isArray(rawWorkoutId) ? rawWorkoutId[0] : rawWorkoutId;
   const now = new Date();
-  const metricsSince = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000);
 
-  const [sessions, metricSets] = await Promise.all([
-    prisma.workoutSession.findMany({
-      where: {
-        userId,
-        endedAt: { not: null },
-        sets: { some: {} },
-      },
-      orderBy: { startedAt: "desc" },
-      take: 12,
-      select: {
-        id: true,
-        startedAt: true,
-        note: true,
-        _count: { select: { sets: true } },
-        sets: {
-          select: {
-            exerciseId: true,
-            reps: true,
-            weight: true,
-            rpe: true,
-            pain: true,
-          },
+  const sessions = await prisma.workoutSession.findMany({
+    where: {
+      userId,
+      endedAt: { not: null },
+      sets: { some: {} },
+    },
+    orderBy: { startedAt: "desc" },
+    take: 12,
+    select: {
+      id: true,
+      startedAt: true,
+      endedAt: true,
+      note: true,
+      _count: { select: { sets: true } },
+      sets: {
+        select: {
+          exerciseId: true,
+          reps: true,
+          weight: true,
+          rpe: true,
+          pain: true,
         },
       },
-    }),
+    },
+  });
+
+  const selectedWorkout =
+    sessions.find((workout) => workout.id === requestedWorkoutId) ?? sessions[0] ?? null;
+  const selectedRiskAnchor = selectedWorkout
+    ? new Date((selectedWorkout.endedAt ?? selectedWorkout.startedAt).getTime() + 1)
+    : now;
+  const metricsSince = new Date(
+    Math.min(now.getTime(), selectedRiskAnchor.getTime()) - 35 * DAY_MS
+  );
+  const metricsUntil = new Date(Math.max(now.getTime(), selectedRiskAnchor.getTime()));
+
+  const [metricSets, recentRiskReasonGroups] = await Promise.all([
     prisma.setEntry.findMany({
       where: {
         userId,
-        performedAt: { gte: metricsSince, lte: now },
+        performedAt: { gte: metricsSince, lte: metricsUntil },
         session: { endedAt: { not: null } },
       },
       select: {
@@ -130,12 +144,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         exercise: { select: { name: true, category: true } },
       },
     }),
-  ]);
-
-  const selectedWorkout =
-    sessions.find((workout) => workout.id === requestedWorkoutId) ?? sessions[0] ?? null;
-
-  const [recentRiskReasonGroups, selectedRiskReasonList] = await Promise.all([
     Promise.all(
       sessions.slice(0, 4).map(async (workout) => {
         const reasons = await computeSessionRisk(userId, workout.id);
@@ -146,24 +154,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         }));
       })
     ),
-    selectedWorkout
-      ? computeSessionRisk(userId, selectedWorkout.id).then((reasons) =>
-          reasons.map((reason) => ({
-            ...reason,
-            sessionId: selectedWorkout.id,
-            startedAt: selectedWorkout.startedAt,
-          }))
-        )
-      : Promise.resolve([]),
   ]);
 
   const recentRiskReasons: DashboardRiskReason[] = recentRiskReasonGroups
     .flat()
     .sort((a, b) => b.score - a.score)
     .slice(0, 4);
-  const selectedRiskReasons: DashboardRiskReason[] = selectedRiskReasonList;
 
   const riskSignal = computeDashboardRiskSignal(metricSets, now);
+  const selectedRiskSignal = selectedWorkout
+    ? computeDashboardRiskSignal(metricSets, selectedRiskAnchor)
+    : null;
   const riskTone =
     riskSignal.state === "high" ? "danger" : riskSignal.state === "monitor" ? "watch" : "safe";
   const heatmap = buildMuscleRegionRisks(metricSets, now);
@@ -173,7 +174,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }));
   const referenceTime = sessions[0] ? new Date(sessions[0].startedAt).getTime() : 0;
   const recentSessions = sessions.filter(
-    (workout) => referenceTime - new Date(workout.startedAt).getTime() <= 7 * 24 * 60 * 60 * 1000
+    (workout) => referenceTime - new Date(workout.startedAt).getTime() <= 7 * DAY_MS
   );
   const recentLoad = recentSessions.reduce(
     (sum, workout) => sum + workout.sets.reduce((load, set) => load + setLoad(set), 0),
@@ -197,7 +198,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const selectedWorkoutName = selectedWorkout
     ? cleanWorkoutName(selectedWorkout.note) ?? "Untitled workout"
     : "No completed workout";
-  const selectedRiskScore = selectedRiskReasons[0]?.score ?? 25;
+  const selectedRiskScore = selectedRiskSignal?.score ?? 20;
   const selectedBaselineLoads = sessionLoads
     .filter((workout) => workout.id !== selectedWorkout?.id && workout.load > 0)
     .map((workout) => workout.load)
@@ -259,25 +260,32 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         <MetricCard
           eyebrow="Risk status"
-          title={`${riskSignal.stateLabel} workload signal`}
-          subtitle="Formula-based signal from weekly load, acute:chronic ratio, high RPE, and pain flags."
+          title={riskSignal.stateLabel}
           actions={
             <StatusChip
-              label={riskSignal.stateLabel}
+              label={`${riskSignal.score} / 100`}
               tone={riskTone}
+              showDot={false}
             />
           }
         >
-          <div className="flex min-h-24 items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-white/90">
-                {riskSignal.topDriver}
+          <div className="space-y-3">
+            <div className="flex items-end gap-2">
+              <div className="text-4xl font-semibold tracking-tight lab-num text-white/95">
+                {riskSignal.score}
               </div>
-              <div className="mt-2 text-xs leading-5 lab-muted">
-                {riskSignal.explanation}
-              </div>
+              <div className="pb-1 text-sm lab-muted">/ 100</div>
             </div>
-            <RiskMeter score={riskSignal.score} />
+            <div className="text-sm font-medium text-white/90">
+              Top driver: {riskSignal.topDriver}
+            </div>
+            <p className="text-xs leading-5 lab-muted">{riskSignal.interpretation}</p>
+            <Link
+              href="/info"
+              className="inline-flex rounded-full border border-emerald-400/25 px-3 py-1 text-xs font-medium text-emerald-200 transition hover:border-emerald-300/45 hover:text-emerald-100"
+            >
+              How this is calculated
+            </Link>
           </div>
         </MetricCard>
 
@@ -374,9 +382,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs lab-muted">Risk events</div>
+                    <div className="text-xs lab-muted">Risk score</div>
                     <div className="mt-1 text-sm font-semibold lab-num text-white/90">
-                      {selectedRiskReasons.length}
+                      {selectedRiskScore}/100
                     </div>
                   </div>
                 </div>
@@ -385,32 +393,32 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
                 <RiskMeter score={selectedRiskScore} />
                 <div className="mt-3 text-xs lab-muted">Selected workout risk</div>
+                <div className="mt-2 text-sm leading-5 text-white/80">
+                  {selectedRiskSignal?.topDriver ?? "No selected workout risk signal."}
+                </div>
               </div>
             </div>
 
             <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <div className="text-sm font-medium text-white/90">Selected workout risk feed</div>
-              {selectedRiskReasons.length === 0 ? (
-                <div className="mt-3 text-sm lab-muted">
-                  No pain, RPE, or load flags for this workout.
-                </div>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  {selectedRiskReasons.slice(0, 4).map((reason, index) => (
-                    <div
-                      key={`${reason.sessionId}-${reason.kind}-${index}`}
-                      className="flex items-start justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3"
-                    >
-                      <div className="text-sm text-white/85">{cleanDisplayText(reason.title)}</div>
-                      <StatusChip
-                        label={`${reason.score}`}
-                        tone={reason.score >= 70 ? "danger" : reason.score >= 40 ? "watch" : "safe"}
-                        showDot={false}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm font-medium text-white/90">Selected workout risk signal</div>
+                <StatusChip
+                  label={selectedRiskSignal?.stateLabel ?? "Stable"}
+                  tone={
+                    selectedRiskSignal?.state === "high"
+                      ? "danger"
+                      : selectedRiskSignal?.state === "monitor"
+                      ? "watch"
+                      : "safe"
+                  }
+                />
+              </div>
+              <div className="mt-3 text-sm text-white/85">
+                Top driver: {selectedRiskSignal?.topDriver ?? "No saved workouts in this window"}
+              </div>
+              <p className="mt-2 text-xs leading-5 lab-muted">
+                Uses the same deterministic workload signal as the dashboard Risk Status.
+              </p>
             </div>
           </>
         ) : (

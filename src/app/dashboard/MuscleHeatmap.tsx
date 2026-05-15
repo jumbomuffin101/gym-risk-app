@@ -27,25 +27,26 @@ type RegionShape = {
 
 const FRONT_REGIONS: RegionShape[] = [
   {
-    id: "shoulders",
-    label: "Shoulders",
+    id: "frontDelts",
+    label: "Front Delts",
     kind: "path",
     d: "M43 88C53 66 79 66 88 89L76 106C63 99 52 99 40 109C36 102 37 94 43 88ZM177 88C167 66 141 66 132 89L144 106C157 99 168 99 180 109C184 102 183 94 177 88Z",
     labelX: 110,
-    labelY: 82,
+    labelY: 79,
   },
   { id: "chest", label: "Chest", kind: "rect", x: 70, y: 95, width: 80, height: 46, labelX: 110, labelY: 123 },
-  { id: "biceps", label: "Biceps", kind: "path", d: "M37 118C52 121 58 138 52 170L32 166C29 145 31 129 37 118ZM183 118C168 121 162 138 168 170L188 166C191 145 189 129 183 118Z", labelX: 110, labelY: 160 },
-  { id: "absCore", label: "Abs/Core", kind: "rect", x: 78, y: 146, width: 64, height: 72, labelX: 110, labelY: 186 },
+  { id: "biceps", label: "Biceps", kind: "path", d: "M37 118C52 121 58 138 52 170L32 166C29 145 31 129 37 118ZM183 118C168 121 162 138 168 170L188 166C191 145 189 129 183 118Z", labelX: 110, labelY: 165 },
+  { id: "absCore", label: "Core", kind: "rect", x: 78, y: 146, width: 64, height: 72, labelX: 110, labelY: 187 },
   { id: "quads", label: "Quads", kind: "path", d: "M77 231H104L100 322H68C65 287 67 256 77 231ZM116 231H143C153 256 155 287 152 322H120L116 231Z", labelX: 110, labelY: 282 },
   { id: "knees", label: "Knees", kind: "path", d: "M69 326H100V356H69V326ZM120 326H151V356H120V326Z", labelX: 110, labelY: 346 },
 ];
 
 const BACK_REGIONS: RegionShape[] = [
-  { id: "upperBack", label: "Upper back", kind: "rect", x: 65, y: 88, width: 90, height: 52, labelX: 110, labelY: 119 },
-  { id: "lats", label: "Lats", kind: "path", d: "M60 139C76 145 83 166 82 202H53C48 172 50 151 60 139ZM160 139C144 145 137 166 138 202H167C172 172 170 151 160 139Z", labelX: 110, labelY: 175 },
-  { id: "triceps", label: "Triceps", kind: "path", d: "M35 116C51 121 56 141 50 173L30 168C27 145 29 127 35 116ZM185 116C169 121 164 141 170 173L190 168C193 145 191 127 185 116Z", labelX: 110, labelY: 158 },
-  { id: "lowerBack", label: "Lower back", kind: "rect", x: 78, y: 203, width: 64, height: 42, labelX: 110, labelY: 229 },
+  { id: "rearDelts", label: "Rear Delts", kind: "path", d: "M44 88C56 70 78 71 88 91L76 107C62 100 52 101 39 111C36 102 37 94 44 88ZM176 88C164 70 142 71 132 91L144 107C158 100 168 101 181 111C184 102 183 94 176 88Z", labelX: 110, labelY: 79 },
+  { id: "upperBack", label: "Upper Back", kind: "rect", x: 65, y: 103, width: 90, height: 44, labelX: 110, labelY: 130 },
+  { id: "lats", label: "Lats", kind: "path", d: "M60 149C76 154 83 176 82 209H53C48 180 50 160 60 149ZM160 149C144 154 137 176 138 209H167C172 180 170 160 160 149Z", labelX: 110, labelY: 184 },
+  { id: "triceps", label: "Triceps", kind: "path", d: "M35 120C51 125 56 145 50 176L30 171C27 148 29 130 35 120ZM185 120C169 125 164 145 170 176L190 171C193 148 191 130 185 120Z", labelX: 110, labelY: 160 },
+  { id: "lowerBack", label: "Lower Back", kind: "rect", x: 78, y: 210, width: 64, height: 40, labelX: 110, labelY: 235 },
   { id: "glutes", label: "Glutes", kind: "path", d: "M72 249C90 238 104 246 106 272C98 286 79 286 67 273C66 263 67 255 72 249ZM148 249C130 238 116 246 114 272C122 286 141 286 153 273C154 263 153 255 148 249Z", labelX: 110, labelY: 274 },
   { id: "hamstrings", label: "Hamstrings", kind: "path", d: "M72 286H102L98 356H67C65 328 66 305 72 286ZM118 286H148C154 305 155 328 153 356H122L118 286Z", labelX: 110, labelY: 325 },
   { id: "calves", label: "Calves", kind: "path", d: "M69 360H97L93 410H66C63 391 64 375 69 360ZM123 360H151C156 375 157 391 154 410H127L123 360Z", labelX: 110, labelY: 392 },

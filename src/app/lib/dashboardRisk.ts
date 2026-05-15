@@ -1,6 +1,7 @@
 export type MuscleRegionId =
   | "chest"
-  | "shoulders"
+  | "frontDelts"
+  | "rearDelts"
   | "biceps"
   | "absCore"
   | "quads"
@@ -47,6 +48,7 @@ export type DashboardRiskSignal = {
   stateLabel: "Stable" | "Monitor" | "High";
   topDriver: string;
   explanation: string;
+  interpretation: string;
   wowChangePct: number | null;
   acuteChronicRatio: number | null;
   highRpeSetCount: number;
@@ -60,15 +62,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const MUSCLE_REGION_LABELS: Record<MuscleRegionId, string> = {
   chest: "Chest",
-  shoulders: "Shoulders",
+  frontDelts: "Front Delts",
+  rearDelts: "Rear Delts",
   biceps: "Biceps",
-  absCore: "Abs/Core",
+  absCore: "Core",
   quads: "Quads",
   knees: "Knees",
-  upperBack: "Upper back",
+  upperBack: "Upper Back",
   lats: "Lats",
   triceps: "Triceps",
-  lowerBack: "Lower back",
+  lowerBack: "Lower Back",
   glutes: "Glutes",
   hamstrings: "Hamstrings",
   calves: "Calves",
@@ -77,12 +80,15 @@ export const MUSCLE_REGION_LABELS: Record<MuscleRegionId, string> = {
 const ALL_REGIONS = Object.keys(MUSCLE_REGION_LABELS) as MuscleRegionId[];
 
 const EXERCISE_REGION_MAP: Record<string, MuscleRegionId[]> = {
-  "bench press": ["chest", "shoulders", "triceps"],
-  "incline bench press": ["chest", "shoulders", "triceps"],
-  "dumbbell bench press": ["chest", "shoulders", "triceps"],
-  dips: ["chest", "shoulders", "triceps"],
-  "push up": ["chest", "shoulders", "triceps"],
-  "overhead press": ["shoulders", "triceps"],
+  "bench press": ["chest", "frontDelts", "triceps"],
+  "incline bench press": ["chest", "frontDelts", "triceps"],
+  "dumbbell bench press": ["chest", "frontDelts", "triceps"],
+  dips: ["chest", "frontDelts", "triceps"],
+  "push up": ["chest", "frontDelts", "triceps"],
+  "overhead press": ["frontDelts", "triceps"],
+  "shoulder press": ["frontDelts", "triceps"],
+  "front raise": ["frontDelts"],
+  "lateral raise": ["frontDelts"],
   "back squat": ["quads", "glutes", "knees"],
   "front squat": ["quads", "glutes", "knees"],
   "goblet squat": ["quads", "glutes", "knees"],
@@ -99,7 +105,9 @@ const EXERCISE_REGION_MAP: Record<string, MuscleRegionId[]> = {
   "barbell row": ["upperBack", "lats", "biceps"],
   "dumbbell row": ["upperBack", "lats", "biceps"],
   "seated cable row": ["upperBack", "lats", "biceps"],
-  "face pull": ["upperBack", "shoulders"],
+  "face pull": ["upperBack", "rearDelts"],
+  "rear delt fly": ["rearDelts", "upperBack"],
+  "reverse fly": ["rearDelts", "upperBack"],
   "bicep curl": ["biceps"],
   "hammer curl": ["biceps"],
   "tricep pushdown": ["triceps"],
@@ -114,8 +122,8 @@ const EXERCISE_REGION_MAP: Record<string, MuscleRegionId[]> = {
 const CATEGORY_REGION_MAP: Record<string, MuscleRegionId[]> = {
   squat: ["quads", "glutes", "knees"],
   hinge: ["hamstrings", "glutes", "lowerBack"],
-  push: ["chest", "shoulders", "triceps"],
-  pull: ["upperBack", "lats", "biceps"],
+  push: ["chest", "frontDelts", "triceps"],
+  pull: ["upperBack", "lats", "biceps", "rearDelts"],
   core: ["absCore"],
   calves: ["calves"],
 };
@@ -322,42 +330,43 @@ function stateLabel(state: DashboardRiskSignal["state"]): DashboardRiskSignal["s
   return "Stable";
 }
 
+type WorkloadRiskScoreInput = {
+  acuteLoad: number;
+  priorWeekLoad: number;
+  chronicWeeklyLoad: number | null;
+  highRpeSetCount: number;
+  painFlagCount: number;
+  maxPain: number;
+};
+
 /**
- * Workload risk signal formula, not a medical prediction:
- * score = 25 base
- *   + 0-30 from positive week-over-week load increase, maxed at +60% WoW
- *   + 0-25 from acute:chronic ratio above 1.0, maxed at 2.0
- *   + 0-15 from high RPE exposure at 3 points per set with RPE >= 9
- *   + 0-20 from pain flags at pain >= 7/10
- * The final score is clamped to 0-100 and labeled Stable 0-39,
- * Monitor 40-69, High 70-100.
+ * Deterministic workload risk signal, not a medical prediction model.
+ * Base 20 + WoW load increase 0-30 + ACWR 0-25 + high RPE 0-15 + pain 0-20.
+ * WoW points scale from 0% to +30%; ACWR points scale from 1.0 to 1.5.
  */
-export function computeDashboardRiskSignal(sets: DashboardMetricSet[], now = new Date()): DashboardRiskSignal {
-  const acuteStart = new Date(now.getTime() - 7 * DAY_MS);
-  const priorStart = new Date(now.getTime() - 14 * DAY_MS);
-  const chronicStart = new Date(now.getTime() - 35 * DAY_MS);
+export function scoreWorkloadRiskSignal(input: WorkloadRiskScoreInput): DashboardRiskSignal {
+  const wowChangePct =
+    input.priorWeekLoad > 0
+      ? ((input.acuteLoad - input.priorWeekLoad) / input.priorWeekLoad) * 100
+      : null;
+  const acuteChronicRatio =
+    input.chronicWeeklyLoad && input.chronicWeeklyLoad > 0
+      ? input.acuteLoad / input.chronicWeeklyLoad
+      : null;
 
-  const acuteSets = sets.filter((set) => inWindow(set.performedAt, acuteStart, now));
-  const priorWeekSets = sets.filter((set) => inWindow(set.performedAt, priorStart, acuteStart));
-  const chronicSets = sets.filter((set) => inWindow(set.performedAt, chronicStart, acuteStart));
-
-  const acuteLoad = acuteSets.reduce((sum, set) => sum + workload(set), 0);
-  const priorWeekLoad = priorWeekSets.reduce((sum, set) => sum + workload(set), 0);
-  const chronicLoad = chronicSets.reduce((sum, set) => sum + workload(set), 0);
-  const chronicWeeklyLoad = chronicLoad > 0 ? chronicLoad / 4 : null;
-  const wowChangePct = priorWeekLoad > 0 ? ((acuteLoad - priorWeekLoad) / priorWeekLoad) * 100 : null;
-  const acuteChronicRatio = chronicWeeklyLoad && chronicWeeklyLoad > 0 ? acuteLoad / chronicWeeklyLoad : null;
-  const highRpeSetCount = acuteSets.filter((set) => (set.rpe ?? 0) >= 9).length;
-  const painFlagSets = acuteSets.filter((set) => (set.pain ?? 0) >= 7);
-  const painFlagCount = painFlagSets.length;
-  const maxPain = painFlagSets.reduce((max, set) => Math.max(max, set.pain ?? 0), 0);
-
-  const wowPoints = wowChangePct === null ? 0 : Math.round((clamp(wowChangePct, 0, 60) / 60) * 30);
+  const wowPoints = wowChangePct === null ? 0 : Math.round((clamp(wowChangePct, 0, 30) / 30) * 30);
   const acuteChronicPoints =
-    acuteChronicRatio === null ? 0 : Math.round(clamp(acuteChronicRatio - 1, 0, 1) * 25);
-  const rpePoints = Math.min(15, highRpeSetCount * 3);
-  const painPoints = Math.min(20, painFlagCount * 8 + Math.max(0, maxPain - 7) * 4);
-  const score = clamp(25 + wowPoints + acuteChronicPoints + rpePoints + painPoints, 0, 100);
+    acuteChronicRatio === null
+      ? 0
+      : Math.round((clamp(acuteChronicRatio - 1, 0, 0.5) / 0.5) * 25);
+  const rpePoints = Math.min(15, input.highRpeSetCount * 3);
+  const painPoints = Math.min(
+    20,
+    input.painFlagCount * 6 + Math.max(0, input.maxPain - 7) * 4
+  );
+  const score = Math.round(
+    clamp(20 + wowPoints + acuteChronicPoints + rpePoints + painPoints, 0, 100)
+  );
   const state = stateFromScore(score);
 
   const drivers = [
@@ -378,21 +387,21 @@ export function computeDashboardRiskSignal(sets: DashboardMetricSet[], now = new
     {
       points: rpePoints,
       label:
-        highRpeSetCount > 0
-          ? `High intensity streak: ${highRpeSetCount} set${highRpeSetCount === 1 ? "" : "s"} at RPE >= 9`
+        input.highRpeSetCount > 0
+          ? `High RPE exposure: ${input.highRpeSetCount} set${input.highRpeSetCount === 1 ? "" : "s"} at RPE >= 9`
           : "No high RPE exposure in the last 7 days",
     },
     {
       points: painPoints,
       label:
-        painFlagCount > 0
-          ? `Pain flags: ${painFlagCount} set${painFlagCount === 1 ? "" : "s"} at pain >= 7/10`
+        input.painFlagCount > 0
+          ? `Pain flags: ${input.painFlagCount} set${input.painFlagCount === 1 ? "" : "s"} at pain >= 7/10`
           : "No pain flags in the last 7 days",
     },
   ].sort((a, b) => b.points - a.points);
 
   const topDriver =
-    acuteSets.length === 0
+    input.acuteLoad <= 0
       ? "No saved workouts in the last 7 days"
       : drivers[0]?.points
       ? drivers[0].label
@@ -403,14 +412,38 @@ export function computeDashboardRiskSignal(sets: DashboardMetricSet[], now = new
     state,
     stateLabel: stateLabel(state),
     topDriver,
-    explanation: `Formula: 25 base + ${wowPoints} weekly load + ${acuteChronicPoints} acute:chronic + ${rpePoints} high RPE + ${painPoints} pain = ${score}. Workload signal only, not a medical prediction.`,
+    explanation: `20 base + ${wowPoints} weekly load + ${acuteChronicPoints} acute:chronic + ${rpePoints} high RPE + ${painPoints} pain = ${score}. Workload signal only.`,
+    interpretation: "Workload signal based on saved sets, RPE, and pain notes.",
     wowChangePct,
     acuteChronicRatio,
-    highRpeSetCount,
-    painFlagCount,
-    acuteLoad,
-    priorWeekLoad,
-    chronicWeeklyLoad,
+    highRpeSetCount: input.highRpeSetCount,
+    painFlagCount: input.painFlagCount,
+    acuteLoad: input.acuteLoad,
+    priorWeekLoad: input.priorWeekLoad,
+    chronicWeeklyLoad: input.chronicWeeklyLoad,
   };
 }
 
+export function computeDashboardRiskSignal(sets: DashboardMetricSet[], now = new Date()): DashboardRiskSignal {
+  const acuteStart = new Date(now.getTime() - 7 * DAY_MS);
+  const priorStart = new Date(now.getTime() - 14 * DAY_MS);
+  const chronicStart = new Date(now.getTime() - 35 * DAY_MS);
+
+  const acuteSets = sets.filter((set) => inWindow(set.performedAt, acuteStart, now));
+  const priorWeekSets = sets.filter((set) => inWindow(set.performedAt, priorStart, acuteStart));
+  const chronicSets = sets.filter((set) => inWindow(set.performedAt, chronicStart, acuteStart));
+
+  const painFlagSets = acuteSets.filter((set) => (set.pain ?? 0) >= 7);
+
+  return scoreWorkloadRiskSignal({
+    acuteLoad: acuteSets.reduce((sum, set) => sum + workload(set), 0),
+    priorWeekLoad: priorWeekSets.reduce((sum, set) => sum + workload(set), 0),
+    chronicWeeklyLoad:
+      chronicSets.length > 0
+        ? chronicSets.reduce((sum, set) => sum + workload(set), 0) / 4
+        : null,
+    highRpeSetCount: acuteSets.filter((set) => (set.rpe ?? 0) >= 9).length,
+    painFlagCount: painFlagSets.length,
+    maxPain: painFlagSets.reduce((max, set) => Math.max(max, set.pain ?? 0), 0),
+  });
+}
