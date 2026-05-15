@@ -7,13 +7,21 @@ export function LoadPanel({
   recentLoad,
   baseline,
   deltaPct,
+  baselineReady,
 }: {
   recentLoad: number;
   baseline: number;
   deltaPct: number;
+  baselineReady: boolean;
 }) {
   const tone =
-    baseline <= 0 ? "neutral" : deltaPct >= 20 ? "danger" : deltaPct >= 12 ? "watch" : "safe";
+    !baselineReady || baseline <= 0
+      ? "neutral"
+      : deltaPct >= 20
+      ? "danger"
+      : deltaPct >= 12
+      ? "watch"
+      : "safe";
 
   const color =
     tone === "danger"
@@ -21,7 +29,7 @@ export function LoadPanel({
       : tone === "watch"
       ? "var(--lab-watch)"
       : "var(--lab-safe)";
-  const activityOpacity = baseline > 0 ? 0.75 : 0.5;
+  const activityOpacity = baselineReady && baseline > 0 ? 0.75 : 0.5;
 
   return (
     <MetricCard
@@ -30,8 +38,8 @@ export function LoadPanel({
       actions={
         <StatusChip
           label={
-            baseline <= 0
-              ? "No baseline"
+            !baselineReady || baseline <= 0
+              ? "Baseline pending"
               : tone === "danger"
               ? "Spike"
               : tone === "watch"
@@ -52,13 +60,13 @@ export function LoadPanel({
         <div>
           <div className="text-xs lab-muted">Baseline</div>
           <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
-            {baseline > 0 ? Math.round(baseline).toLocaleString() : "-"}
+            {baselineReady && baseline > 0 ? Math.round(baseline).toLocaleString() : "-"}
           </div>
         </div>
         <div>
           <div className="text-xs lab-muted">Change</div>
           <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
-            {baseline > 0 ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "-"}
+            {baselineReady && baseline > 0 ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "-"}
           </div>
         </div>
       </div>
@@ -82,8 +90,8 @@ export function LoadPanel({
         </svg>
 
         <div className="text-xs lab-muted">
-          {baseline <= 0
-            ? "More saved workouts will establish a baseline."
+          {!baselineReady || baseline <= 0
+            ? "Log at least 3 workouts across 7+ days to establish a baseline."
             : tone === "danger"
             ? "Recent load is materially above baseline."
             : tone === "watch"

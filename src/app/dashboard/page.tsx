@@ -6,7 +6,11 @@ import { authOptions } from "@/app/lib/auth/authOptions";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { computeSessionRisk } from "@/app/lib/riskEngine";
-import { buildMuscleRegionRisks, computeDashboardRiskSignal } from "@/app/lib/dashboardRisk";
+import {
+  buildMuscleRegionRisks,
+  computeDashboardRiskSignal,
+  getBaselineReadiness,
+} from "@/app/lib/dashboardRisk";
 import { cleanWorkoutName, formatLoad, setLoad, summarizeWorkoutSets } from "@/app/lib/workouts";
 
 import DashboardActions from "./DashboardActions";
@@ -92,37 +96,53 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const requestedWorkoutId = Array.isArray(rawWorkoutId) ? rawWorkoutId[0] : rawWorkoutId;
   const now = new Date();
 
-  const sessions = await prisma.workoutSession.findMany({
-    where: {
-      userId,
-      endedAt: { not: null },
-      sets: { some: {} },
-    },
-    orderBy: { startedAt: "desc" },
-    take: 12,
-    select: {
-      id: true,
-      startedAt: true,
-      endedAt: true,
-      note: true,
-      _count: { select: { sets: true } },
-      sets: {
-        select: {
-          exerciseId: true,
-          reps: true,
-          weight: true,
-          rpe: true,
-          pain: true,
+  const [sessions, baselineWorkouts] = await Promise.all([
+    prisma.workoutSession.findMany({
+      where: {
+        userId,
+        endedAt: { not: null },
+        sets: { some: {} },
+      },
+      orderBy: { startedAt: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        startedAt: true,
+        endedAt: true,
+        note: true,
+        _count: { select: { sets: true } },
+        sets: {
+          select: {
+            exerciseId: true,
+            reps: true,
+            weight: true,
+            rpe: true,
+            pain: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.workoutSession.findMany({
+      where: {
+        userId,
+        endedAt: { not: null },
+        sets: { some: {} },
+      },
+      orderBy: { startedAt: "asc" },
+      select: {
+        startedAt: true,
+        endedAt: true,
+      },
+    }),
+  ]);
 
   const selectedWorkout =
     sessions.find((workout) => workout.id === requestedWorkoutId) ?? sessions[0] ?? null;
   const selectedRiskAnchor = selectedWorkout
     ? new Date((selectedWorkout.endedAt ?? selectedWorkout.startedAt).getTime() + 1)
     : now;
+  const baselineReadiness = getBaselineReadiness(baselineWorkouts, now);
+  const selectedBaselineReadiness = getBaselineReadiness(baselineWorkouts, selectedRiskAnchor);
   const metricsSince = new Date(
     Math.min(now.getTime(), selectedRiskAnchor.getTime()) - 35 * DAY_MS
   );
@@ -161,13 +181,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     .sort((a, b) => b.score - a.score)
     .slice(0, 4);
 
-  const riskSignal = computeDashboardRiskSignal(metricSets, now);
+  const riskSignal = computeDashboardRiskSignal(metricSets, now, baselineReadiness.isReady);
   const selectedRiskSignal = selectedWorkout
-    ? computeDashboardRiskSignal(metricSets, selectedRiskAnchor)
+    ? computeDashboardRiskSignal(metricSets, selectedRiskAnchor, selectedBaselineReadiness.isReady)
     : null;
   const riskTone =
-    riskSignal.state === "high" ? "danger" : riskSignal.state === "monitor" ? "watch" : "safe";
-  const heatmap = buildMuscleRegionRisks(metricSets, now);
+    riskSignal.state === "high"
+      ? "danger"
+      : riskSignal.state === "monitor"
+      ? "watch"
+      : riskSignal.state === "baseline"
+      ? "neutral"
+      : "safe";
+  const heatmap = buildMuscleRegionRisks(metricSets, now, baselineReadiness.isReady);
   const sessionLoads = sessions.map((workout) => ({
     id: workout.id,
     load: workout.sets.reduce((sum, set) => sum + setLoad(set), 0),
@@ -208,11 +234,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       ? selectedBaselineLoads.reduce((sum, load) => sum + load, 0) / selectedBaselineLoads.length
       : 0;
   const selectedDeltaPct =
-    selectedSummary && selectedBaseline
+    selectedSummary && selectedBaselineReadiness.isReady && selectedBaseline
       ? Math.round(((selectedSummary.sessionLoad - selectedBaseline) / selectedBaseline) * 100)
       : 0;
   const selectedLoadTone =
-    !selectedBaseline ? "neutral" : selectedDeltaPct >= 20 ? "danger" : selectedDeltaPct >= 12 ? "watch" : "safe";
+    !selectedBaselineReadiness.isReady || !selectedBaseline
+      ? "neutral"
+      : selectedDeltaPct >= 20
+      ? "danger"
+      : selectedDeltaPct >= 12
+      ? "watch"
+      : "safe";
 
   return (
     <PageShell>
@@ -255,7 +287,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           badge={lastWorkout ? `${lastWorkout._count.sets} sets` : "New"}
           badgeTone={lastWorkout ? "safe" : "neutral"}
           subline={lastWorkout ? `${formatLoad(lastWorkoutLoad) ?? "0"} load` : "Create a workout to begin tracking."}
-          progress={lastWorkout && baseline ? Math.min(100, Math.max(8, (lastWorkoutLoad / baseline) * 50)) : 8}
+          progress={
+            lastWorkout && baselineReadiness.isReady && baseline
+              ? Math.min(100, Math.max(8, (lastWorkoutLoad / baseline) * 50))
+              : 8
+          }
         />
 
         <MetricCard
@@ -292,14 +328,23 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <KpiCard
           title="7-day load"
           value={formatLoad(recentLoad) ?? "0"}
-          badge={baseline ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "New"}
-          badgeTone={!baseline ? "neutral" : deltaPct >= 20 ? "danger" : deltaPct >= 12 ? "watch" : "safe"}
-          subline={baseline ? "Compared with session baseline." : "No baseline yet."}
-          progress={baseline ? Math.min(100, Math.max(8, (recentLoad / baseline) * 50)) : 8}
+          badge={baselineReadiness.isReady && baseline ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "Baseline"}
+          badgeTone={!baselineReadiness.isReady || !baseline ? "neutral" : deltaPct >= 20 ? "danger" : deltaPct >= 12 ? "watch" : "safe"}
+          subline={
+            baselineReadiness.isReady && baseline
+              ? "Compared with session baseline."
+              : "Log 3 workouts across 7+ days to establish a baseline."
+          }
+          progress={baselineReadiness.isReady && baseline ? Math.min(100, Math.max(8, (recentLoad / baseline) * 50)) : 8}
         />
       </section>
 
-      <LoadPanel recentLoad={recentLoad} baseline={baseline} deltaPct={deltaPct} />
+      <LoadPanel
+        recentLoad={recentLoad}
+        baseline={baseline}
+        deltaPct={deltaPct}
+        baselineReady={baselineReadiness.isReady}
+      />
 
       <MetricCard
         eyebrow="Selected workout analysis"
@@ -323,9 +368,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 label="Session load"
                 value={formatLoad(selectedSummary.sessionLoad) ?? "0"}
                 subline={
-                  selectedBaseline
+                  selectedBaselineReadiness.isReady && selectedBaseline
                     ? `${selectedDeltaPct >= 0 ? "+" : ""}${selectedDeltaPct}% vs recent baseline`
-                    : "No baseline yet"
+                    : "Baseline pending"
                 }
               />
               <AnalysisMetric label="Sets" value={String(selectedSummary.setCount)} />
@@ -351,8 +396,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <div className="text-sm font-medium text-white/90">Load and effort signals</div>
                   <StatusChip
                     label={
-                      !selectedBaseline
-                        ? "No baseline"
+                      !selectedBaselineReadiness.isReady || !selectedBaseline
+                        ? "Baseline pending"
                         : selectedDeltaPct >= 20
                         ? "Load spike"
                         : selectedDeltaPct >= 12
@@ -366,7 +411,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <div>
                     <div className="text-xs lab-muted">Recent baseline</div>
                     <div className="mt-1 text-sm font-semibold lab-num text-white/90">
-                      {selectedBaseline ? formatLoad(selectedBaseline) ?? "0" : "-"}
+                      {selectedBaselineReadiness.isReady && selectedBaseline ? formatLoad(selectedBaseline) ?? "0" : "-"}
                     </div>
                   </div>
                   <div>
@@ -409,6 +454,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       ? "danger"
                       : selectedRiskSignal?.state === "monitor"
                       ? "watch"
+                      : selectedRiskSignal?.state === "baseline"
+                      ? "neutral"
                       : "safe"
                   }
                 />
