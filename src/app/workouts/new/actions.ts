@@ -34,8 +34,14 @@ const WorkoutExerciseSchema = z.object({
   sets: z.array(WorkoutSetSchema).min(1, "Each exercise needs at least one set."),
 });
 
+const WorkoutDateSchema = z.string().trim().min(1, "Workout date is required.").refine(
+  (value) => Number.isFinite(new Date(value).getTime()),
+  "Enter a valid workout date."
+);
+
 const SaveWorkoutSchema = z.object({
   workoutName: z.string().trim().max(120, "Workout name must be 120 characters or fewer.").optional(),
+  workoutDate: WorkoutDateSchema,
   exercises: z.array(WorkoutExerciseSchema).min(1, "Select at least one exercise."),
 });
 
@@ -60,15 +66,16 @@ export async function saveWorkoutBuilderAction(input: unknown): Promise<SaveWork
     return { ok: false, error: "One or more selected exercises could not be found." };
   }
 
-  const now = new Date();
+  const workoutStartedAt = new Date(parsed.data.workoutDate);
+  const workoutEndedAt = new Date(workoutStartedAt.getTime() + 60 * 1000);
   const note = normalizeWorkoutName(parsed.data.workoutName);
 
   await prisma.$transaction(async (tx) => {
     const session = await tx.workoutSession.create({
       data: {
         userId,
-        startedAt: now,
-        endedAt: now,
+        startedAt: workoutStartedAt,
+        endedAt: workoutEndedAt,
         note,
       },
       select: { id: true },
@@ -84,7 +91,7 @@ export async function saveWorkoutBuilderAction(input: unknown): Promise<SaveWork
           weight: set.weight,
           rpe: set.rpe ?? null,
           pain: set.pain ?? null,
-          performedAt: now,
+          performedAt: workoutStartedAt,
         }))
       ),
     });

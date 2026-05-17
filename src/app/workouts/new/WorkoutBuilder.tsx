@@ -39,6 +39,17 @@ function newSet(values?: Partial<Omit<BuilderSet, "id">>): BuilderSet {
   };
 }
 
+function formatDateTimeLocal(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export function WorkoutBuilder({
   exercises,
   previousWorkouts,
@@ -48,6 +59,7 @@ export function WorkoutBuilder({
 }) {
   const [query, setQuery] = useState("");
   const [workoutName, setWorkoutName] = useState("");
+  const [workoutDate, setWorkoutDate] = useState(() => formatDateTimeLocal(new Date()));
   const [previousWorkoutId, setPreviousWorkoutId] = useState("");
   const [selected, setSelected] = useState<BuilderExercise[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -163,6 +175,7 @@ export function WorkoutBuilder({
     startTransition(async () => {
       const result = await saveWorkoutBuilderAction({
         workoutName,
+        workoutDate,
         exercises: selected.map((exercise) => ({
           exerciseId: exercise.id,
           sets: exercise.sets.map((set) => ({
@@ -240,7 +253,7 @@ export function WorkoutBuilder({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px_360px]">
           <label className="block">
             <span className="text-xs uppercase tracking-wide lab-muted">Workout name</span>
             <input
@@ -250,6 +263,20 @@ export function WorkoutBuilder({
               maxLength={120}
               className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
             />
+          </label>
+
+          <label className="block">
+            <span className="text-xs uppercase tracking-wide lab-muted">Workout date</span>
+            <input
+              type="datetime-local"
+              value={workoutDate}
+              onChange={(event) => setWorkoutDate(event.target.value)}
+              required
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
+            />
+            <span className="mt-2 block text-xs lab-muted">
+              Used for workload windows and baseline calculations.
+            </span>
           </label>
 
           <label className="block">
