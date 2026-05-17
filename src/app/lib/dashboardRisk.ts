@@ -72,6 +72,24 @@ export type DashboardRiskSignal = {
   chronicWeeklyLoad: number | null;
 };
 
+export type AnalyticsRiskState = "Baseline" | "Stable" | "Monitor" | "High";
+
+export type DashboardAnalytics = {
+  baselineReady: boolean;
+  baselineReason: string;
+  overallRiskState: AnalyticsRiskState;
+  riskScore: number | null;
+  topDriver: string;
+  interpretation: string;
+  sevenDayLoad: number;
+  baselineLoad: number | null;
+  wowChangePct: number | null;
+  acuteChronicRatio: number | null;
+  highRpeSetCount: number;
+  painFlagCount: number;
+  riskSignal: DashboardRiskSignal;
+};
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const MUSCLE_REGION_LABELS: Record<MuscleRegionId, string> = {
@@ -297,7 +315,7 @@ export function buildMuscleRegionRisks(
       ? ((regionStats.currentLoad - regionStats.baselineLoad) / regionStats.baselineLoad) * 100
       : null;
     const painSignal = regionStats.painFlagCount > 0;
-    const severePainSignal = regionStats.maxPain >= 9 || regionStats.painFlagCount >= 3;
+    const severePainSignal = regionStats.maxPain >= 9 || regionStats.painFlagCount >= 5;
     const severeHighRpeSignal = regionStats.maxRpe >= 9.5 || regionStats.highRpeSetCount >= 6;
     const highRpeSignal = regionStats.highRpeSetCount >= 3;
     const repeatedHighRpe = regionStats.highRpeSetCount >= 2;
@@ -307,7 +325,7 @@ export function buildMuscleRegionRisks(
     if (
       (hasRegionalBaseline && changePct !== null && changePct >= 30) ||
       severePainSignal ||
-      severeHighRpeSignal
+      (hasRegionalBaseline && severeHighRpeSignal)
     ) {
       state = "high";
     } else if (
@@ -341,8 +359,8 @@ export function buildMuscleRegionRisks(
           ? `Regional load increased ${formatPct(changePct)} vs baseline.${signals.length ? ` ${signals.join(", ")}.` : ""}`
           : `Regional load is within baseline range.${signals.length ? ` ${signals.join(", ")}.` : ""}`
         : signals.length
-        ? `Recent load exists before a baseline is ready. ${signals.join(", ")}.`
-        : "Recent load exists, but there is not enough history for comparison yet.";
+        ? `Recent regional load exists before a baseline is ready. ${signals.join(", ")}.`
+        : "Recent regional load exists, but there is not enough history for comparison yet.";
 
     const action =
       state === "high"
@@ -352,7 +370,7 @@ export function buildMuscleRegionRisks(
           ? "Keep the next exposure controlled and watch RPE or pain closely."
           : "Keep the next exposure controlled and avoid another sharp load increase."
         : state === "baseline"
-        ? "Log at least 3 workouts across 7+ days to establish a baseline."
+        ? "Log more workouts to establish a regional baseline."
         : "No adjustment indicated from logged workload.";
 
     return {
@@ -381,6 +399,13 @@ function stateLabel(state: DashboardRiskSignal["state"]): DashboardRiskSignal["s
   if (state === "high") return "High";
   if (state === "monitor") return "Monitor";
   if (state === "baseline") return "Baseline pending";
+  return "Stable";
+}
+
+function analyticsState(state: DashboardRiskSignal["state"]): AnalyticsRiskState {
+  if (state === "baseline") return "Baseline";
+  if (state === "high") return "High";
+  if (state === "monitor") return "Monitor";
   return "Stable";
 }
 
@@ -425,7 +450,7 @@ export function scoreWorkloadRiskSignal(input: WorkloadRiskScoreInput): Dashboar
   const score = Math.round(
     clamp(20 + wowPoints + acuteChronicPoints + rpePoints + painPoints, 0, 100)
   );
-  const severePainSignal = input.maxPain >= 9 || input.painFlagCount >= 3;
+  const severePainSignal = input.maxPain >= 9 || input.painFlagCount >= 5;
   const severeHighRpeSignal = input.highRpeSetCount >= 6;
   const highWorkloadSignal =
     input.baselineReady &&
@@ -439,9 +464,12 @@ export function scoreWorkloadRiskSignal(input: WorkloadRiskScoreInput): Dashboar
 
   let state: DashboardRiskSignal["state"] = input.baselineReady ? stateFromScore(score) : "baseline";
   let displayScore = score;
-  if (highWorkloadSignal || severePainSignal || severeHighRpeSignal) {
+  if (highWorkloadSignal || severePainSignal || (input.baselineReady && severeHighRpeSignal)) {
     state = "high";
     displayScore = Math.max(displayScore, 70);
+  } else if (!input.baselineReady && severeHighRpeSignal) {
+    state = "monitor";
+    displayScore = Math.max(displayScore, 40);
   } else if (!input.baselineReady && monitorSignal) {
     state = "monitor";
     displayScore = Math.max(displayScore, 40);
@@ -489,7 +517,7 @@ export function scoreWorkloadRiskSignal(input: WorkloadRiskScoreInput): Dashboar
     input.acuteLoad <= 0
       ? "No saved workouts in the last 7 days"
       : !input.baselineReady && !monitorSignal
-      ? "Building baseline"
+      ? "Need more workout history"
       : drivers[0]?.points
       ? drivers[0].label
       : !input.baselineReady
@@ -544,4 +572,38 @@ export function computeDashboardRiskSignal(
     maxPain: painFlagSets.reduce((max, set) => Math.max(max, set.pain ?? 0), 0),
     baselineReady,
   });
+}
+
+export function buildDashboardAnalytics(
+  sets: DashboardMetricSet[],
+  workouts: BaselineWorkout[],
+  now = new Date()
+): DashboardAnalytics {
+  const baseline = getBaselineReadiness(workouts, now);
+  const riskSignal = computeDashboardRiskSignal(sets, now, baseline.isReady);
+  const hasEffortOrPainSignal = riskSignal.highRpeSetCount > 0 || riskSignal.painFlagCount > 0;
+
+  return {
+    baselineReady: baseline.isReady,
+    baselineReason: baseline.isReady
+      ? "Baseline established."
+      : "Log at least 3 workouts across 7+ days.",
+    overallRiskState: analyticsState(riskSignal.state),
+    riskScore: baseline.isReady ? riskSignal.score : null,
+    topDriver:
+      !baseline.isReady && !hasEffortOrPainSignal
+        ? "Need more workout history"
+        : riskSignal.topDriver,
+    interpretation:
+      !baseline.isReady && hasEffortOrPainSignal
+        ? "Baseline is pending, but effort or pain signals are raised."
+        : riskSignal.interpretation,
+    sevenDayLoad: riskSignal.acuteLoad,
+    baselineLoad: baseline.isReady ? riskSignal.chronicWeeklyLoad : null,
+    wowChangePct: baseline.isReady ? riskSignal.wowChangePct : null,
+    acuteChronicRatio: baseline.isReady ? riskSignal.acuteChronicRatio : null,
+    highRpeSetCount: riskSignal.highRpeSetCount,
+    painFlagCount: riskSignal.painFlagCount,
+    riskSignal,
+  };
 }

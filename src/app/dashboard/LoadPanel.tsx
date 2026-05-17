@@ -10,12 +10,12 @@ export function LoadPanel({
   baselineReady,
 }: {
   recentLoad: number;
-  baseline: number;
-  deltaPct: number;
+  baseline: number | null;
+  deltaPct: number | null;
   baselineReady: boolean;
 }) {
   const tone =
-    !baselineReady || baseline <= 0
+    !baselineReady || !baseline || deltaPct === null
       ? "neutral"
       : deltaPct >= 20
       ? "danger"
@@ -28,22 +28,24 @@ export function LoadPanel({
       ? "var(--lab-danger)"
       : tone === "watch"
       ? "var(--lab-watch)"
+      : tone === "neutral"
+      ? "rgba(230,232,238,0.38)"
       : "var(--lab-safe)";
-  const activityOpacity = baselineReady && baseline > 0 ? 0.75 : 0.5;
+  const activityOpacity = baselineReady && baseline ? 0.75 : 0.5;
 
   return (
     <MetricCard
       title="Overall recent training load"
-      subtitle="Seven-day saved workout load compared with your recent session baseline."
+      subtitle="Seven-day saved workout load compared with your workload baseline."
       actions={
         <StatusChip
           label={
-            !baselineReady || baseline <= 0
+            !baselineReady || !baseline
               ? "Baseline pending"
               : tone === "danger"
               ? "Spike"
               : tone === "watch"
-              ? "Watch"
+              ? "Monitor"
               : "Stable"
           }
           tone={tone}
@@ -60,13 +62,13 @@ export function LoadPanel({
         <div>
           <div className="text-xs lab-muted">Baseline</div>
           <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
-            {baselineReady && baseline > 0 ? Math.round(baseline).toLocaleString() : "-"}
+            {baselineReady && baseline ? Math.round(baseline).toLocaleString() : "-"}
           </div>
         </div>
         <div>
           <div className="text-xs lab-muted">Change</div>
           <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
-            {baselineReady && baseline > 0 ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "-"}
+            {baselineReady && baseline && deltaPct !== null ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "-"}
           </div>
         </div>
       </div>
@@ -90,7 +92,7 @@ export function LoadPanel({
         </svg>
 
         <div className="text-xs lab-muted">
-          {!baselineReady || baseline <= 0
+          {!baselineReady || !baseline
             ? "Log at least 3 workouts across 7+ days to establish a baseline."
             : tone === "danger"
             ? "Recent load is materially above baseline."

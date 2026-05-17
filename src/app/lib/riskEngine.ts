@@ -57,7 +57,7 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
   const painSets = sets.filter((s) => (s.pain ?? 0) >= 7);
   if (painSets.length > 0) {
     const maxPain = Math.max(...painSets.map((s) => s.pain ?? 0));
-    const severePain = maxPain >= 9 || painSets.length >= 3;
+    const severePain = maxPain >= 9 || painSets.length >= 5;
     reasons.push({
       kind: "pain_flag",
       title: `Pain flagged (max ${maxPain}/10)`,
@@ -80,12 +80,11 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
 
   const hardSets = sets.filter((s) => (s.rpe ?? 0) >= 9);
   if (hardSets.length >= 3) {
-    const severeRpe = hardSets.length >= 6;
     reasons.push({
       kind: "rpe_spike",
       title: `High intensity streak (${hardSets.length} sets at RPE >= 9)`,
       score:
-        baselineReadiness.isReady || severeRpe
+        baselineReadiness.isReady
           ? clamp(40 + hardSets.length * 8, 50, 95)
           : clamp(40 + hardSets.length * 5, 40, 69),
       details: {
@@ -101,7 +100,9 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
     reasons.push({
       kind: "rpe_warning",
       title: `High intensity present (${hardSets.length} sets at RPE >= 9)`,
-      score: clamp(25 + hardSets.length * 10, 25, 60),
+      score: baselineReadiness.isReady
+        ? clamp(25 + hardSets.length * 10, 25, 60)
+        : clamp(40 + hardSets.length * 5, 40, 69),
       details: {
         baselineReady: baselineReadiness.isReady,
         hardSets: hardSets.slice(0, 5).map((s) => ({

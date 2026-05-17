@@ -8,8 +8,8 @@ import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { computeSessionRisk } from "@/app/lib/riskEngine";
 import {
   buildMuscleRegionRisks,
-  computeDashboardRiskSignal,
-  getBaselineReadiness,
+  buildDashboardAnalytics,
+  type AnalyticsRiskState,
 } from "@/app/lib/dashboardRisk";
 import { cleanWorkoutName, formatLoad, setLoad, summarizeWorkoutSets } from "@/app/lib/workouts";
 
@@ -60,6 +60,22 @@ function formatWorkoutOptionLabel(workout: { startedAt: Date; note: string | nul
   const name = cleanWorkoutName(workout.note, 56);
 
   return name ? `${date} - ${name}` : date;
+}
+
+function toneForRiskState(state: AnalyticsRiskState) {
+  if (state === "High") return "danger";
+  if (state === "Monitor") return "watch";
+  if (state === "Baseline") return "neutral";
+  return "safe";
+}
+
+function riskStateLabel(state: AnalyticsRiskState) {
+  return state === "Baseline" ? "Baseline pending" : state;
+}
+
+function formatChangePct(value: number | null) {
+  if (value === null) return "Baseline pending";
+  return `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
 }
 
 function AnalysisMetric({
@@ -141,8 +157,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const selectedRiskAnchor = selectedWorkout
     ? new Date((selectedWorkout.endedAt ?? selectedWorkout.startedAt).getTime() + 1)
     : now;
-  const baselineReadiness = getBaselineReadiness(baselineWorkouts, now);
-  const selectedBaselineReadiness = getBaselineReadiness(baselineWorkouts, selectedRiskAnchor);
   const metricsSince = new Date(
     Math.min(now.getTime(), selectedRiskAnchor.getTime()) - 35 * DAY_MS
   );
@@ -181,37 +195,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     .sort((a, b) => b.score - a.score)
     .slice(0, 4);
 
-  const riskSignal = computeDashboardRiskSignal(metricSets, now, baselineReadiness.isReady);
-  const selectedRiskSignal = selectedWorkout
-    ? computeDashboardRiskSignal(metricSets, selectedRiskAnchor, selectedBaselineReadiness.isReady)
+  const analytics = buildDashboardAnalytics(metricSets, baselineWorkouts, now);
+  const selectedAnalytics = selectedWorkout
+    ? buildDashboardAnalytics(metricSets, baselineWorkouts, selectedRiskAnchor)
     : null;
-  const riskTone =
-    riskSignal.state === "high"
-      ? "danger"
-      : riskSignal.state === "monitor"
-      ? "watch"
-      : riskSignal.state === "baseline"
-      ? "neutral"
-      : "safe";
-  const heatmap = buildMuscleRegionRisks(metricSets, now, baselineReadiness.isReady);
-  const sessionLoads = sessions.map((workout) => ({
-    id: workout.id,
-    load: workout.sets.reduce((sum, set) => sum + setLoad(set), 0),
-  }));
-  const referenceTime = sessions[0] ? new Date(sessions[0].startedAt).getTime() : 0;
-  const recentSessions = sessions.filter(
-    (workout) => referenceTime - new Date(workout.startedAt).getTime() <= 7 * DAY_MS
-  );
-  const recentLoad = recentSessions.reduce(
-    (sum, workout) => sum + workout.sets.reduce((load, set) => load + setLoad(set), 0),
-    0
-  );
-  const completedLoads = sessionLoads.filter((workout) => workout.load > 0).map((workout) => workout.load);
-  const baseline =
-    completedLoads.length > 0
-      ? completedLoads.reduce((sum, load) => sum + load, 0) / completedLoads.length
-      : 0;
-  const deltaPct = baseline ? Math.round(((recentLoad - baseline) / baseline) * 100) : 0;
+  const riskTone = toneForRiskState(analytics.overallRiskState);
+  const heatmap = buildMuscleRegionRisks(metricSets, now, analytics.baselineReady);
   const lastWorkout = sessions[0] ?? null;
   const lastWorkoutLoad = lastWorkout
     ? lastWorkout.sets.reduce((sum, set) => sum + setLoad(set), 0)
@@ -224,27 +213,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const selectedWorkoutName = selectedWorkout
     ? cleanWorkoutName(selectedWorkout.note) ?? "Untitled workout"
     : "No completed workout";
-  const selectedRiskScore = selectedRiskSignal?.score ?? 20;
-  const selectedBaselineLoads = sessionLoads
-    .filter((workout) => workout.id !== selectedWorkout?.id && workout.load > 0)
-    .map((workout) => workout.load)
-    .slice(0, 7);
-  const selectedBaseline =
-    selectedBaselineLoads.length > 0
-      ? selectedBaselineLoads.reduce((sum, load) => sum + load, 0) / selectedBaselineLoads.length
-      : 0;
-  const selectedDeltaPct =
-    selectedSummary && selectedBaselineReadiness.isReady && selectedBaseline
-      ? Math.round(((selectedSummary.sessionLoad - selectedBaseline) / selectedBaseline) * 100)
-      : 0;
-  const selectedLoadTone =
-    !selectedBaselineReadiness.isReady || !selectedBaseline
-      ? "neutral"
-      : selectedDeltaPct >= 20
-      ? "danger"
-      : selectedDeltaPct >= 12
-      ? "watch"
-      : "safe";
+  const selectedLoadTone = selectedAnalytics
+    ? toneForRiskState(selectedAnalytics.overallRiskState)
+    : "neutral";
 
   return (
     <PageShell>
@@ -288,18 +259,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           badgeTone={lastWorkout ? "safe" : "neutral"}
           subline={lastWorkout ? `${formatLoad(lastWorkoutLoad) ?? "0"} load` : "Create a workout to begin tracking."}
           progress={
-            lastWorkout && baselineReadiness.isReady && baseline
-              ? Math.min(100, Math.max(8, (lastWorkoutLoad / baseline) * 50))
+            lastWorkout && analytics.baselineReady && analytics.baselineLoad
+              ? Math.min(100, Math.max(8, (lastWorkoutLoad / analytics.baselineLoad) * 50))
               : 8
           }
         />
 
         <MetricCard
           eyebrow="Risk status"
-          title={riskSignal.stateLabel}
+          title={riskStateLabel(analytics.overallRiskState)}
           actions={
             <StatusChip
-              label={`${riskSignal.score} / 100`}
+              label={analytics.riskScore === null ? "-" : `${analytics.riskScore} / 100`}
               tone={riskTone}
               showDot={false}
             />
@@ -308,14 +279,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <div className="space-y-3">
             <div className="flex items-end gap-2">
               <div className="text-4xl font-semibold tracking-tight lab-num text-white/95">
-                {riskSignal.score}
+                {analytics.riskScore === null ? "-" : analytics.riskScore}
               </div>
-              <div className="pb-1 text-sm lab-muted">/ 100</div>
+              {analytics.riskScore === null ? null : <div className="pb-1 text-sm lab-muted">/ 100</div>}
             </div>
             <div className="text-sm font-medium text-white/90">
-              Top driver: {riskSignal.topDriver}
+              Top driver: {analytics.topDriver}
             </div>
-            <p className="text-xs leading-5 lab-muted">{riskSignal.interpretation}</p>
+            <p className="text-xs leading-5 lab-muted">{analytics.interpretation}</p>
             <Link
               href="/info"
               className="inline-flex rounded-full border border-emerald-400/25 px-3 py-1 text-xs font-medium text-emerald-200 transition hover:border-emerald-300/45 hover:text-emerald-100"
@@ -327,23 +298,23 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         <KpiCard
           title="7-day load"
-          value={formatLoad(recentLoad) ?? "0"}
-          badge={baselineReadiness.isReady && baseline ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "Baseline"}
-          badgeTone={!baselineReadiness.isReady || !baseline ? "neutral" : deltaPct >= 20 ? "danger" : deltaPct >= 12 ? "watch" : "safe"}
+          value={formatLoad(analytics.sevenDayLoad) ?? "0"}
+          badge={analytics.baselineReady ? formatChangePct(analytics.wowChangePct) : "Baseline pending"}
+          badgeTone={!analytics.baselineReady ? "neutral" : analytics.overallRiskState === "High" ? "danger" : analytics.overallRiskState === "Monitor" ? "watch" : "safe"}
           subline={
-            baselineReadiness.isReady && baseline
-              ? "Compared with session baseline."
-              : "Log 3 workouts across 7+ days to establish a baseline."
+            analytics.baselineReady
+              ? "Compared with workload baseline."
+              : analytics.baselineReason
           }
-          progress={baselineReadiness.isReady && baseline ? Math.min(100, Math.max(8, (recentLoad / baseline) * 50)) : 8}
+          progress={analytics.baselineReady && analytics.baselineLoad ? Math.min(100, Math.max(8, (analytics.sevenDayLoad / analytics.baselineLoad) * 50)) : 8}
         />
       </section>
 
       <LoadPanel
-        recentLoad={recentLoad}
-        baseline={baseline}
-        deltaPct={deltaPct}
-        baselineReady={baselineReadiness.isReady}
+        recentLoad={analytics.sevenDayLoad}
+        baseline={analytics.baselineLoad}
+        deltaPct={analytics.wowChangePct}
+        baselineReady={analytics.baselineReady}
       />
 
       <MetricCard
@@ -368,9 +339,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 label="Session load"
                 value={formatLoad(selectedSummary.sessionLoad) ?? "0"}
                 subline={
-                  selectedBaselineReadiness.isReady && selectedBaseline
-                    ? `${selectedDeltaPct >= 0 ? "+" : ""}${selectedDeltaPct}% vs recent baseline`
-                    : "Baseline pending"
+                  selectedAnalytics?.baselineReady
+                    ? `${formatChangePct(selectedAnalytics.wowChangePct)} vs baseline`
+                    : "This workout contributes to baseline formation."
                 }
               />
               <AnalysisMetric label="Sets" value={String(selectedSummary.setCount)} />
@@ -396,13 +367,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <div className="text-sm font-medium text-white/90">Load and effort signals</div>
                   <StatusChip
                     label={
-                      !selectedBaselineReadiness.isReady || !selectedBaseline
+                      !selectedAnalytics?.baselineReady
                         ? "Baseline pending"
-                        : selectedDeltaPct >= 20
-                        ? "Load spike"
-                        : selectedDeltaPct >= 12
-                        ? "Above baseline"
-                        : "In range"
+                        : riskStateLabel(selectedAnalytics.overallRiskState)
                     }
                     tone={selectedLoadTone}
                   />
@@ -411,7 +378,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <div>
                     <div className="text-xs lab-muted">Recent baseline</div>
                     <div className="mt-1 text-sm font-semibold lab-num text-white/90">
-                      {selectedBaselineReadiness.isReady && selectedBaseline ? formatLoad(selectedBaseline) ?? "0" : "-"}
+                      {selectedAnalytics?.baselineReady && selectedAnalytics.baselineLoad ? formatLoad(selectedAnalytics.baselineLoad) ?? "0" : "-"}
                     </div>
                   </div>
                   <div>
@@ -429,17 +396,23 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <div>
                     <div className="text-xs lab-muted">Risk score</div>
                     <div className="mt-1 text-sm font-semibold lab-num text-white/90">
-                      {selectedRiskScore}/100
+                      {selectedAnalytics?.riskScore === null || !selectedAnalytics ? "-" : `${selectedAnalytics.riskScore}/100`}
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                <RiskMeter score={selectedRiskScore} />
+                {selectedAnalytics?.riskScore === null || !selectedAnalytics ? (
+                  <div className="grid h-24 w-24 place-items-center rounded-full border border-white/10 bg-white/[0.03] text-2xl font-semibold lab-num text-white/70">
+                    -
+                  </div>
+                ) : (
+                  <RiskMeter score={selectedAnalytics.riskScore} />
+                )}
                 <div className="mt-3 text-xs lab-muted">Selected workout risk</div>
                 <div className="mt-2 text-sm leading-5 text-white/80">
-                  {selectedRiskSignal?.topDriver ?? "No selected workout risk signal."}
+                  {selectedAnalytics?.topDriver ?? "No selected workout risk signal."}
                 </div>
               </div>
             </div>
@@ -448,23 +421,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm font-medium text-white/90">Selected workout risk signal</div>
                 <StatusChip
-                  label={selectedRiskSignal?.stateLabel ?? "Stable"}
-                  tone={
-                    selectedRiskSignal?.state === "high"
-                      ? "danger"
-                      : selectedRiskSignal?.state === "monitor"
-                      ? "watch"
-                      : selectedRiskSignal?.state === "baseline"
-                      ? "neutral"
-                      : "safe"
-                  }
+                  label={selectedAnalytics ? riskStateLabel(selectedAnalytics.overallRiskState) : "Stable"}
+                  tone={selectedAnalytics ? toneForRiskState(selectedAnalytics.overallRiskState) : "safe"}
                 />
               </div>
               <div className="mt-3 text-sm text-white/85">
-                Top driver: {selectedRiskSignal?.topDriver ?? "No saved workouts in this window"}
+                Top driver: {selectedAnalytics?.topDriver ?? "No saved workouts in this window"}
               </div>
               <p className="mt-2 text-xs leading-5 lab-muted">
-                Uses the same deterministic workload signal as the dashboard Risk Status.
+                {selectedAnalytics?.baselineReady
+                  ? "Uses the same deterministic workload signal as the dashboard Risk Status."
+                  : "This workout contributes to baseline formation."}
               </p>
             </div>
           </>
