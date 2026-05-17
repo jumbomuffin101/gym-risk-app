@@ -77,6 +77,8 @@ export type AnalyticsRiskState = "Baseline" | "Stable" | "Monitor" | "High";
 export type DashboardAnalytics = {
   baselineReady: boolean;
   baselineReason: string;
+  baselineWorkoutCount: number;
+  baselineSpanDays: number;
   overallRiskState: AnalyticsRiskState;
   riskScore: number | null;
   topDriver: string;
@@ -114,31 +116,50 @@ const ALL_REGIONS = Object.keys(MUSCLE_REGION_LABELS) as MuscleRegionId[];
 const EXERCISE_REGION_MAP: Record<string, MuscleRegionId[]> = {
   "bench press": ["chest", "frontDelts", "triceps"],
   "incline bench press": ["chest", "frontDelts", "triceps"],
+  "incline bench": ["chest", "frontDelts", "triceps"],
   "dumbbell bench press": ["chest", "frontDelts", "triceps"],
+  "db bench press": ["chest", "frontDelts", "triceps"],
   dips: ["chest", "frontDelts", "triceps"],
   "push up": ["chest", "frontDelts", "triceps"],
   "overhead press": ["frontDelts", "triceps"],
   "shoulder press": ["frontDelts", "triceps"],
+  "seated db press": ["frontDelts", "triceps"],
+  "seated dumbbell press": ["frontDelts", "triceps"],
+  "arnold press": ["frontDelts", "triceps"],
   "front raise": ["frontDelts"],
   "lateral raise": ["frontDelts"],
-  "back squat": ["quads", "glutes", "knees"],
-  "front squat": ["quads", "glutes", "knees"],
-  "goblet squat": ["quads", "glutes", "knees"],
+  "back squat": ["quads", "glutes", "lowerBack", "knees"],
+  "front squat": ["quads", "glutes", "lowerBack", "knees"],
+  "high bar squat": ["quads", "glutes", "lowerBack", "knees"],
+  "low bar squat": ["quads", "glutes", "lowerBack", "knees"],
+  "goblet squat": ["quads", "glutes", "lowerBack", "knees"],
   "leg press": ["quads", "glutes", "knees"],
+  "leg extension": ["quads"],
   "walking lunge": ["quads", "glutes", "knees"],
+  lunge: ["quads", "glutes", "knees"],
+  lunges: ["quads", "glutes", "knees"],
   "bulgarian split squat": ["quads", "glutes", "knees"],
   deadlift: ["hamstrings", "glutes", "lowerBack"],
   "romanian deadlift": ["hamstrings", "glutes", "lowerBack"],
+  "stiff leg deadlift": ["hamstrings", "glutes", "lowerBack"],
+  "stiff legged deadlift": ["hamstrings", "glutes", "lowerBack"],
   "good morning": ["hamstrings", "glutes", "lowerBack"],
   "hip thrust": ["glutes", "hamstrings"],
   "back extension": ["lowerBack", "glutes", "hamstrings"],
+  "seated leg curl": ["hamstrings"],
+  "lying leg curl": ["hamstrings"],
+  "hamstring curl": ["hamstrings"],
+  "nordic curl": ["hamstrings"],
+  "glute ham raise": ["hamstrings", "glutes"],
   "pull up": ["upperBack", "lats", "biceps"],
+  "chin up": ["upperBack", "lats", "biceps"],
   "lat pulldown": ["upperBack", "lats", "biceps"],
   "barbell row": ["upperBack", "lats", "biceps"],
   "dumbbell row": ["upperBack", "lats", "biceps"],
   "seated cable row": ["upperBack", "lats", "biceps"],
   "face pull": ["upperBack", "rearDelts"],
   "rear delt fly": ["rearDelts", "upperBack"],
+  "reverse pec deck": ["rearDelts", "upperBack"],
   "reverse fly": ["rearDelts", "upperBack"],
   "bicep curl": ["biceps"],
   "hammer curl": ["biceps"],
@@ -147,18 +168,60 @@ const EXERCISE_REGION_MAP: Record<string, MuscleRegionId[]> = {
   plank: ["absCore"],
   "hanging leg raise": ["absCore"],
   "cable crunch": ["absCore"],
+  "ab wheel": ["absCore"],
   "standing calf raise": ["calves"],
   "seated calf raise": ["calves"],
+  "calf raise": ["calves"],
 };
 
 const CATEGORY_REGION_MAP: Record<string, MuscleRegionId[]> = {
-  squat: ["quads", "glutes", "knees"],
+  squat: ["quads", "glutes", "lowerBack", "knees"],
   hinge: ["hamstrings", "glutes", "lowerBack"],
   push: ["chest", "frontDelts", "triceps"],
   pull: ["upperBack", "lats", "biceps", "rearDelts"],
+  arms: ["biceps", "triceps"],
   core: ["absCore"],
   calves: ["calves"],
 };
+
+const EXERCISE_REGION_RULES: { includes: string[]; regions: MuscleRegionId[] }[] = [
+  { includes: ["leg extension"], regions: ["quads"] },
+  { includes: ["seated leg curl"], regions: ["hamstrings"] },
+  { includes: ["lying leg curl"], regions: ["hamstrings"] },
+  { includes: ["hamstring curl"], regions: ["hamstrings"] },
+  { includes: ["nordic curl"], regions: ["hamstrings"] },
+  { includes: ["glute ham raise"], regions: ["hamstrings", "glutes"] },
+  { includes: ["bulgarian split squat"], regions: ["quads", "glutes", "knees"] },
+  { includes: ["leg press"], regions: ["quads", "glutes", "knees"] },
+  { includes: ["squat"], regions: ["quads", "glutes", "lowerBack", "knees"] },
+  { includes: ["lunge"], regions: ["quads", "glutes", "knees"] },
+  { includes: ["incline", "bench"], regions: ["chest", "frontDelts", "triceps"] },
+  { includes: ["dumbbell", "bench"], regions: ["chest", "frontDelts", "triceps"] },
+  { includes: ["bench"], regions: ["chest", "frontDelts", "triceps"] },
+  { includes: ["dip"], regions: ["chest", "frontDelts", "triceps"] },
+  { includes: ["overhead press"], regions: ["frontDelts", "triceps"] },
+  { includes: ["shoulder press"], regions: ["frontDelts", "triceps"] },
+  { includes: ["seated", "press"], regions: ["frontDelts", "triceps"] },
+  { includes: ["arnold press"], regions: ["frontDelts", "triceps"] },
+  { includes: ["lateral raise"], regions: ["frontDelts"] },
+  { includes: ["rear delt"], regions: ["rearDelts", "upperBack"] },
+  { includes: ["reverse pec deck"], regions: ["rearDelts", "upperBack"] },
+  { includes: ["face pull"], regions: ["rearDelts", "upperBack"] },
+  { includes: ["lat pulldown"], regions: ["lats", "upperBack", "biceps"] },
+  { includes: ["pull up"], regions: ["lats", "upperBack", "biceps"] },
+  { includes: ["chin up"], regions: ["lats", "upperBack", "biceps"] },
+  { includes: ["row"], regions: ["upperBack", "lats", "biceps"] },
+  { includes: ["romanian deadlift"], regions: ["hamstrings", "glutes", "lowerBack"] },
+  { includes: ["stiff leg deadlift"], regions: ["hamstrings", "glutes", "lowerBack"] },
+  { includes: ["deadlift"], regions: ["hamstrings", "glutes", "lowerBack"] },
+  { includes: ["good morning"], regions: ["hamstrings", "glutes", "lowerBack"] },
+  { includes: ["hip thrust"], regions: ["glutes", "hamstrings"] },
+  { includes: ["calf raise"], regions: ["calves"] },
+  { includes: ["cable crunch"], regions: ["absCore"] },
+  { includes: ["hanging leg raise"], regions: ["absCore"] },
+  { includes: ["ab wheel"], regions: ["absCore"] },
+  { includes: ["plank"], regions: ["absCore"] },
+];
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -169,8 +232,14 @@ function normalizeExerciseName(name: string) {
 }
 
 export function regionsForExercise(name: string, category: string | null) {
-  const exact = EXERCISE_REGION_MAP[normalizeExerciseName(name)];
+  const normalized = normalizeExerciseName(name);
+  const exact = EXERCISE_REGION_MAP[normalized];
   if (exact) return exact;
+
+  const rule = EXERCISE_REGION_RULES.find(({ includes }) =>
+    includes.every((term) => normalized.includes(term))
+  );
+  if (rule) return rule.regions;
 
   const categoryRegions = category ? CATEGORY_REGION_MAP[category.toLowerCase()] : undefined;
   return categoryRegions ?? [];
@@ -197,10 +266,8 @@ export function getBaselineReadiness(
   workouts: BaselineWorkout[],
   asOf = new Date()
 ): BaselineReadiness {
-  const asOfTime = asOf.getTime();
-  const completed = workouts
-    .map((workout) => workout.endedAt ?? workout.startedAt)
-    .filter((date) => date.getTime() <= asOfTime)
+  const completed = getCompletedWorkouts(workouts, asOf)
+    .map((workout) => workout.startedAt)
     .sort((a, b) => a.getTime() - b.getTime());
 
   const firstWorkoutAt = completed[0] ?? null;
@@ -217,6 +284,41 @@ export function getBaselineReadiness(
     firstWorkoutAt,
     latestWorkoutAt,
   };
+}
+
+export function getCompletedWorkouts(workouts: BaselineWorkout[], asOf = new Date()) {
+  const asOfTime = asOf.getTime();
+
+  return workouts.filter((workout) => workout.startedAt.getTime() <= asOfTime);
+}
+
+export function isBaselineReady(workouts: BaselineWorkout[], asOf = new Date()) {
+  return getBaselineReadiness(workouts, asOf).isReady;
+}
+
+export function computeWorkoutLoad(sets: DashboardMetricSet[]) {
+  return sets.reduce((sum, set) => sum + workload(set), 0);
+}
+
+export function computeSevenDayLoad(sets: DashboardMetricSet[], now = new Date()) {
+  const acuteStart = new Date(now.getTime() - 7 * DAY_MS);
+  return computeWorkoutLoad(sets.filter((set) => inWindow(set.performedAt, acuteStart, now)));
+}
+
+export function computePriorWeekLoad(sets: DashboardMetricSet[], now = new Date()) {
+  const acuteStart = new Date(now.getTime() - 7 * DAY_MS);
+  const priorStart = new Date(now.getTime() - 14 * DAY_MS);
+  return computeWorkoutLoad(sets.filter((set) => inWindow(set.performedAt, priorStart, acuteStart)));
+}
+
+export function computeBaselineLoad(sets: DashboardMetricSet[], now = new Date()) {
+  const acuteStart = new Date(now.getTime() - 7 * DAY_MS);
+  const chronicStart = new Date(now.getTime() - 35 * DAY_MS);
+  const chronicLoad = computeWorkoutLoad(
+    sets.filter((set) => inWindow(set.performedAt, chronicStart, acuteStart))
+  );
+
+  return chronicLoad > 0 ? chronicLoad / 4 : null;
 }
 
 function emptyRegion(id: MuscleRegionId, hasCompletedSets: boolean): RegionRisk {
@@ -245,7 +347,7 @@ export function buildMuscleRegionRisks(
   baselineReady = true
 ): RegionRisk[] {
   const recentStart = new Date(now.getTime() - 7 * DAY_MS);
-  const priorStart = new Date(now.getTime() - 14 * DAY_MS);
+  const baselineStart = new Date(now.getTime() - 35 * DAY_MS);
   const hasCompletedSets = sets.length > 0;
 
   const stats = new Map<
@@ -283,10 +385,11 @@ export function buildMuscleRegionRisks(
     if (regions.length === 0) continue;
 
     const isRecent = inWindow(set.performedAt, recentStart, now);
-    const isPrior = inWindow(set.performedAt, priorStart, recentStart);
-    if (!isRecent && !isPrior) continue;
+    const isBaseline = inWindow(set.performedAt, baselineStart, recentStart);
+    if (!isRecent && !isBaseline) continue;
 
-    const setLoad = tonnage(set);
+    // Split set tonnage evenly so multi-region exercises do not double-count load.
+    const setLoad = tonnage(set) / regions.length;
     for (const region of regions) {
       const regionStats = ensure(region);
       if (isRecent) {
@@ -300,7 +403,7 @@ export function buildMuscleRegionRisks(
           (regionStats.exerciseLoads.get(set.exercise.name) ?? 0) + setLoad
         );
       }
-      if (isPrior) {
+      if (isBaseline) {
         regionStats.baselineLoad += setLoad;
       }
     }
@@ -310,9 +413,10 @@ export function buildMuscleRegionRisks(
     const regionStats = stats.get(id);
     if (!regionStats) return emptyRegion(id, hasCompletedSets);
 
-    const hasRegionalBaseline = baselineReady && regionStats.baselineLoad > 0;
+    const weeklyBaselineLoad = regionStats.baselineLoad > 0 ? regionStats.baselineLoad / 4 : 0;
+    const hasRegionalBaseline = baselineReady && weeklyBaselineLoad > 0;
     const changePct = hasRegionalBaseline
-      ? ((regionStats.currentLoad - regionStats.baselineLoad) / regionStats.baselineLoad) * 100
+      ? ((regionStats.currentLoad - weeklyBaselineLoad) / weeklyBaselineLoad) * 100
       : null;
     const painSignal = regionStats.painFlagCount > 0;
     const severePainSignal = regionStats.maxPain >= 9 || regionStats.painFlagCount >= 5;
@@ -378,7 +482,7 @@ export function buildMuscleRegionRisks(
       name: MUSCLE_REGION_LABELS[id],
       state,
       currentLoad: regionStats.currentLoad,
-      baselineLoad: hasRegionalBaseline ? regionStats.baselineLoad : null,
+      baselineLoad: hasRegionalBaseline ? weeklyBaselineLoad : null,
       changePct,
       highRpeSetCount: regionStats.highRpeSetCount,
       painFlagCount: regionStats.painFlagCount,
@@ -550,23 +654,18 @@ export function computeDashboardRiskSignal(
   now = new Date(),
   baselineReady = true
 ): DashboardRiskSignal {
+  // Date windows are based on SetEntry.performedAt, which the workout builder saves
+  // from WorkoutSession.startedAt. Current 7 days are acute load; 7-14 days ago
+  // are the WoW comparison; 7-35 days ago form the chronic weekly baseline.
   const acuteStart = new Date(now.getTime() - 7 * DAY_MS);
-  const priorStart = new Date(now.getTime() - 14 * DAY_MS);
-  const chronicStart = new Date(now.getTime() - 35 * DAY_MS);
-
   const acuteSets = sets.filter((set) => inWindow(set.performedAt, acuteStart, now));
-  const priorWeekSets = sets.filter((set) => inWindow(set.performedAt, priorStart, acuteStart));
-  const chronicSets = sets.filter((set) => inWindow(set.performedAt, chronicStart, acuteStart));
 
   const painFlagSets = acuteSets.filter((set) => (set.pain ?? 0) >= 7);
 
   return scoreWorkloadRiskSignal({
-    acuteLoad: acuteSets.reduce((sum, set) => sum + workload(set), 0),
-    priorWeekLoad: priorWeekSets.reduce((sum, set) => sum + workload(set), 0),
-    chronicWeeklyLoad:
-      chronicSets.length > 0
-        ? chronicSets.reduce((sum, set) => sum + workload(set), 0) / 4
-        : null,
+    acuteLoad: computeSevenDayLoad(sets, now),
+    priorWeekLoad: computePriorWeekLoad(sets, now),
+    chronicWeeklyLoad: computeBaselineLoad(sets, now),
     highRpeSetCount: acuteSets.filter((set) => (set.rpe ?? 0) >= 9).length,
     painFlagCount: painFlagSets.length,
     maxPain: painFlagSets.reduce((max, set) => Math.max(max, set.pain ?? 0), 0),
@@ -588,6 +687,8 @@ export function buildDashboardAnalytics(
     baselineReason: baseline.isReady
       ? "Baseline established."
       : "Log at least 3 workouts across 7+ days.",
+    baselineWorkoutCount: baseline.workoutCount,
+    baselineSpanDays: baseline.spanDays,
     overallRiskState: analyticsState(riskSignal.state),
     riskScore: baseline.isReady ? riskSignal.score : null,
     topDriver:

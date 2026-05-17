@@ -10,6 +10,7 @@ import {
   buildMuscleRegionRisks,
   buildDashboardAnalytics,
   type AnalyticsRiskState,
+  type DashboardAnalytics,
 } from "@/app/lib/dashboardRisk";
 import { cleanWorkoutName, formatLoad, setLoad, summarizeWorkoutSets } from "@/app/lib/workouts";
 
@@ -37,6 +38,15 @@ type DashboardRiskReason = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+type RiskFeedTone = "safe" | "watch" | "danger" | "neutral";
+
+type RiskFeedEvent = {
+  id: string;
+  title: string;
+  meta: string;
+  badgeLabel: string;
+  tone: RiskFeedTone;
+};
 
 function cleanDisplayText(value: string) {
   return value
@@ -76,6 +86,77 @@ function riskStateLabel(state: AnalyticsRiskState) {
 function formatChangePct(value: number | null) {
   if (value === null) return "Baseline pending";
   return `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
+}
+
+function riskFeedTone(score: number): RiskFeedTone {
+  if (score >= 70) return "danger";
+  if (score >= 40) return "watch";
+  return "safe";
+}
+
+function riskFeedLabel(score: number) {
+  if (score >= 70) return "High";
+  if (score >= 40) return "Monitor";
+  return "Stable";
+}
+
+function riskReasonGroupKey(reason: DashboardRiskReason) {
+  const day = reason.startedAt.toISOString().slice(0, 10);
+  const kind = reason.kind.startsWith("rpe")
+    ? "rpe"
+    : reason.kind.startsWith("pain")
+    ? "pain"
+    : reason.kind.startsWith("workload")
+    ? "workload"
+    : reason.kind;
+  const category =
+    typeof reason.details.category === "string" ? reason.details.category : "overall";
+
+  return `${day}-${kind}-${category}`;
+}
+
+function buildRiskFeedEvents(
+  reasons: DashboardRiskReason[],
+  analytics: DashboardAnalytics
+): RiskFeedEvent[] {
+  const events: RiskFeedEvent[] = [];
+
+  if (!analytics.baselineReady) {
+    const days = Math.floor(analytics.baselineSpanDays);
+    events.push({
+      id: "baseline-building",
+      title: `Baseline building: ${analytics.baselineWorkoutCount} workout${
+        analytics.baselineWorkoutCount === 1 ? "" : "s"
+      } logged across ${days} day${days === 1 ? "" : "s"}`,
+      meta: analytics.baselineReason,
+      badgeLabel: "Baseline",
+      tone: "neutral",
+    });
+  }
+
+  const grouped = new Map<string, DashboardRiskReason>();
+  for (const reason of reasons.sort((a, b) => b.score - a.score)) {
+    const key = riskReasonGroupKey(reason);
+    const existing = grouped.get(key);
+    if (!existing || reason.score > existing.score) grouped.set(key, reason);
+  }
+
+  const remainingSlots = Math.max(0, 5 - events.length);
+  const reasonEvents = Array.from(grouped.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, remainingSlots)
+    .map((reason) => ({
+      id: `${reason.sessionId}-${reason.kind}-${reason.startedAt.toISOString()}`,
+      title: cleanDisplayText(reason.title),
+      meta: new Date(reason.startedAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      }),
+      badgeLabel: riskFeedLabel(reason.score),
+      tone: riskFeedTone(reason.score),
+    }));
+
+  return [...events, ...reasonEvents];
 }
 
 function AnalysisMetric({
@@ -179,7 +260,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       },
     }),
     Promise.all(
-      sessions.slice(0, 4).map(async (workout) => {
+      sessions.slice(0, 5).map(async (workout) => {
         const reasons = await computeSessionRisk(userId, workout.id);
         return reasons.map((reason) => ({
           ...reason,
@@ -192,10 +273,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const recentRiskReasons: DashboardRiskReason[] = recentRiskReasonGroups
     .flat()
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 4);
+    .sort((a, b) => b.score - a.score);
 
   const analytics = buildDashboardAnalytics(metricSets, baselineWorkouts, now);
+  const riskFeedEvents = buildRiskFeedEvents(recentRiskReasons, analytics);
   const selectedAnalytics = selectedWorkout
     ? buildDashboardAnalytics(metricSets, baselineWorkouts, selectedRiskAnchor)
     : null;
@@ -496,10 +577,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <LabCard className="rounded-2xl p-5">
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-white/90">Risk feed</div>
-            <div className="text-xs lab-muted">{recentRiskReasons.length} events</div>
+            <div className="text-xs lab-muted">{riskFeedEvents.length} events</div>
           </div>
 
-          {recentRiskReasons.length === 0 ? (
+          {riskFeedEvents.length === 0 ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
               <div className="text-sm text-white/85">No risk events</div>
               <div className="mt-1 text-xs lab-muted">
@@ -508,21 +589,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
           ) : (
             <div className="mt-4 space-y-2">
-              {recentRiskReasons.map((reason, index) => (
-                <div key={`${reason.sessionId}-${reason.kind}-${index}`} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+              {riskFeedEvents.map((event) => (
+                <div key={event.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-sm font-medium text-white/90">{cleanDisplayText(reason.title)}</div>
-                      <div className="mt-1 text-xs lab-muted">
-                        {new Date(reason.startedAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </div>
+                      <div className="text-sm font-medium text-white/90">{event.title}</div>
+                      <div className="mt-1 text-xs lab-muted">{event.meta}</div>
                     </div>
                     <StatusChip
-                      label={`${reason.score}`}
-                      tone={reason.score >= 70 ? "danger" : reason.score >= 40 ? "watch" : "safe"}
+                      label={event.badgeLabel}
+                      tone={event.tone}
                       showDot={false}
                     />
                   </div>
