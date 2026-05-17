@@ -29,6 +29,40 @@ type PreviousWorkout = {
   exercises: BuilderExercise[];
 };
 
+type WorkoutBuilderCopy = {
+  libraryLabel?: string;
+  libraryPlaceholder?: string;
+  builderEyebrow?: string;
+  builderTitle?: string;
+  saveLabel?: string;
+  savingLabel?: string;
+  workoutDateHelper?: string;
+  previousLabel?: string;
+  previousEmptyLabel?: string;
+  previousSelectLabel?: string;
+  previousUseLabel?: string;
+  previousConfirm?: string;
+  emptyMessage?: string;
+  redirectTo?: "/dashboard" | "/workouts" | "/log";
+};
+
+const defaultCopy: Required<WorkoutBuilderCopy> = {
+  libraryLabel: "Exercise library",
+  libraryPlaceholder: "Search exercises",
+  builderEyebrow: "Workout log",
+  builderTitle: "Log completed training",
+  saveLabel: "Save log",
+  savingLabel: "Saving...",
+  workoutDateHelper: "Used for workload windows and baseline calculations.",
+  previousLabel: "Log from previous workout",
+  previousEmptyLabel: "No previous workouts",
+  previousSelectLabel: "Select workout",
+  previousUseLabel: "Use",
+  previousConfirm: "Replace the current log with this previous workout?",
+  emptyMessage: "Select exercises from the library or use a previous workout to log training.",
+  redirectTo: "/dashboard",
+};
+
 function newSet(values?: Partial<Omit<BuilderSet, "id">>): BuilderSet {
   return {
     id: crypto.randomUUID(),
@@ -53,10 +87,13 @@ function formatDateTimeLocal(date: Date) {
 export function WorkoutBuilder({
   exercises,
   previousWorkouts,
+  copy,
 }: {
   exercises: ExerciseOption[];
   previousWorkouts: PreviousWorkout[];
+  copy?: WorkoutBuilderCopy;
 }) {
+  const ui = { ...defaultCopy, ...copy };
   const [query, setQuery] = useState("");
   const [workoutName, setWorkoutName] = useState("");
   const [workoutDate, setWorkoutDate] = useState(() => formatDateTimeLocal(new Date()));
@@ -148,7 +185,7 @@ export function WorkoutBuilder({
     if (!workout) return;
 
     const hasCurrentWork = selected.length > 0 || workoutName.trim().length > 0;
-    if (hasCurrentWork && !window.confirm("Replace the current workout builder with this previous workout?")) {
+    if (hasCurrentWork && !window.confirm(ui.previousConfirm)) {
       return;
     }
 
@@ -176,6 +213,7 @@ export function WorkoutBuilder({
       const result = await saveWorkoutBuilderAction({
         workoutName,
         workoutDate,
+        redirectTo: ui.redirectTo,
         exercises: selected.map((exercise) => ({
           exerciseId: exercise.id,
           sets: exercise.sets.map((set) => ({
@@ -197,11 +235,11 @@ export function WorkoutBuilder({
     <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
       <section className="lab-card rounded-2xl p-5">
         <label className="block">
-          <span className="text-xs uppercase tracking-wide lab-muted">Exercise library</span>
+          <span className="text-xs uppercase tracking-wide lab-muted">{ui.libraryLabel}</span>
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search exercises"
+            placeholder={ui.libraryPlaceholder}
             className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
           />
         </label>
@@ -237,9 +275,9 @@ export function WorkoutBuilder({
       <section className="lab-card rounded-2xl p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <div className="text-xs uppercase tracking-wide lab-muted">Workout builder</div>
+            <div className="text-xs uppercase tracking-wide lab-muted">{ui.builderEyebrow}</div>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-white/95">
-              Selected exercises
+              {ui.builderTitle}
             </h2>
           </div>
 
@@ -249,7 +287,7 @@ export function WorkoutBuilder({
             disabled={pending || selected.length === 0}
             className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {pending ? "Saving..." : "Save workout"}
+            {pending ? ui.savingLabel : ui.saveLabel}
           </button>
         </div>
 
@@ -275,12 +313,12 @@ export function WorkoutBuilder({
               className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
             />
             <span className="mt-2 block text-xs lab-muted">
-              Used for workload windows and baseline calculations.
+              {ui.workoutDateHelper}
             </span>
           </label>
 
           <label className="block">
-            <span className="text-xs uppercase tracking-wide lab-muted">Use previous workout</span>
+            <span className="text-xs uppercase tracking-wide lab-muted">{ui.previousLabel}</span>
             <div className="mt-2 flex gap-2">
               <select
                 value={previousWorkoutId}
@@ -289,7 +327,7 @@ export function WorkoutBuilder({
                 className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0f1722] px-3 py-3 text-sm text-white/90 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:border-[rgba(34,197,94,0.35)]"
               >
                 <option value="">
-                  {previousWorkouts.length === 0 ? "No previous workouts" : "Select workout"}
+                  {previousWorkouts.length === 0 ? ui.previousEmptyLabel : ui.previousSelectLabel}
                 </option>
                 {previousWorkouts.map((workout) => (
                   <option key={workout.id} value={workout.id}>
@@ -303,7 +341,7 @@ export function WorkoutBuilder({
                 disabled={!previousWorkoutId}
                 className="rounded-xl border border-white/10 px-4 py-2 text-sm text-white/75 hover:bg-white/[0.04] hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Use
+                {ui.previousUseLabel}
               </button>
             </div>
           </label>
@@ -317,7 +355,7 @@ export function WorkoutBuilder({
 
         {selected.length === 0 ? (
           <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.02] p-5 text-sm lab-muted">
-            Select exercises from the library to build a workout.
+            {ui.emptyMessage}
           </div>
         ) : (
           <div className="mt-5 space-y-4">

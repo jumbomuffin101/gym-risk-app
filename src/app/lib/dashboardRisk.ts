@@ -262,6 +262,18 @@ function formatPct(value: number) {
   return `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
 }
 
+function formatBaselineReason(readiness: BaselineReadiness) {
+  if (readiness.isReady) return "Baseline established.";
+  if (readiness.workoutCount === 0) {
+    return "No workouts logged yet. Need 3 workouts across 7+ days.";
+  }
+
+  const days = Math.floor(readiness.spanDays);
+  return `${readiness.workoutCount} workout${
+    readiness.workoutCount === 1 ? "" : "s"
+  } logged across ${days} day${days === 1 ? "" : "s"}. Need 3 workouts across 7+ days.`;
+}
+
 export function getBaselineReadiness(
   workouts: BaselineWorkout[],
   asOf = new Date()
@@ -684,9 +696,7 @@ export function buildDashboardAnalytics(
 
   return {
     baselineReady: baseline.isReady,
-    baselineReason: baseline.isReady
-      ? "Baseline established."
-      : "Log at least 3 workouts across 7+ days.",
+    baselineReason: formatBaselineReason(baseline),
     baselineWorkoutCount: baseline.workoutCount,
     baselineSpanDays: baseline.spanDays,
     overallRiskState: analyticsState(riskSignal.state),
@@ -697,7 +707,9 @@ export function buildDashboardAnalytics(
         : riskSignal.topDriver,
     interpretation:
       !baseline.isReady && hasEffortOrPainSignal
-        ? "Baseline is pending, but effort or pain signals are raised."
+        ? `Baseline is pending, but effort or pain signals are raised. ${formatBaselineReason(baseline)}`
+        : !baseline.isReady
+        ? formatBaselineReason(baseline)
         : riskSignal.interpretation,
     sevenDayLoad: riskSignal.acuteLoad,
     baselineLoad: baseline.isReady ? riskSignal.chronicWeeklyLoad : null,

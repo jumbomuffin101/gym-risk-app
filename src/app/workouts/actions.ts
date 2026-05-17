@@ -26,6 +26,7 @@ const DeleteWorkoutSchema = z.object({
 function revalidateWorkoutViews(exerciseIds: string[] = []) {
   revalidatePath("/workouts");
   revalidatePath("/workouts/new");
+  revalidatePath("/log");
   revalidatePath("/dashboard");
   revalidatePath("/exercises");
 

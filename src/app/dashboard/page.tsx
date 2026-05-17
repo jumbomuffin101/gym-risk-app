@@ -236,7 +236,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const selectedWorkout =
     sessions.find((workout) => workout.id === requestedWorkoutId) ?? sessions[0] ?? null;
   const selectedRiskAnchor = selectedWorkout
-    ? new Date((selectedWorkout.endedAt ?? selectedWorkout.startedAt).getTime() + 1)
+    ? new Date(selectedWorkout.startedAt.getTime() + 60 * 1000)
     : now;
   const metricsSince = new Date(
     Math.min(now.getTime(), selectedRiskAnchor.getTime()) - 35 * DAY_MS
@@ -314,7 +314,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   </div>
                   <div className="h-4 w-px bg-white/10" />
                   <div className="text-sm lab-muted">
-                    Workout load updates after saving workouts.
+                    Workout load updates after saving logs.
                   </div>
                 </div>
               }
@@ -338,7 +338,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           }
           badge={lastWorkout ? `${lastWorkout._count.sets} sets` : "New"}
           badgeTone={lastWorkout ? "safe" : "neutral"}
-          subline={lastWorkout ? `${formatLoad(lastWorkoutLoad) ?? "0"} load` : "Create a workout to begin tracking."}
+          subline={lastWorkout ? `${formatLoad(lastWorkoutLoad) ?? "0"} load` : "Log a workout to begin tracking."}
           progress={
             lastWorkout && analytics.baselineReady && analytics.baselineLoad
               ? Math.min(100, Math.max(8, (lastWorkoutLoad / analytics.baselineLoad) * 50))
@@ -404,7 +404,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         subtitle={
           selectedWorkout
             ? `${formatWorkoutDateTime(selectedWorkout.startedAt)}. Workout-level load, risk, and effort signals.`
-            : "Save a completed workout to analyze a specific session."
+            : "Save a workout log to analyze a specific session."
         }
         actions={
           <DashboardWorkoutSelector
@@ -539,7 +539,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
               <div className="text-sm text-white/85">No workouts yet</div>
               <div className="mt-1 text-xs lab-muted">
-                Save a workout to populate your dashboard.
+                Save a workout log to populate your dashboard.
               </div>
             </div>
           ) : (

@@ -42,6 +42,7 @@ const WorkoutDateSchema = z.string().trim().min(1, "Workout date is required.").
 const SaveWorkoutSchema = z.object({
   workoutName: z.string().trim().max(120, "Workout name must be 120 characters or fewer.").optional(),
   workoutDate: WorkoutDateSchema,
+  redirectTo: z.enum(["/dashboard", "/workouts", "/log"]).optional(),
   exercises: z.array(WorkoutExerciseSchema).min(1, "Select at least one exercise."),
 });
 
@@ -100,12 +101,13 @@ export async function saveWorkoutBuilderAction(input: unknown): Promise<SaveWork
   revalidatePath("/dashboard");
   revalidatePath("/workouts");
   revalidatePath("/workouts/new");
+  revalidatePath("/log");
   revalidatePath("/exercises");
   for (const exerciseId of exerciseIds) {
     revalidatePath(`/exercises/${exerciseId}`);
   }
 
-  redirect("/workouts");
+  redirect(parsed.data.redirectTo ?? "/workouts");
 }
 
 export async function saveWorkoutAction(input: unknown): Promise<SaveWorkoutResult> {

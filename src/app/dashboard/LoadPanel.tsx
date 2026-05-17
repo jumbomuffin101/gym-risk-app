@@ -36,7 +36,7 @@ export function LoadPanel({
   return (
     <MetricCard
       title="Overall recent training load"
-      subtitle="Seven-day saved workout load compared with your workload baseline."
+      subtitle="Seven-day logged workout load compared with your workload baseline."
       actions={
         <StatusChip
           label={
@@ -93,7 +93,7 @@ export function LoadPanel({
 
         <div className="text-xs lab-muted">
           {!baselineReady || !baseline
-            ? "Log at least 3 workouts across 7+ days to establish a baseline."
+            ? "Log workouts across 7+ days to establish a baseline."
             : tone === "danger"
             ? "Recent load is materially above baseline."
             : tone === "watch"

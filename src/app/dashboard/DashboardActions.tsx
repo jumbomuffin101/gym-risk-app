@@ -7,10 +7,16 @@ export default function DashboardActions() {
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
       <Link
-        href="/workouts/new"
+        href="/log"
         className="btn-primary text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
       >
-        New workout
+        Log workout
+      </Link>
+      <Link
+        href="/workouts/new"
+        className="btn-secondary text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
+      >
+        New Workout
       </Link>
       <button
         type="button"

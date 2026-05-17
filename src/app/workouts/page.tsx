@@ -41,24 +41,29 @@ export default async function WorkoutPage() {
         <div className="mt-1 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-white/95">
-              Workout history
+              Logged workouts
             </h1>
             <p className="mt-1 text-sm lab-muted">
-              Past saved workouts, set counts, and session load.
+              Completed workout logs used for dashboard load, baseline, and risk analytics.
             </p>
           </div>
-          <Link href="/workouts/new" className="btn-primary text-sm">
-            Create workout
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/log" className="btn-primary text-sm">
+              Log workout
+            </Link>
+            <Link href="/workouts/new" className="btn-secondary text-sm">
+              New Workout
+            </Link>
+          </div>
         </div>
       </header>
 
       {workouts.length === 0 ? (
         <div className="lab-card rounded-2xl p-6">
           <div className="text-sm font-medium text-white/90">No workouts logged yet.</div>
-          <p className="mt-2 text-sm lab-muted">Create one from New Workout.</p>
-          <Link href="/workouts/new" className="btn-secondary mt-5">
-            New Workout
+          <p className="mt-2 text-sm lab-muted">Use Log to save a completed training session.</p>
+          <Link href="/log" className="btn-secondary mt-5">
+            Log workout
           </Link>
         </div>
       ) : (
