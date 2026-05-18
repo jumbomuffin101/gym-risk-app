@@ -89,3 +89,7 @@ export async function createSetEntryAction(formData: FormData) {
 
   return { ok: true as const, volume, risk: 0, label: "Logged" };
 }
+
+export async function createExerciseDetailSetEntryAction(formData: FormData) {
+  return createSetEntryAction(formData);
+}

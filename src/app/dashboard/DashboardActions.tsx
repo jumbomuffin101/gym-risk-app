@@ -18,6 +18,12 @@ export default function DashboardActions() {
       >
         New Workout
       </Link>
+      <Link
+        href="/history"
+        className="btn-secondary text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
+      >
+        History
+      </Link>
       <button
         type="button"
         onClick={() => signOut({ callbackUrl: "/" })}

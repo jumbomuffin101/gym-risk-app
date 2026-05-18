@@ -1,0 +1,4 @@
+ALTER TABLE "SetEntry"
+ADD COLUMN "durationSeconds" INTEGER,
+ADD COLUMN "distanceMeters" DOUBLE PRECISION,
+ADD COLUMN "notes" TEXT;
