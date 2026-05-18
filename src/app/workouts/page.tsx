@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { prisma } from "@/app/lib/prisma";
-import { cleanWorkoutName, formatLoad, setLoad } from "@/app/lib/workouts";
 import { WorkoutHistoryActions } from "./WorkoutHistoryActions";
 
 export const runtime = "nodejs";
@@ -10,27 +9,20 @@ export const runtime = "nodejs";
 export default async function WorkoutPage() {
   const userId = await requireDbUserId();
 
-  const workouts = await prisma.workoutSession.findMany({
-    where: {
-      userId,
-      endedAt: { not: null },
-      sets: { some: {} },
-    },
-    orderBy: { startedAt: "desc" },
+  const templates = await prisma.workoutTemplate.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
     take: 30,
     select: {
       id: true,
-      startedAt: true,
-      note: true,
-      sets: {
+      name: true,
+      updatedAt: true,
+      exercises: {
         select: {
-          exerciseId: true,
-          reps: true,
-          weight: true,
-          rpe: true,
+          sets: { select: { id: true } },
         },
       },
-      _count: { select: { sets: true } },
+      _count: { select: { exercises: true } },
     },
   });
 
@@ -41,10 +33,10 @@ export default async function WorkoutPage() {
         <div className="mt-1 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-white/95">
-              Logged workouts
+              Workout templates
             </h1>
             <p className="mt-1 text-sm lab-muted">
-              Completed workout logs used for dashboard load, baseline, and risk analytics.
+              Reusable workout plans you can log from the Log tab.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -58,22 +50,19 @@ export default async function WorkoutPage() {
         </div>
       </header>
 
-      {workouts.length === 0 ? (
+      {templates.length === 0 ? (
         <div className="lab-card rounded-2xl p-6">
-          <div className="text-sm font-medium text-white/90">No workouts logged yet.</div>
-          <p className="mt-2 text-sm lab-muted">Use Log to save a completed training session.</p>
-          <Link href="/log" className="btn-secondary mt-5">
-            Log workout
+          <div className="text-sm font-medium text-white/90">No workout templates yet.</div>
+          <p className="mt-2 text-sm lab-muted">Create a reusable workout template first.</p>
+          <Link href="/workouts/new" className="btn-secondary mt-5">
+            New Workout
           </Link>
         </div>
       ) : (
         <div className="space-y-3">
-          {workouts.map((workout) => {
-            const sessionLoad = workout.sets.reduce((sum, set) => sum + setLoad(set), 0);
-            const exerciseCount = new Set(workout.sets.map((set) => set.exerciseId)).size;
-            const workoutName = cleanWorkoutName(workout.note);
-            const load = formatLoad(sessionLoad);
-            const startedAt = new Date(workout.startedAt).toLocaleString(undefined, {
+          {templates.map((template) => {
+            const setCount = template.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
+            const updatedAt = new Date(template.updatedAt).toLocaleString(undefined, {
               month: "short",
               day: "numeric",
               year: "numeric",
@@ -82,38 +71,32 @@ export default async function WorkoutPage() {
             });
 
             return (
-              <article key={workout.id} className="lab-card rounded-2xl p-5">
+              <article key={template.id} className="lab-card rounded-2xl p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-white/92">
-                      {workoutName ?? "Untitled workout"}
+                      {template.name}
                     </h2>
-                    <p className="mt-2 text-sm lab-muted">{startedAt}</p>
+                    <p className="mt-2 text-sm lab-muted">Updated {updatedAt}</p>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 text-left md:text-right">
+                  <div className="grid grid-cols-2 gap-3 text-left md:text-right">
                     <div>
-                      <div className="text-xs lab-muted">Sets</div>
+                      <div className="text-xs lab-muted">Planned sets</div>
                       <div className="mt-1 text-sm font-semibold text-white/90">
-                        {workout._count.sets}
+                        {setCount}
                       </div>
                     </div>
                     <div>
                       <div className="text-xs lab-muted">Exercises</div>
                       <div className="mt-1 text-sm font-semibold text-white/90">
-                        {exerciseCount}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs lab-muted">Load</div>
-                      <div className="mt-1 text-sm font-semibold text-white/90">
-                        {load ?? "-"}
+                        {template._count.exercises}
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="mt-4 flex justify-start md:justify-end">
-                  <WorkoutHistoryActions workoutId={workout.id} initialName={workoutName ?? ""} />
+                  <WorkoutHistoryActions workoutId={template.id} initialName={template.name} />
                 </div>
               </article>
             );

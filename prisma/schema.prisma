@@ -19,6 +19,7 @@ model User {
 
   workoutSessions WorkoutSession[]
   setEntries      SetEntry[]
+  workoutTemplates WorkoutTemplate[]
 
   passwordResetTokens PasswordResetToken[]
 }
@@ -43,7 +44,54 @@ model Exercise {
   category  String?
   createdAt DateTime @default(now())
 
-  sets SetEntry[]
+  sets              SetEntry[]
+  templateExercises WorkoutTemplateExercise[]
+}
+
+model WorkoutTemplate {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exercises WorkoutTemplateExercise[]
+
+  @@index([userId, updatedAt])
+}
+
+model WorkoutTemplateExercise {
+  id String @id @default(cuid())
+
+  templateId String
+  template   WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  order Int @default(0)
+
+  sets WorkoutTemplateSet[]
+
+  @@index([templateId])
+  @@index([exerciseId])
+}
+
+model WorkoutTemplateSet {
+  id String @id @default(cuid())
+
+  templateExerciseId String
+  templateExercise   WorkoutTemplateExercise @relation(fields: [templateExerciseId], references: [id], onDelete: Cascade)
+
+  reps   Int
+  weight Float
+  rpe    Float?
+  pain   Int?
+  order  Int    @default(0)
+
+  @@index([templateExerciseId])
 }
 
 model WorkoutSession {

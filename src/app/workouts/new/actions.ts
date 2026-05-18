@@ -46,7 +46,23 @@ const SaveWorkoutSchema = z.object({
   exercises: z.array(WorkoutExerciseSchema).min(1, "Select at least one exercise."),
 });
 
-export async function saveWorkoutBuilderAction(input: unknown): Promise<SaveWorkoutResult> {
+const SaveTemplateSchema = z.object({
+  workoutName: z.string().trim().min(1, "Workout name is required.").max(120, "Workout name must be 120 characters or fewer."),
+  redirectTo: z.enum(["/dashboard", "/workouts", "/log"]).optional(),
+  exercises: z.array(WorkoutExerciseSchema).min(1, "Select at least one exercise."),
+});
+
+async function validateExerciseIds(exerciseIds: string[]) {
+  const existingExercises = await prisma.exercise.findMany({
+    where: { id: { in: exerciseIds } },
+    select: { id: true },
+  });
+  const existingIds = new Set(existingExercises.map((exercise) => exercise.id));
+
+  return existingIds.size === exerciseIds.length;
+}
+
+export async function saveWorkoutLogAction(input: unknown): Promise<SaveWorkoutResult> {
   const parsed = SaveWorkoutSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -57,13 +73,8 @@ export async function saveWorkoutBuilderAction(input: unknown): Promise<SaveWork
 
   const userId = await requireDbUserId();
   const exerciseIds = Array.from(new Set(parsed.data.exercises.map((exercise) => exercise.exerciseId)));
-  const existingExercises = await prisma.exercise.findMany({
-    where: { id: { in: exerciseIds } },
-    select: { id: true },
-  });
-  const existingIds = new Set(existingExercises.map((exercise) => exercise.id));
 
-  if (existingIds.size !== exerciseIds.length) {
+  if (!(await validateExerciseIds(exerciseIds))) {
     return { ok: false, error: "One or more selected exercises could not be found." };
   }
 
@@ -110,6 +121,60 @@ export async function saveWorkoutBuilderAction(input: unknown): Promise<SaveWork
   redirect(parsed.data.redirectTo ?? "/workouts");
 }
 
+export async function saveWorkoutTemplateAction(input: unknown): Promise<SaveWorkoutResult> {
+  const parsed = SaveTemplateSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Check the workout template and try again.",
+    };
+  }
+
+  const userId = await requireDbUserId();
+  const exerciseIds = Array.from(new Set(parsed.data.exercises.map((exercise) => exercise.exerciseId)));
+
+  if (!(await validateExerciseIds(exerciseIds))) {
+    return { ok: false, error: "One or more selected exercises could not be found." };
+  }
+
+  const name = normalizeWorkoutName(parsed.data.workoutName);
+  if (!name) {
+    return { ok: false, error: "Workout name is required." };
+  }
+
+  await prisma.workoutTemplate.create({
+    data: {
+      userId,
+      name,
+      exercises: {
+        create: parsed.data.exercises.map((exercise, exerciseIndex) => ({
+          exerciseId: exercise.exerciseId,
+          order: exerciseIndex,
+          sets: {
+            create: exercise.sets.map((set, setIndex) => ({
+              reps: set.reps,
+              weight: set.weight,
+              rpe: set.rpe ?? null,
+              pain: set.pain ?? null,
+              order: setIndex,
+            })),
+          },
+        })),
+      },
+    },
+  });
+
+  revalidatePath("/workouts");
+  revalidatePath("/workouts/new");
+  revalidatePath("/log");
+
+  redirect(parsed.data.redirectTo ?? "/workouts");
+}
+
+export async function saveWorkoutBuilderAction(input: unknown): Promise<SaveWorkoutResult> {
+  return saveWorkoutLogAction(input);
+}
+
 export async function saveWorkoutAction(input: unknown): Promise<SaveWorkoutResult> {
-  return saveWorkoutBuilderAction(input);
+  return saveWorkoutLogAction(input);
 }

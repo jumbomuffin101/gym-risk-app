@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 
-import { saveWorkoutBuilderAction } from "./actions";
+import { saveWorkoutLogAction, saveWorkoutTemplateAction } from "./actions";
 
 type ExerciseOption = {
   id: string;
@@ -43,6 +43,7 @@ type WorkoutBuilderCopy = {
   previousUseLabel?: string;
   previousConfirm?: string;
   emptyMessage?: string;
+  saveMode?: "log" | "template";
   redirectTo?: "/dashboard" | "/workouts" | "/log";
 };
 
@@ -60,6 +61,7 @@ const defaultCopy: Required<WorkoutBuilderCopy> = {
   previousUseLabel: "Use",
   previousConfirm: "Replace the current log with this previous workout?",
   emptyMessage: "Select exercises from the library or use a previous workout to log training.",
+  saveMode: "log",
   redirectTo: "/dashboard",
 };
 
@@ -210,20 +212,28 @@ export function WorkoutBuilder({
     setError(null);
 
     startTransition(async () => {
-      const result = await saveWorkoutBuilderAction({
+      const exercisesPayload = selected.map((exercise) => ({
+        exerciseId: exercise.id,
+        sets: exercise.sets.map((set) => ({
+          reps: set.reps,
+          weight: set.weight,
+          rpe: set.rpe,
+          pain: set.pain,
+        })),
+      }));
+      const result =
+        ui.saveMode === "template"
+          ? await saveWorkoutTemplateAction({
+              workoutName,
+              redirectTo: ui.redirectTo,
+              exercises: exercisesPayload,
+            })
+          : await saveWorkoutLogAction({
         workoutName,
         workoutDate,
         redirectTo: ui.redirectTo,
-        exercises: selected.map((exercise) => ({
-          exerciseId: exercise.id,
-          sets: exercise.sets.map((set) => ({
-            reps: set.reps,
-            weight: set.weight,
-            rpe: set.rpe,
-            pain: set.pain,
-          })),
-        })),
-      });
+              exercises: exercisesPayload,
+            });
 
       if (result?.ok === false) {
         setError(result.error);
@@ -291,7 +301,7 @@ export function WorkoutBuilder({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px_360px]">
+        <div className={`mt-5 grid gap-4 ${ui.saveMode === "template" ? "xl:grid-cols-[minmax(0,1fr)_360px]" : "xl:grid-cols-[minmax(0,1fr)_260px_360px]"}`}>
           <label className="block">
             <span className="text-xs uppercase tracking-wide lab-muted">Workout name</span>
             <input
@@ -299,23 +309,26 @@ export function WorkoutBuilder({
               onChange={(event) => setWorkoutName(event.target.value)}
               placeholder="Workout name, e.g. Push B or Heavy Squat Day"
               maxLength={120}
+              required={ui.saveMode === "template"}
               className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
             />
           </label>
 
-          <label className="block">
-            <span className="text-xs uppercase tracking-wide lab-muted">Workout date</span>
-            <input
-              type="datetime-local"
-              value={workoutDate}
-              onChange={(event) => setWorkoutDate(event.target.value)}
-              required
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
-            />
-            <span className="mt-2 block text-xs lab-muted">
-              {ui.workoutDateHelper}
-            </span>
-          </label>
+          {ui.saveMode === "log" ? (
+            <label className="block">
+              <span className="text-xs uppercase tracking-wide lab-muted">Workout date</span>
+              <input
+                type="datetime-local"
+                value={workoutDate}
+                onChange={(event) => setWorkoutDate(event.target.value)}
+                required
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
+              />
+              <span className="mt-2 block text-xs lab-muted">
+                {ui.workoutDateHelper}
+              </span>
+            </label>
+          ) : null}
 
           <label className="block">
             <span className="text-xs uppercase tracking-wide lab-muted">{ui.previousLabel}</span>

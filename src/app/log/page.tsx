@@ -2,31 +2,55 @@ import Link from "next/link";
 
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { prisma } from "@/app/lib/prisma";
-import { cleanWorkoutName } from "@/app/lib/workouts";
+import { cleanWorkoutName, formatLoad, setLoad } from "@/app/lib/workouts";
 import { WorkoutBuilder } from "@/app/workouts/new/WorkoutBuilder";
+import { LogHistoryActions } from "./LogHistoryActions";
 
 export const runtime = "nodejs";
 
-function formatPreviousWorkoutLabel(startedAt: Date, note: string | null) {
-  const date = new Date(startedAt).toLocaleString(undefined, {
+function formatWorkoutDateTime(startedAt: Date) {
+  return new Date(startedAt).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
   });
-  const name = cleanWorkoutName(note, 56);
-
-  return name ? `${date} - ${name}` : date;
 }
 
 export default async function LogWorkoutPage() {
   const userId = await requireDbUserId();
 
-  const [exercises, recentLogs] = await Promise.all([
+  const [exercises, templates, loggedWorkouts] = await Promise.all([
     prisma.exercise.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, category: true },
+    }),
+    prisma.workoutTemplate.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        exercises: {
+          orderBy: { order: "asc" },
+          select: {
+            id: true,
+            exerciseId: true,
+            exercise: { select: { id: true, name: true, category: true } },
+            sets: {
+              orderBy: { order: "asc" },
+              select: {
+                id: true,
+                reps: true,
+                weight: true,
+                rpe: true,
+                pain: true,
+              },
+            },
+          },
+        },
+      },
     }),
     prisma.workoutSession.findMany({
       where: {
@@ -35,65 +59,40 @@ export default async function LogWorkoutPage() {
         sets: { some: {} },
       },
       orderBy: { startedAt: "desc" },
-      take: 12,
       select: {
         id: true,
         startedAt: true,
         note: true,
         sets: {
-          orderBy: { performedAt: "asc" },
           select: {
-            id: true,
             exerciseId: true,
             reps: true,
             weight: true,
             rpe: true,
-            pain: true,
-            exercise: { select: { id: true, name: true, category: true } },
           },
         },
+        _count: { select: { sets: true } },
       },
     }),
   ]);
 
-  const previousWorkouts = recentLogs.map((workout) => {
-    const exerciseMap = new Map<
-      string,
-      {
-        id: string;
-        name: string;
-        category: string | null;
-        sets: Array<{ id: string; reps: string; weight: string; rpe: string; pain: string }>;
-      }
-    >();
-
-    for (const set of workout.sets) {
-      const current =
-        exerciseMap.get(set.exerciseId) ??
-        {
-          id: set.exercise.id,
-          name: set.exercise.name,
-          category: set.exercise.category,
-          sets: [],
-        };
-
-      current.sets.push({
+  const previousWorkouts = templates.map((template) => ({
+    id: template.id,
+    label: template.name,
+    name: template.name,
+    exercises: template.exercises.map((templateExercise) => ({
+      id: templateExercise.exercise.id,
+      name: templateExercise.exercise.name,
+      category: templateExercise.exercise.category,
+      sets: templateExercise.sets.map((set) => ({
         id: set.id,
         reps: String(set.reps),
         weight: String(set.weight),
         rpe: set.rpe === null ? "" : String(set.rpe),
         pain: set.pain === null ? "" : String(set.pain),
-      });
-      exerciseMap.set(set.exerciseId, current);
-    }
-
-    return {
-      id: workout.id,
-      label: formatPreviousWorkoutLabel(workout.startedAt, workout.note),
-      name: cleanWorkoutName(workout.note, 120) ?? "",
-      exercises: Array.from(exerciseMap.values()),
-    };
-  });
+      })),
+    })),
+  }));
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -119,7 +118,7 @@ export default async function LogWorkoutPage() {
         <div className="lab-card rounded-2xl p-4">
           <div className="text-sm font-medium text-white/90">Log from existing workout</div>
           <p className="mt-1 text-xs leading-5 lab-muted">
-            Choose a previous workout to pre-fill exercises and sets, then edit before saving.
+            Choose a workout template to pre-fill exercises and sets, then edit before saving.
           </p>
         </div>
         <div className="lab-card rounded-2xl p-4">
@@ -130,7 +129,82 @@ export default async function LogWorkoutPage() {
         </div>
       </div>
 
-      <WorkoutBuilder exercises={exercises} previousWorkouts={previousWorkouts} />
+      <WorkoutBuilder
+        exercises={exercises}
+        previousWorkouts={previousWorkouts}
+        copy={{
+          previousLabel: "Log from template",
+          previousEmptyLabel: "No templates yet",
+          previousSelectLabel: "Select template",
+          previousConfirm: "Replace the current log with this template?",
+          redirectTo: "/log",
+        }}
+      />
+
+      <section className="lab-card rounded-2xl p-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-wide lab-muted">Log history</div>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight text-white/95">
+              Logged workouts
+            </h2>
+            <p className="mt-1 text-sm lab-muted">
+              Completed sessions used for dashboard analytics.
+            </p>
+          </div>
+          <div className="text-xs lab-muted">{loggedWorkouts.length} shown</div>
+        </div>
+
+        {loggedWorkouts.length === 0 ? (
+          <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+            <div className="text-sm text-white/85">No logged workouts yet.</div>
+            <p className="mt-1 text-sm lab-muted">
+              Save a log above to start building dashboard analytics.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-5 space-y-3">
+            {loggedWorkouts.map((workout) => {
+              const workoutName = cleanWorkoutName(workout.note) ?? "Untitled workout";
+              const sessionLoad = workout.sets.reduce((sum, set) => sum + setLoad(set), 0);
+              const exerciseCount = new Set(workout.sets.map((set) => set.exerciseId)).size;
+
+              return (
+                <article key={workout.id} className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <h3 className="text-base font-semibold text-white/92">{workoutName}</h3>
+                      <p className="mt-2 text-sm lab-muted">{formatWorkoutDateTime(workout.startedAt)}</p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 text-left md:text-right">
+                      <div>
+                        <div className="text-xs lab-muted">Sets</div>
+                        <div className="mt-1 text-sm font-semibold text-white/90">{workout._count.sets}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs lab-muted">Exercises</div>
+                        <div className="mt-1 text-sm font-semibold text-white/90">{exerciseCount}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs lab-muted">Load</div>
+                        <div className="mt-1 text-sm font-semibold text-white/90">{formatLoad(sessionLoad) ?? "-"}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex justify-start md:justify-end">
+                    <LogHistoryActions
+                      workoutId={workout.id}
+                      initialName={workoutName}
+                      initialStartedAt={workout.startedAt.toISOString()}
+                    />
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

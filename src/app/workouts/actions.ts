@@ -16,7 +16,7 @@ type WorkoutActionResult =
 
 const RenameWorkoutSchema = z.object({
   workoutId: z.string().min(1),
-  name: z.string().trim().min(1, "Workout name cannot be empty.").max(120, "Workout name must be 120 characters or fewer."),
+  name: z.string().trim().min(1, "Template name cannot be empty.").max(120, "Template name must be 120 characters or fewer."),
 });
 
 const DeleteWorkoutSchema = z.object({
@@ -40,27 +40,26 @@ export async function renameWorkoutAction(input: unknown): Promise<WorkoutAction
   if (!parsed.success) {
     return {
       ok: false,
-      error: parsed.error.issues[0]?.message ?? "Enter a workout name.",
+      error: parsed.error.issues[0]?.message ?? "Enter a template name.",
     };
   }
 
   const userId = await requireDbUserId();
   const name = normalizeWorkoutName(parsed.data.name);
   if (!name) {
-    return { ok: false, error: "Workout name cannot be empty." };
+    return { ok: false, error: "Template name cannot be empty." };
   }
 
-  const result = await prisma.workoutSession.updateMany({
+  const result = await prisma.workoutTemplate.updateMany({
     where: {
       id: parsed.data.workoutId,
       userId,
-      endedAt: { not: null },
     },
-    data: { note: name },
+    data: { name },
   });
 
   if (result.count === 0) {
-    return { ok: false, error: "Workout could not be found." };
+    return { ok: false, error: "Workout template could not be found." };
   }
 
   revalidateWorkoutViews();
@@ -74,33 +73,31 @@ export async function deleteWorkoutAction(input: unknown): Promise<WorkoutAction
   }
 
   const userId = await requireDbUserId();
-  const workout = await prisma.workoutSession.findFirst({
+  const workout = await prisma.workoutTemplate.findFirst({
     where: {
       id: parsed.data.workoutId,
       userId,
-      endedAt: { not: null },
     },
     select: {
-      sets: { select: { exerciseId: true } },
+      exercises: { select: { exerciseId: true } },
     },
   });
 
   if (!workout) {
-    return { ok: false, error: "Workout could not be found." };
+    return { ok: false, error: "Workout template could not be found." };
   }
 
-  const result = await prisma.workoutSession.deleteMany({
+  const result = await prisma.workoutTemplate.deleteMany({
     where: {
       id: parsed.data.workoutId,
       userId,
-      endedAt: { not: null },
     },
   });
 
   if (result.count === 0) {
-    return { ok: false, error: "Workout could not be deleted." };
+    return { ok: false, error: "Workout template could not be deleted." };
   }
 
-  revalidateWorkoutViews(Array.from(new Set(workout.sets.map((set) => set.exerciseId))));
+  revalidateWorkoutViews(Array.from(new Set(workout.exercises.map((exercise) => exercise.exerciseId))));
   return { ok: true };
 }
