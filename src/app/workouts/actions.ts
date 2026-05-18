@@ -50,12 +50,14 @@ export async function renameWorkoutAction(input: unknown): Promise<WorkoutAction
     return { ok: false, error: "Template name cannot be empty." };
   }
 
-  const result = await prisma.workoutTemplate.updateMany({
+  const result = await prisma.workoutSession.updateMany({
     where: {
       id: parsed.data.workoutId,
       userId,
+      endedAt: null,
+      sets: { some: {} },
     },
-    data: { name },
+    data: { note: name },
   });
 
   if (result.count === 0) {
@@ -73,13 +75,15 @@ export async function deleteWorkoutAction(input: unknown): Promise<WorkoutAction
   }
 
   const userId = await requireDbUserId();
-  const workout = await prisma.workoutTemplate.findFirst({
+  const workout = await prisma.workoutSession.findFirst({
     where: {
       id: parsed.data.workoutId,
       userId,
+      endedAt: null,
+      sets: { some: {} },
     },
     select: {
-      exercises: { select: { exerciseId: true } },
+      sets: { select: { exerciseId: true } },
     },
   });
 
@@ -87,10 +91,11 @@ export async function deleteWorkoutAction(input: unknown): Promise<WorkoutAction
     return { ok: false, error: "Workout template could not be found." };
   }
 
-  const result = await prisma.workoutTemplate.deleteMany({
+  const result = await prisma.workoutSession.deleteMany({
     where: {
       id: parsed.data.workoutId,
       userId,
+      endedAt: null,
     },
   });
 
@@ -98,6 +103,6 @@ export async function deleteWorkoutAction(input: unknown): Promise<WorkoutAction
     return { ok: false, error: "Workout template could not be deleted." };
   }
 
-  revalidateWorkoutViews(Array.from(new Set(workout.exercises.map((exercise) => exercise.exerciseId))));
+  revalidateWorkoutViews(Array.from(new Set(workout.sets.map((set) => set.exerciseId))));
   return { ok: true };
 }

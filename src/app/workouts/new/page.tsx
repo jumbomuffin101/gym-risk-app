@@ -6,59 +6,104 @@ import { WorkoutBuilder } from "./WorkoutBuilder";
 
 export const runtime = "nodejs";
 
+type WorkoutPlan = {
+  id: string;
+  startedAt: Date;
+  note: string | null;
+  sets: Array<{
+    id: string;
+    exerciseId: string;
+    exercise: {
+      id: string;
+      name: string;
+      category: string | null;
+    };
+    reps: number;
+    weight: number;
+    rpe: number | null;
+    pain: number | null;
+  }>;
+};
+
+function buildPlanExercises(plan: WorkoutPlan) {
+  const exercises = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      category: string | null;
+      sets: Array<{
+        id: string;
+        reps: string;
+        weight: string;
+        rpe: string;
+        pain: string;
+      }>;
+    }
+  >();
+
+  for (const set of plan.sets) {
+    const current = exercises.get(set.exerciseId) ?? {
+      id: set.exercise.id,
+      name: set.exercise.name,
+      category: set.exercise.category,
+      sets: [],
+    };
+
+    current.sets.push({
+      id: set.id,
+      reps: String(set.reps),
+      weight: String(set.weight),
+      rpe: set.rpe === null ? "" : String(set.rpe),
+      pain: set.pain === null ? "" : String(set.pain),
+    });
+    exercises.set(set.exerciseId, current);
+  }
+
+  return Array.from(exercises.values());
+}
+
 export default async function NewWorkoutPage() {
   const userId = await requireDbUserId();
 
-  const [exercises, templates] = await Promise.all([
+  const [exercises, plans] = await Promise.all([
     prisma.exercise.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, category: true },
     }),
-    prisma.workoutTemplate.findMany({
-      where: { userId },
-      orderBy: { updatedAt: "desc" },
+    prisma.workoutSession.findMany({
+      where: {
+        userId,
+        endedAt: null,
+        sets: { some: {} },
+      },
+      orderBy: { startedAt: "desc" },
       take: 12,
       select: {
         id: true,
-        name: true,
-        exercises: {
-          orderBy: { order: "asc" },
+        startedAt: true,
+        note: true,
+        sets: {
+          orderBy: { performedAt: "asc" },
           select: {
             id: true,
             exerciseId: true,
             exercise: { select: { id: true, name: true, category: true } },
-            sets: {
-              orderBy: { order: "asc" },
-              select: {
-                id: true,
-                reps: true,
-                weight: true,
-                rpe: true,
-                pain: true,
-              },
-            },
+            reps: true,
+            weight: true,
+            rpe: true,
+            pain: true,
           },
         },
       },
     }),
   ]);
 
-  const previousWorkouts = templates.map((template) => ({
-    id: template.id,
-    label: template.name,
-    name: template.name,
-    exercises: template.exercises.map((templateExercise) => ({
-      id: templateExercise.exercise.id,
-      name: templateExercise.exercise.name,
-      category: templateExercise.exercise.category,
-      sets: templateExercise.sets.map((set) => ({
-        id: set.id,
-        reps: String(set.reps),
-        weight: String(set.weight),
-        rpe: set.rpe === null ? "" : String(set.rpe),
-        pain: set.pain === null ? "" : String(set.pain),
-      })),
-    })),
+  const previousWorkouts = plans.map((plan) => ({
+    id: plan.id,
+    label: plan.note ?? "Untitled template",
+    name: plan.note ?? "",
+    exercises: buildPlanExercises(plan),
   }));
 
   return (

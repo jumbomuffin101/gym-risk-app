@@ -142,26 +142,33 @@ export async function saveWorkoutTemplateAction(input: unknown): Promise<SaveWor
     return { ok: false, error: "Workout name is required." };
   }
 
-  await prisma.workoutTemplate.create({
-    data: {
-      userId,
-      name,
-      exercises: {
-        create: parsed.data.exercises.map((exercise, exerciseIndex) => ({
-          exerciseId: exercise.exerciseId,
-          order: exerciseIndex,
-          sets: {
-            create: exercise.sets.map((set, setIndex) => ({
-              reps: set.reps,
-              weight: set.weight,
-              rpe: set.rpe ?? null,
-              pain: set.pain ?? null,
-              order: setIndex,
-            })),
-          },
-        })),
+  const plannedAt = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    const session = await tx.workoutSession.create({
+      data: {
+        userId,
+        startedAt: plannedAt,
+        endedAt: null,
+        note: name,
       },
-    },
+      select: { id: true },
+    });
+
+    await tx.setEntry.createMany({
+      data: parsed.data.exercises.flatMap((exercise) =>
+        exercise.sets.map((set) => ({
+          userId,
+          sessionId: session.id,
+          exerciseId: exercise.exerciseId,
+          reps: set.reps,
+          weight: set.weight,
+          rpe: set.rpe ?? null,
+          pain: set.pain ?? null,
+          performedAt: plannedAt,
+        }))
+      ),
+    });
   });
 
   revalidatePath("/workouts");

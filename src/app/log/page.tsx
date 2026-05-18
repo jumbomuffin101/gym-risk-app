@@ -24,48 +24,21 @@ type LogExercise = {
   category: string | null;
 };
 
-type LogTemplate = {
-  id: string;
-  name: string;
-  exercises: Array<{
-    id: string;
-    exerciseId: string;
-    exercise: LogExercise;
-    sets: Array<{
-      id: string;
-      reps: number;
-      weight: number;
-      rpe: number | null;
-      pain: number | null;
-    }>;
-  }>;
-};
-
 type LoggedWorkout = {
   id: string;
   startedAt: Date;
   note: string | null;
   sets: Array<{
+    id: string;
     exerciseId: string;
+    exercise: LogExercise;
     reps: number;
     weight: number;
     rpe: number | null;
+    pain: number | null;
   }>;
   _count: { sets: number };
 };
-
-function isMissingTemplateTableError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-
-  return (
-    message.includes("WorkoutTemplate") ||
-    message.includes("WorkoutTemplateExercise") ||
-    message.includes("WorkoutTemplateSet") ||
-    message.includes("workoutTemplate") ||
-    message.includes("does not exist") ||
-    message.includes("P2021")
-  );
-}
 
 async function getSafeUserId() {
   try {
@@ -86,40 +59,6 @@ async function getSafeExercises(): Promise<LogExercise[]> {
   }
 }
 
-async function getSafeTemplates(userId: string): Promise<LogTemplate[]> {
-  try {
-    return await prisma.workoutTemplate.findMany({
-      where: { userId },
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        exercises: {
-          orderBy: { order: "asc" },
-          select: {
-            id: true,
-            exerciseId: true,
-            exercise: { select: { id: true, name: true, category: true } },
-            sets: {
-              orderBy: { order: "asc" },
-              select: {
-                id: true,
-                reps: true,
-                weight: true,
-                rpe: true,
-                pain: true,
-              },
-            },
-          },
-        },
-      },
-    });
-  } catch (error) {
-    if (isMissingTemplateTableError(error)) return [];
-    return [];
-  }
-}
-
 async function getSafeLoggedWorkouts(userId: string): Promise<LoggedWorkout[]> {
   try {
     return await prisma.workoutSession.findMany({
@@ -134,11 +73,15 @@ async function getSafeLoggedWorkouts(userId: string): Promise<LoggedWorkout[]> {
         startedAt: true,
         note: true,
         sets: {
+          orderBy: { performedAt: "asc" },
           select: {
+            id: true,
             exerciseId: true,
+            exercise: { select: { id: true, name: true, category: true } },
             reps: true,
             weight: true,
             rpe: true,
+            pain: true,
           },
         },
         _count: { select: { sets: true } },
@@ -147,6 +90,41 @@ async function getSafeLoggedWorkouts(userId: string): Promise<LoggedWorkout[]> {
   } catch {
     return [];
   }
+}
+
+function buildPreviousWorkoutExercises(workout: LoggedWorkout) {
+  const exercises = new Map<
+    string,
+    LogExercise & {
+      sets: Array<{
+        id: string;
+        reps: string;
+        weight: string;
+        rpe: string;
+        pain: string;
+      }>;
+    }
+  >();
+
+  for (const set of workout.sets) {
+    const current = exercises.get(set.exerciseId) ?? {
+      id: set.exercise.id,
+      name: set.exercise.name,
+      category: set.exercise.category,
+      sets: [],
+    };
+
+    current.sets.push({
+      id: set.id,
+      reps: String(set.reps),
+      weight: String(set.weight),
+      rpe: set.rpe === null ? "" : String(set.rpe),
+      pain: set.pain === null ? "" : String(set.pain),
+    });
+    exercises.set(set.exerciseId, current);
+  }
+
+  return Array.from(exercises.values());
 }
 
 export default async function LogWorkoutPage() {
@@ -171,28 +149,16 @@ export default async function LogWorkoutPage() {
     );
   }
 
-  const [exercises, templates, loggedWorkouts] = await Promise.all([
+  const [exercises, loggedWorkouts] = await Promise.all([
     getSafeExercises(),
-    getSafeTemplates(userId),
     getSafeLoggedWorkouts(userId),
   ]);
 
-  const previousWorkouts = templates.map((template) => ({
-    id: template.id,
-    label: template.name || "Untitled template",
-    name: template.name || "",
-    exercises: (template.exercises ?? []).map((templateExercise) => ({
-      id: templateExercise.exercise?.id ?? templateExercise.exerciseId,
-      name: templateExercise.exercise?.name ?? "Unknown exercise",
-      category: templateExercise.exercise?.category ?? null,
-      sets: templateExercise.sets.map((set) => ({
-        id: set.id,
-        reps: String(set.reps),
-        weight: String(set.weight),
-        rpe: set.rpe === null ? "" : String(set.rpe),
-        pain: set.pain === null ? "" : String(set.pain),
-      })),
-    })),
+  const previousWorkouts = loggedWorkouts.map((workout) => ({
+    id: workout.id,
+    label: `${cleanWorkoutName(workout.note) ?? "Untitled workout"} - ${formatWorkoutDateTime(workout.startedAt)}`,
+    name: cleanWorkoutName(workout.note) ?? "",
+    exercises: buildPreviousWorkoutExercises(workout),
   }));
 
   return (
@@ -219,7 +185,7 @@ export default async function LogWorkoutPage() {
         <div className="lab-card rounded-2xl p-4">
           <div className="text-sm font-medium text-white/90">Log from existing workout</div>
           <p className="mt-1 text-xs leading-5 lab-muted">
-            Choose a workout template to pre-fill exercises and sets, then edit before saving.
+            Choose a previous logged workout to pre-fill exercises and sets, then edit before saving.
           </p>
         </div>
         <div className="lab-card rounded-2xl p-4">
@@ -234,10 +200,10 @@ export default async function LogWorkoutPage() {
         exercises={exercises}
         previousWorkouts={previousWorkouts}
         copy={{
-          previousLabel: "Log from template",
-          previousEmptyLabel: "No templates yet",
-          previousSelectLabel: "Select template",
-          previousConfirm: "Replace the current log with this template?",
+          previousLabel: "Use previous logged workout",
+          previousEmptyLabel: "No previous logs yet",
+          previousSelectLabel: "Select workout",
+          previousConfirm: "Replace the current log with this previous workout?",
           redirectTo: "/log",
         }}
       />

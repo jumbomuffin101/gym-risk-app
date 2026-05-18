@@ -9,20 +9,24 @@ export const runtime = "nodejs";
 export default async function WorkoutPage() {
   const userId = await requireDbUserId();
 
-  const templates = await prisma.workoutTemplate.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
+  const templates = await prisma.workoutSession.findMany({
+    where: {
+      userId,
+      endedAt: null,
+      sets: { some: {} },
+    },
+    orderBy: { startedAt: "desc" },
     take: 30,
     select: {
       id: true,
-      name: true,
-      updatedAt: true,
-      exercises: {
+      note: true,
+      startedAt: true,
+      sets: {
         select: {
-          sets: { select: { id: true } },
+          exerciseId: true,
         },
       },
-      _count: { select: { exercises: true } },
+      _count: { select: { sets: true } },
     },
   });
 
@@ -61,8 +65,9 @@ export default async function WorkoutPage() {
       ) : (
         <div className="space-y-3">
           {templates.map((template) => {
-            const setCount = template.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
-            const updatedAt = new Date(template.updatedAt).toLocaleString(undefined, {
+            const setCount = template._count.sets;
+            const exerciseCount = new Set(template.sets.map((set) => set.exerciseId)).size;
+            const updatedAt = new Date(template.startedAt).toLocaleString(undefined, {
               month: "short",
               day: "numeric",
               year: "numeric",
@@ -75,9 +80,9 @@ export default async function WorkoutPage() {
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-white/92">
-                      {template.name}
+                      {template.note ?? "Untitled template"}
                     </h2>
-                    <p className="mt-2 text-sm lab-muted">Updated {updatedAt}</p>
+                    <p className="mt-2 text-sm lab-muted">Created {updatedAt}</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 text-left md:text-right">
@@ -90,13 +95,16 @@ export default async function WorkoutPage() {
                     <div>
                       <div className="text-xs lab-muted">Exercises</div>
                       <div className="mt-1 text-sm font-semibold text-white/90">
-                        {template._count.exercises}
+                        {exerciseCount}
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="mt-4 flex justify-start md:justify-end">
-                  <WorkoutHistoryActions workoutId={template.id} initialName={template.name} />
+                  <WorkoutHistoryActions
+                    workoutId={template.id}
+                    initialName={template.note ?? "Untitled template"}
+                  />
                 </div>
               </article>
             );
