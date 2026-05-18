@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { requireDbUserId } from "@/app/lib/auth/requireUser";
+import { getOptionalDbUserId } from "@/app/lib/auth/requireUser";
 import { prisma } from "@/app/lib/prisma";
 import { cleanWorkoutName, formatLoad, setLoad } from "@/app/lib/workouts";
 import { WorkoutBuilder } from "@/app/workouts/new/WorkoutBuilder";
@@ -18,15 +18,77 @@ function formatWorkoutDateTime(startedAt: Date) {
   });
 }
 
-export default async function LogWorkoutPage() {
-  const userId = await requireDbUserId();
+type LogExercise = {
+  id: string;
+  name: string;
+  category: string | null;
+};
 
-  const [exercises, templates, loggedWorkouts] = await Promise.all([
-    prisma.exercise.findMany({
+type LogTemplate = {
+  id: string;
+  name: string;
+  exercises: Array<{
+    id: string;
+    exerciseId: string;
+    exercise: LogExercise;
+    sets: Array<{
+      id: string;
+      reps: number;
+      weight: number;
+      rpe: number | null;
+      pain: number | null;
+    }>;
+  }>;
+};
+
+type LoggedWorkout = {
+  id: string;
+  startedAt: Date;
+  note: string | null;
+  sets: Array<{
+    exerciseId: string;
+    reps: number;
+    weight: number;
+    rpe: number | null;
+  }>;
+  _count: { sets: number };
+};
+
+function isMissingTemplateTableError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+
+  return (
+    message.includes("WorkoutTemplate") ||
+    message.includes("WorkoutTemplateExercise") ||
+    message.includes("WorkoutTemplateSet") ||
+    message.includes("workoutTemplate") ||
+    message.includes("does not exist") ||
+    message.includes("P2021")
+  );
+}
+
+async function getSafeUserId() {
+  try {
+    return await getOptionalDbUserId();
+  } catch {
+    return null;
+  }
+}
+
+async function getSafeExercises(): Promise<LogExercise[]> {
+  try {
+    return await prisma.exercise.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, category: true },
-    }),
-    prisma.workoutTemplate.findMany({
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function getSafeTemplates(userId: string): Promise<LogTemplate[]> {
+  try {
+    return await prisma.workoutTemplate.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
       select: {
@@ -51,8 +113,16 @@ export default async function LogWorkoutPage() {
           },
         },
       },
-    }),
-    prisma.workoutSession.findMany({
+    });
+  } catch (error) {
+    if (isMissingTemplateTableError(error)) return [];
+    return [];
+  }
+}
+
+async function getSafeLoggedWorkouts(userId: string): Promise<LoggedWorkout[]> {
+  try {
+    return await prisma.workoutSession.findMany({
       where: {
         userId,
         endedAt: { not: null },
@@ -73,17 +143,48 @@ export default async function LogWorkoutPage() {
         },
         _count: { select: { sets: true } },
       },
-    }),
+    });
+  } catch {
+    return [];
+  }
+}
+
+export default async function LogWorkoutPage() {
+  const userId = await getSafeUserId();
+
+  if (!userId) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6">
+        <section className="lab-card rounded-2xl p-6">
+          <div className="text-xs uppercase tracking-wide lab-muted">Log</div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white/95">
+            Sign in to log workouts
+          </h1>
+          <p className="mt-2 text-sm lab-muted">
+            Logging requires an account so completed workouts can power your dashboard analytics.
+          </p>
+          <Link href="/signin?callbackUrl=/log" className="btn-primary mt-5 text-sm">
+            Sign in
+          </Link>
+        </section>
+      </div>
+    );
+  }
+
+  const [exercises, templates, loggedWorkouts] = await Promise.all([
+    getSafeExercises(),
+    getSafeTemplates(userId),
+    getSafeLoggedWorkouts(userId),
   ]);
 
   const previousWorkouts = templates.map((template) => ({
     id: template.id,
-    label: template.name,
-    name: template.name,
-    exercises: template.exercises.map((templateExercise) => ({
-      id: templateExercise.exercise.id,
-      name: templateExercise.exercise.name,
-      category: templateExercise.exercise.category,
+    label: template.name || "Untitled template",
+    name: template.name || "",
+    exercises: (template.exercises ?? []).map((templateExercise) => ({
+      id: templateExercise.exercise?.id ?? templateExercise.exerciseId,
+      name: templateExercise.exercise?.name ?? "Unknown exercise",
+      category: templateExercise.exercise?.category ?? null,
       sets: templateExercise.sets.map((set) => ({
         id: set.id,
         reps: String(set.reps),
