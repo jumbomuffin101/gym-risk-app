@@ -2,23 +2,24 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
-import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { authOptions } from "@/app/lib/auth/authOptions";
 import { prisma } from "@/app/lib/prisma";
+import { requireDbUserId } from "@/app/lib/auth/requireUser";
+import { computeSessionRisk } from "@/app/lib/riskEngine";
 import {
-  computeAcuteChronicRatio,
-  computeSessionLoad,
-  computeWowPercent,
-  deriveRiskState,
-  sumLoadInWindow,
-} from "@/lib/metrics/load";
+  buildMuscleRegionRisks,
+  buildDashboardAnalytics,
+  type AnalyticsRiskState,
+  type DashboardAnalytics,
+} from "@/app/lib/dashboardRisk";
+import { cleanWorkoutName, formatLoad, setLoad, summarizeWorkoutSets } from "@/app/lib/workouts";
 
 import DashboardActions from "./DashboardActions";
+import { DashboardWorkoutSelector } from "./DashboardWorkoutSelector";
 import { KpiCard } from "src/app/dashboard/KpiCard";
-import { LoadPanel } from "src/app/dashboard/LoadPanel";
-import { MuscleHeatmap, type RiskMap } from "src/app/dashboard/MuscleHeatmap";
 import { RiskMeter } from "src/app/dashboard/RiskMeter";
-import { SessionStepper } from "src/app/dashboard/SessionStepper";
+import { MuscleHeatmap } from "src/app/dashboard/MuscleHeatmap";
+import { LoadPanel } from "src/app/dashboard/LoadPanel";
 import { LabCard } from "src/app/dashboard/components/LabCard";
 import { MetricCard } from "src/app/dashboard/components/MetricCard";
 import { PageShell } from "src/app/dashboard/components/PageShell";
@@ -27,164 +28,280 @@ import { StatusChip } from "src/app/dashboard/components/StatusChip";
 
 export const runtime = "nodejs";
 
-function daysAgo(d: Date) {
-  const diff = Date.now() - d.getTime();
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+type DashboardRiskReason = {
+  kind: string;
+  title: string;
+  score: number;
+  details: Record<string, unknown>;
+  sessionId: string;
+  startedAt: Date;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+type RiskFeedTone = "safe" | "watch" | "danger" | "neutral";
+
+type RiskFeedEvent = {
+  id: string;
+  title: string;
+  meta: string;
+  badgeLabel: string;
+  tone: RiskFeedTone;
+};
+
+function cleanDisplayText(value: string) {
+  return value
+    .replaceAll("\u00e2\u2030\u00a5", ">=")
+    .replaceAll("\u00e2\u20ac\u201c", "-")
+    .replaceAll("\u00e2\u20ac\u201d", "-");
 }
 
-function formatSessionLabel(session: {
-  note: string | null;
-  endedAt: Date | null;
-  _count: { sets: number };
+function formatWorkoutDateTime(startedAt: Date) {
+  return new Date(startedAt).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatWorkoutOptionLabel(workout: { startedAt: Date; note: string | null }) {
+  const date = formatWorkoutDateTime(workout.startedAt);
+  const name = cleanWorkoutName(workout.note, 56);
+
+  return name ? `${date} - ${name}` : date;
+}
+
+function toneForRiskState(state: AnalyticsRiskState) {
+  if (state === "High") return "danger";
+  if (state === "Monitor") return "watch";
+  if (state === "Baseline") return "neutral";
+  return "safe";
+}
+
+function riskStateLabel(state: AnalyticsRiskState) {
+  return state === "Baseline" ? "Baseline pending" : state;
+}
+
+function formatChangePct(value: number | null) {
+  if (value === null) return "Baseline pending";
+  return `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
+}
+
+function riskFeedTone(score: number): RiskFeedTone {
+  if (score >= 70) return "danger";
+  if (score >= 40) return "watch";
+  return "safe";
+}
+
+function riskFeedLabel(score: number) {
+  if (score >= 70) return "High";
+  if (score >= 40) return "Monitor";
+  return "Stable";
+}
+
+function riskReasonGroupKey(reason: DashboardRiskReason) {
+  const day = reason.startedAt.toISOString().slice(0, 10);
+  const kind = reason.kind.startsWith("rpe")
+    ? "rpe"
+    : reason.kind.startsWith("pain")
+    ? "pain"
+    : reason.kind.startsWith("workload")
+    ? "workload"
+    : reason.kind;
+  const category =
+    typeof reason.details.category === "string" ? reason.details.category : "overall";
+
+  return `${day}-${kind}-${category}`;
+}
+
+function buildRiskFeedEvents(
+  reasons: DashboardRiskReason[],
+  analytics: DashboardAnalytics
+): RiskFeedEvent[] {
+  const events: RiskFeedEvent[] = [];
+
+  if (!analytics.baselineReady) {
+    const days = Math.floor(analytics.baselineSpanDays);
+    events.push({
+      id: "baseline-building",
+      title: `Baseline building: ${analytics.baselineWorkoutCount} workout${
+        analytics.baselineWorkoutCount === 1 ? "" : "s"
+      } logged across ${days} day${days === 1 ? "" : "s"}`,
+      meta: analytics.baselineReason,
+      badgeLabel: "Baseline",
+      tone: "neutral",
+    });
+  }
+
+  const grouped = new Map<string, DashboardRiskReason>();
+  for (const reason of reasons.sort((a, b) => b.score - a.score)) {
+    const key = riskReasonGroupKey(reason);
+    const existing = grouped.get(key);
+    if (!existing || reason.score > existing.score) grouped.set(key, reason);
+  }
+
+  const remainingSlots = Math.max(0, 5 - events.length);
+  const reasonEvents = Array.from(grouped.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, remainingSlots)
+    .map((reason) => ({
+      id: `${reason.sessionId}-${reason.kind}-${reason.startedAt.toISOString()}`,
+      title: cleanDisplayText(reason.title),
+      meta: new Date(reason.startedAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      }),
+      badgeLabel: riskFeedLabel(reason.score),
+      tone: riskFeedTone(reason.score),
+    }));
+
+  return [...events, ...reasonEvents];
+}
+
+function AnalysisMetric({
+  label,
+  value,
+  subline,
+}: {
+  label: string;
+  value: string;
+  subline?: string;
 }) {
-  if (session.note) return session.note;
-  if (session.endedAt === null) return "Active session";
-  if (session._count.sets > 0) return `${session._count.sets} sets logged`;
-  return "Session recorded";
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="text-xs lab-muted">{label}</div>
+      <div className="mt-1 text-xl font-semibold lab-num text-white/90">{value}</div>
+      {subline ? <div className="mt-1 text-xs lab-muted">{subline}</div> : null}
+    </div>
+  );
 }
 
-export default async function DashboardPage() {
-  await requireDbUserId();
+type DashboardPageProps = {
+  searchParams?: Promise<{ workoutId?: string | string[] }>;
+};
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const userId = await requireDbUserId();
 
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? null;
   if (!email) redirect("/signin?callbackUrl=/dashboard");
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, email: true },
-  });
-  if (!user) redirect("/signin?callbackUrl=/dashboard");
-
-  const sessions = await prisma.workoutSession.findMany({
-    where: { userId: user.id },
-    orderBy: { startedAt: "desc" },
-    take: 24,
-    select: {
-      id: true,
-      startedAt: true,
-      endedAt: true,
-      note: true,
-      sets: { select: { reps: true, weight: true, rpe: true } },
-      _count: { select: { sets: true } },
-    },
-  });
-
-  const sessionsWithLoad = sessions.map((workout) => ({
-    ...workout,
-    sessionLoad: computeSessionLoad(workout.sets),
-  }));
-
-  const activeSession = sessionsWithLoad.find((entry) => entry.endedAt === null) ?? null;
-  const loggedSessions = sessionsWithLoad.filter((entry) => entry._count.sets > 0);
-  const completedLoggedSessions = loggedSessions.filter((entry) => entry.endedAt !== null);
-  const analyticsSessions = loggedSessions;
-
+  const params = searchParams ? await searchParams : {};
+  const rawWorkoutId = params.workoutId;
+  const requestedWorkoutId = Array.isArray(rawWorkoutId) ? rawWorkoutId[0] : rawWorkoutId;
   const now = new Date();
-  const sevenDaysAgo = new Date(now);
-  sevenDaysAgo.setDate(now.getDate() - 7);
-  const fourteenDaysAgo = new Date(now);
-  fourteenDaysAgo.setDate(now.getDate() - 14);
-  const twentyEightDaysAgo = new Date(now);
-  twentyEightDaysAgo.setDate(now.getDate() - 28);
 
-  const weeklyLoad = sumLoadInWindow(analyticsSessions, sevenDaysAgo, now);
-  const priorWeeklyLoad = sumLoadInWindow(analyticsSessions, fourteenDaysAgo, sevenDaysAgo);
-  const chronic28d = sumLoadInWindow(analyticsSessions, twentyEightDaysAgo, now);
-  const baseline7d = chronic28d / 4;
-  const ratio = computeAcuteChronicRatio(weeklyLoad, chronic28d);
-  const wowPct = computeWowPercent(weeklyLoad, priorWeeklyLoad);
+  const [sessions, baselineWorkouts] = await Promise.all([
+    prisma.workoutSession.findMany({
+      where: {
+        userId,
+        endedAt: { not: null },
+        sets: { some: {} },
+      },
+      orderBy: { startedAt: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        startedAt: true,
+        endedAt: true,
+        note: true,
+        _count: { select: { sets: true } },
+        sets: {
+          select: {
+            exerciseId: true,
+            reps: true,
+            weight: true,
+            rpe: true,
+            pain: true,
+          },
+        },
+      },
+    }),
+    prisma.workoutSession.findMany({
+      where: {
+        userId,
+        endedAt: { not: null },
+        sets: { some: {} },
+      },
+      orderBy: { startedAt: "asc" },
+      select: {
+        startedAt: true,
+        endedAt: true,
+      },
+    }),
+  ]);
 
-  const hasTwoWeekWindow = analyticsSessions.some((entry) => daysAgo(new Date(entry.startedAt)) >= 14);
-  const derivedRisk = deriveRiskState(wowPct, ratio);
-  const risk =
-    analyticsSessions.length === 0
-      ? { state: "Stable" as const, driver: "Log workouts to establish your baseline" }
-      : derivedRisk;
+  const selectedWorkout =
+    sessions.find((workout) => workout.id === requestedWorkoutId) ?? sessions[0] ?? null;
+  const selectedRiskAnchor = selectedWorkout
+    ? new Date(selectedWorkout.startedAt.getTime() + 60 * 1000)
+    : now;
+  const metricsSince = new Date(
+    Math.min(now.getTime(), selectedRiskAnchor.getTime()) - 35 * DAY_MS
+  );
+  const metricsUntil = new Date(Math.max(now.getTime(), selectedRiskAnchor.getTime()));
 
-  const fakeRiskScore =
-    analyticsSessions.length === 0
-      ? 8
-      : risk.state === "High"
-        ? 79
-        : risk.state === "Monitor"
-          ? 48
-          : 20;
+  const [metricSets, recentRiskReasonGroups] = await Promise.all([
+    prisma.setEntry.findMany({
+      where: {
+        userId,
+        performedAt: { gte: metricsSince, lte: metricsUntil },
+        session: { endedAt: { not: null } },
+      },
+      select: {
+        performedAt: true,
+        reps: true,
+        weight: true,
+        rpe: true,
+        pain: true,
+        exercise: { select: { name: true, category: true } },
+      },
+    }),
+    Promise.all(
+      sessions.slice(0, 5).map(async (workout) => {
+        const reasons = await computeSessionRisk(userId, workout.id);
+        return reasons.map((reason) => ({
+          ...reason,
+          sessionId: workout.id,
+          startedAt: workout.startedAt,
+        }));
+      })
+    ),
+  ]);
 
-  const heatmap: RiskMap = {
-    shoulders: "low",
-    elbows: ratio >= 1.3 ? "moderate" : "low",
-    lowerBack: risk.state === "High" ? "high" : ratio >= 1.3 ? "moderate" : "low",
-    quads: ratio > 1.5 ? "high" : ratio >= 1.3 ? "moderate" : "low",
-    hamstrings: wowPct >= 15 ? "moderate" : "low",
-    knees: "low",
-  };
-  const elevatedCount = Object.values(heatmap).filter((value) => value !== "low").length;
+  const recentRiskReasons: DashboardRiskReason[] = recentRiskReasonGroups
+    .flat()
+    .sort((a, b) => b.score - a.score);
 
-  const trend = analyticsSessions
-    .slice(0, 8)
-    .reverse()
-    .map((entry) => Number(entry.sessionLoad.toFixed(2)));
-
-  const riskEvents: Array<{ when: Date; title: string; detail: string; tone: "danger" | "watch" }> = [];
-  if (analyticsSessions.length === 0) {
-    riskEvents.push({
-      when: now,
-      title: "Baseline building",
-      detail: "Log a few sessions with sets to unlock load trendlines and regional risk signals.",
-      tone: "watch",
-    });
-  } else if (wowPct >= 30) {
-    riskEvents.push({
-      when: now,
-      title: "Week-over-week spike",
-      detail: `Weekly load increased ${wowPct.toFixed(1)}% vs prior week.`,
-      tone: "danger",
-    });
-  } else if (wowPct >= 15) {
-    riskEvents.push({
-      when: now,
-      title: "Week-over-week increase",
-      detail: `Weekly load increased ${wowPct.toFixed(1)}%.`,
-      tone: "watch",
-    });
-  }
-
-  if (analyticsSessions.length > 0) {
-    if (ratio > 1.5) {
-      riskEvents.push({
-        when: now,
-        title: "Acute:chronic high",
-        detail: `AC ratio ${ratio.toFixed(2)} is above 1.5.`,
-        tone: "danger",
-      });
-    } else if (ratio >= 1.3) {
-      riskEvents.push({
-        when: now,
-        title: "Acute:chronic monitor",
-        detail: `AC ratio ${ratio.toFixed(2)} is in the monitor band.`,
-        tone: "watch",
-      });
-    }
-  }
-
-  const lastMeaningfulSession = loggedSessions[0] ?? activeSession ?? null;
-  const lastSessionAgo = lastMeaningfulSession ? daysAgo(new Date(lastMeaningfulSession.startedAt)) : null;
-  const activeSessionLoggedSets = activeSession?._count.sets ?? 0;
-  const recentSessions = completedLoggedSessions.slice(0, 5);
+  const analytics = buildDashboardAnalytics(metricSets, baselineWorkouts, now);
+  const riskFeedEvents = buildRiskFeedEvents(recentRiskReasons, analytics);
+  const selectedAnalytics = selectedWorkout
+    ? buildDashboardAnalytics(metricSets, baselineWorkouts, selectedRiskAnchor)
+    : null;
+  const riskTone = toneForRiskState(analytics.overallRiskState);
+  const heatmap = buildMuscleRegionRisks(metricSets, now, analytics.baselineReady);
+  const lastWorkout = sessions[0] ?? null;
+  const lastWorkoutLoad = lastWorkout
+    ? lastWorkout.sets.reduce((sum, set) => sum + setLoad(set), 0)
+    : 0;
+  const workoutOptions = sessions.map((workout) => ({
+    id: workout.id,
+    label: formatWorkoutOptionLabel(workout),
+  }));
+  const selectedSummary = selectedWorkout ? summarizeWorkoutSets(selectedWorkout.sets) : null;
+  const selectedWorkoutName = selectedWorkout
+    ? cleanWorkoutName(selectedWorkout.note) ?? "Untitled workout"
+    : "No completed workout";
+  const selectedLoadTone = selectedAnalytics
+    ? toneForRiskState(selectedAnalytics.overallRiskState)
+    : "neutral";
 
   return (
     <PageShell>
-      <LabCard className="relative overflow-hidden rounded-2xl p-5" hover={false}>
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-60"
-          style={{
-            background:
-              "radial-gradient(800px 240px at 20% 30%, rgba(34,197,94,0.10), transparent 55%), radial-gradient(600px 220px at 80% 20%, rgba(56,189,248,0.06), transparent 55%)",
-          }}
-        />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+      <LabCard className="rounded-2xl p-5" hover={false}>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <SectionHeader
               eyebrow="Dashboard"
@@ -196,14 +313,8 @@ export default async function DashboardPage() {
                     Logged in as <span className="text-white/80">{email}</span>
                   </div>
                   <div className="h-4 w-px bg-white/10" />
-                  <div className="text-sm text-white/80">
-                    <span className="lab-muted">
-                      {lastSessionAgo === null
-                        ? "No recent training detected."
-                        : lastSessionAgo === 0
-                          ? "Last session today."
-                          : `Last session: ${lastSessionAgo}d ago.`}
-                    </span>
+                  <div className="text-sm lab-muted">
+                    Workout load updates after saving logs.
                   </div>
                 </div>
               }
@@ -216,155 +327,281 @@ export default async function DashboardPage() {
 
       <section className="grid gap-4 md:grid-cols-3">
         <KpiCard
-          title="Session flow"
-          value={activeSession ? "In progress" : "No active session"}
-          badge={activeSession ? "Active" : "Ready"}
-          badgeTone={activeSession ? "watch" : "safe"}
-          subline={
-            activeSession
-              ? `Started ${new Date(activeSession.startedAt).toLocaleString()}`
-              : "Start a new workout when ready."
+          title="Last workout"
+          value={
+            lastWorkout
+              ? new Date(lastWorkout.startedAt).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                })
+              : "None"
           }
-          micro={
-            activeSession
-              ? activeSessionLoggedSets > 0
-                ? `${activeSessionLoggedSets} sets logged`
-                : "No sets logged yet"
-              : "Ready to start"
+          badge={lastWorkout ? `${lastWorkout._count.sets} sets` : "New"}
+          badgeTone={lastWorkout ? "safe" : "neutral"}
+          subline={lastWorkout ? `${formatLoad(lastWorkoutLoad) ?? "0"} load` : "Log a workout to begin tracking."}
+          progress={
+            lastWorkout && analytics.baselineReady && analytics.baselineLoad
+              ? Math.min(100, Math.max(8, (lastWorkoutLoad / analytics.baselineLoad) * 50))
+              : 8
           }
-          microTone={activeSession ? (activeSessionLoggedSets > 0 ? "watch" : "neutral") : "neutral"}
-          progress={activeSession ? (activeSessionLoggedSets > 0 ? 68 : 18) : 10}
         />
 
         <MetricCard
           eyebrow="Risk status"
-          title={risk.state}
-          subtitle={risk.driver}
+          title={riskStateLabel(analytics.overallRiskState)}
           actions={
             <StatusChip
-              label={risk.state}
-              tone={risk.state === "High" ? "danger" : risk.state === "Monitor" ? "watch" : "safe"}
+              label={analytics.riskScore === null ? "-" : `${analytics.riskScore} / 100`}
+              tone={riskTone}
+              showDot={false}
             />
           }
         >
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-xs lab-muted">Weekly change and load ratio.</div>
-            <RiskMeter score={fakeRiskScore} />
+          <div className="space-y-3">
+            <div className="flex items-end gap-2">
+              <div className="text-4xl font-semibold tracking-tight lab-num text-white/95">
+                {analytics.riskScore === null ? "-" : analytics.riskScore}
+              </div>
+              {analytics.riskScore === null ? null : <div className="pb-1 text-sm lab-muted">/ 100</div>}
+            </div>
+            <div className="text-sm font-medium text-white/90">
+              Top driver: {analytics.topDriver}
+            </div>
+            <p className="text-xs leading-5 lab-muted">{analytics.interpretation}</p>
+            <Link
+              href="/info"
+              className="inline-flex rounded-full border border-emerald-400/25 px-3 py-1 text-xs font-medium text-emerald-200 transition hover:border-emerald-300/45 hover:text-emerald-100"
+            >
+              How this is calculated
+            </Link>
           </div>
         </MetricCard>
 
         <KpiCard
-          title="Muscle heatmap"
-          value={elevatedCount === 0 ? "No hot zones" : `${elevatedCount} elevated`}
-          badge={elevatedCount === 0 ? "Stable" : "Watch"}
-          badgeTone={elevatedCount === 0 ? "safe" : "watch"}
-          subline="Where strain looks concentrated."
-          micro={elevatedCount === 0 ? "Even distribution" : "Concentration detected"}
-          microTone={elevatedCount === 0 ? "neutral" : "watch"}
-          progress={elevatedCount === 0 ? 18 : 54}
+          title="7-day load"
+          value={formatLoad(analytics.sevenDayLoad) ?? "0"}
+          badge={analytics.baselineReady ? formatChangePct(analytics.wowChangePct) : "Baseline pending"}
+          badgeTone={!analytics.baselineReady ? "neutral" : analytics.overallRiskState === "High" ? "danger" : analytics.overallRiskState === "Monitor" ? "watch" : "safe"}
+          subline={
+            analytics.baselineReady
+              ? "Compared with workload baseline."
+              : analytics.baselineReason
+          }
+          progress={analytics.baselineReady && analytics.baselineLoad ? Math.min(100, Math.max(8, (analytics.sevenDayLoad / analytics.baselineLoad) * 50)) : 8}
         />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <SessionStepper active={Boolean(activeSession)} />
-        <LoadPanel
-          weeklyLoad={weeklyLoad}
-          baseline7d={baseline7d}
-          wowPct={wowPct}
-          ratio={ratio}
-          riskState={risk.state}
-          driver={risk.driver}
-          trend={trend}
-          baselinePending={!hasTwoWeekWindow}
-        />
-      </section>
+      <LoadPanel
+        recentLoad={analytics.sevenDayLoad}
+        baseline={analytics.baselineLoad}
+        deltaPct={analytics.wowChangePct}
+        baselineReady={analytics.baselineReady}
+      />
 
-      <MuscleHeatmap risk={heatmap} active={Boolean(activeSession)} />
+      <MetricCard
+        eyebrow="Selected workout analysis"
+        title={selectedWorkoutName}
+        subtitle={
+          selectedWorkout
+            ? `${formatWorkoutDateTime(selectedWorkout.startedAt)}. Workout-level load, risk, and effort signals.`
+            : "Save a workout log to analyze a specific session."
+        }
+        actions={
+          <DashboardWorkoutSelector
+            options={workoutOptions}
+            selectedId={selectedWorkout?.id ?? null}
+          />
+        }
+      >
+        {selectedWorkout && selectedSummary ? (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <AnalysisMetric
+                label="Session load"
+                value={formatLoad(selectedSummary.sessionLoad) ?? "0"}
+                subline={
+                  selectedAnalytics?.baselineReady
+                    ? `${formatChangePct(selectedAnalytics.wowChangePct)} vs baseline`
+                    : "This workout contributes to baseline formation."
+                }
+              />
+              <AnalysisMetric label="Sets" value={String(selectedSummary.setCount)} />
+              <AnalysisMetric label="Exercises" value={String(selectedSummary.exerciseCount)} />
+              <AnalysisMetric
+                label="RPE / pain"
+                value={
+                  selectedSummary.averageRpe === null
+                    ? "No RPE"
+                    : `${selectedSummary.averageRpe.toFixed(1)} avg`
+                }
+                subline={
+                  selectedSummary.maxPain === null
+                    ? "No pain logged"
+                    : `${selectedSummary.maxPain}/10 max pain`
+                }
+              />
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm font-medium text-white/90">Load and effort signals</div>
+                  <StatusChip
+                    label={
+                      !selectedAnalytics?.baselineReady
+                        ? "Baseline pending"
+                        : riskStateLabel(selectedAnalytics.overallRiskState)
+                    }
+                    tone={selectedLoadTone}
+                  />
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <div className="text-xs lab-muted">Recent baseline</div>
+                    <div className="mt-1 text-sm font-semibold lab-num text-white/90">
+                      {selectedAnalytics?.baselineReady && selectedAnalytics.baselineLoad ? formatLoad(selectedAnalytics.baselineLoad) ?? "0" : "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs lab-muted">High RPE sets</div>
+                    <div className="mt-1 text-sm font-semibold lab-num text-white/90">
+                      {selectedSummary.highRpeSetCount}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs lab-muted">Pain entries</div>
+                    <div className="mt-1 text-sm font-semibold lab-num text-white/90">
+                      {selectedSummary.painSetCount}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs lab-muted">Risk score</div>
+                    <div className="mt-1 text-sm font-semibold lab-num text-white/90">
+                      {selectedAnalytics?.riskScore === null || !selectedAnalytics ? "-" : `${selectedAnalytics.riskScore}/100`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                {selectedAnalytics?.riskScore === null || !selectedAnalytics ? (
+                  <div className="grid h-24 w-24 place-items-center rounded-full border border-white/10 bg-white/[0.03] text-2xl font-semibold lab-num text-white/70">
+                    -
+                  </div>
+                ) : (
+                  <RiskMeter score={selectedAnalytics.riskScore} />
+                )}
+                <div className="mt-3 text-xs lab-muted">Selected workout risk</div>
+                <div className="mt-2 text-sm leading-5 text-white/80">
+                  {selectedAnalytics?.topDriver ?? "No selected workout risk signal."}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm font-medium text-white/90">Selected workout risk signal</div>
+                <StatusChip
+                  label={selectedAnalytics ? riskStateLabel(selectedAnalytics.overallRiskState) : "Stable"}
+                  tone={selectedAnalytics ? toneForRiskState(selectedAnalytics.overallRiskState) : "safe"}
+                />
+              </div>
+              <div className="mt-3 text-sm text-white/85">
+                Top driver: {selectedAnalytics?.topDriver ?? "No saved workouts in this window"}
+              </div>
+              <p className="mt-2 text-xs leading-5 lab-muted">
+                {selectedAnalytics?.baselineReady
+                  ? "Uses the same deterministic workload signal as the dashboard Risk Status."
+                  : "This workout contributes to baseline formation."}
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="text-sm text-white/85">No completed workouts yet</div>
+            <div className="mt-1 text-xs lab-muted">
+              Create and save a workout to analyze its load, set count, RPE, pain, and risk.
+            </div>
+          </div>
+        )}
+      </MetricCard>
+
+      <MuscleHeatmap regions={heatmap} hasWorkouts={sessions.length > 0} />
 
       <section className="grid gap-4 md:grid-cols-2">
         <LabCard className="rounded-2xl p-5">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-white/90">Recent sessions</div>
-            <div className="text-xs lab-muted">{Math.min(recentSessions.length, 5)} shown</div>
+            <div className="text-sm font-medium text-white/90">Recent workouts</div>
+            <div className="text-xs lab-muted">{sessions.length} shown</div>
           </div>
 
-          {sessionsWithLoad.length === 0 ? (
+          {sessions.length === 0 ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="text-sm text-white/85">No sessions yet</div>
-              <div className="mt-1 text-xs lab-muted">Log a workout to populate this dashboard.</div>
-              <div className="mt-3">
-                <Link
-                  className="btn-primary text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
-                  href="/workouts"
-                >
-                  Go to workouts
-                </Link>
-              </div>
-            </div>
-          ) : recentSessions.length === 0 ? (
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="text-sm text-white/85">No logged sessions yet</div>
+              <div className="text-sm text-white/85">No workouts yet</div>
               <div className="mt-1 text-xs lab-muted">
-                An active session exists, but this view fills in after the first logged set.
-              </div>
-              <div className="mt-3">
-                <Link
-                  className="btn-secondary text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lab-accent-strong)]"
-                  href="/workouts/new"
-                >
-                  Open workout
-                </Link>
+                Save a workout log to populate your dashboard.
               </div>
             </div>
           ) : (
             <div className="mt-4 space-y-2">
-              {recentSessions.map((entry) => (
-                <div key={entry.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium text-white/90">
-                      {new Date(entry.startedAt).toLocaleString()}
+              {sessions.map((workout) => {
+                const load = formatLoad(workout.sets.reduce((sum, set) => sum + setLoad(set), 0));
+                const workoutName = cleanWorkoutName(workout.note, 80);
+                const date = new Date(workout.startedAt).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+
+                return (
+                  <div
+                    key={workout.id}
+                    className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-medium text-white/90">
+                        {workoutName ?? date}
+                      </div>
+                      <div className="text-xs lab-muted">
+                        {workout._count.sets} sets{load ? ` - ${load} load` : ""}
+                      </div>
                     </div>
-                    <div className="text-xs lab-muted">{entry._count.sets} sets</div>
+                    {workoutName ? <div className="mt-1 text-xs text-white/65">{date}</div> : null}
                   </div>
-                  <div className="mt-1 text-xs lab-muted">
-                    Session load: {Math.round(entry.sessionLoad).toLocaleString()}
-                  </div>
-                  <div className="mt-1 text-xs text-white/70">{formatSessionLabel(entry)}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </LabCard>
 
-        <LabCard className="relative overflow-hidden rounded-2xl p-5">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute left-0 right-0 top-0 h-px opacity-40"
-            style={{
-              background: "linear-gradient(90deg, transparent, rgba(34,197,94,0.45), transparent)",
-              animation: "lab-scan 3.6s ease-in-out infinite",
-            }}
-          />
-
+        <LabCard className="rounded-2xl p-5">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-white/90">Watchouts</div>
-            <div className="text-xs lab-muted">Derived</div>
+            <div className="text-sm font-medium text-white/90">Risk feed</div>
+            <div className="text-xs lab-muted">{riskFeedEvents.length} events</div>
           </div>
 
-          {riskEvents.length === 0 ? (
+          {riskFeedEvents.length === 0 ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="text-sm text-white/85">No active watchouts</div>
-              <div className="mt-1 text-xs lab-muted">Current load and ratio are inside stable bands.</div>
+              <div className="text-sm text-white/85">No risk events</div>
+              <div className="mt-1 text-xs lab-muted">
+                Recent workouts have not triggered a pain, RPE, or load flag.
+              </div>
             </div>
           ) : (
             <div className="mt-4 space-y-2">
-              {riskEvents.slice(0, 5).map((event, index) => (
-                <div key={`${event.title}-${index}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm text-white/90">{event.title}</div>
-                    <StatusChip label={event.tone === "danger" ? "High" : "Monitor"} tone={event.tone} />
+              {riskFeedEvents.map((event) => (
+                <div key={event.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-white/90">{event.title}</div>
+                      <div className="mt-1 text-xs lab-muted">{event.meta}</div>
+                    </div>
+                    <StatusChip
+                      label={event.badgeLabel}
+                      tone={event.tone}
+                      showDot={false}
+                    />
                   </div>
-                  <div className="mt-1 text-xs lab-muted">{event.detail}</div>
                 </div>
               ))}
             </div>

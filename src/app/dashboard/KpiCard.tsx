@@ -51,7 +51,6 @@ export function KpiCard(props: {
             className="h-full origin-left rounded-full bg-[rgba(230,232,238,0.18)]"
             style={{
               width: `${p}%`,
-              animation: "lab-bar-fill 420ms ease-out",
               boxShadow: "0 0 0 1px rgba(255,255,255,0.05) inset",
             }}
           />

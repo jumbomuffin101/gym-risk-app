@@ -3,145 +3,104 @@ import React from "react";
 import { MetricCard } from "./components/MetricCard";
 import { StatusChip } from "./components/StatusChip";
 
-type RiskState = "Stable" | "Monitor" | "High";
-
 export function LoadPanel({
-  weeklyLoad,
-  baseline7d,
-  wowPct,
-  ratio,
-  riskState,
-  driver,
-  trend,
-  baselinePending,
+  recentLoad,
+  baseline,
+  deltaPct,
+  baselineReady,
 }: {
-  weeklyLoad: number;
-  baseline7d: number;
-  wowPct: number;
-  ratio: number;
-  riskState: RiskState;
-  driver: string;
-  trend: number[];
-  baselinePending: boolean;
+  recentLoad: number;
+  baseline: number | null;
+  deltaPct: number | null;
+  baselineReady: boolean;
 }) {
-  const tone = riskState === "High" ? "danger" : riskState === "Monitor" ? "watch" : "safe";
-  const trendData = trend.slice(-8);
-  const hasTrend = trendData.some((value) => value > 0);
-  const chartHeight = 100;
-  const chartWidth = 100;
-  const max = hasTrend ? Math.max(...trendData, 1) : 1;
-  const min = hasTrend ? Math.min(...trendData) : 0;
-  const spread = Math.max(max - min, max * 0.12, 1);
-  const paddedMin = Math.max(0, min - spread * 0.2);
-  const paddedMax = max + spread * 0.2;
-  const baselineLow = baseline7d * 0.9;
-  const baselineHigh = baseline7d * 1.1;
+  const tone =
+    !baselineReady || !baseline || deltaPct === null
+      ? "neutral"
+      : deltaPct >= 20
+      ? "danger"
+      : deltaPct >= 12
+      ? "watch"
+      : "safe";
 
-  function yFor(value: number) {
-    return chartHeight - ((value - paddedMin) / Math.max(paddedMax - paddedMin, 1)) * chartHeight;
-  }
-
-  const points = hasTrend
-    ? trendData.map((value, index) => {
-        const x = trendData.length === 1 ? chartWidth / 2 : (index / (trendData.length - 1)) * chartWidth;
-        return { x, y: yFor(value) };
-      })
-    : [];
-
-  const linePath =
-    points.length > 0
-      ? points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ")
-      : "";
-  const areaPath =
-    points.length > 0
-      ? `${linePath} L ${points[points.length - 1].x} ${chartHeight} L ${points[0].x} ${chartHeight} Z`
-      : "";
-  const bandTop = yFor(baselineHigh);
-  const bandBottom = yFor(baselineLow);
+  const color =
+    tone === "danger"
+      ? "var(--lab-danger)"
+      : tone === "watch"
+      ? "var(--lab-watch)"
+      : tone === "neutral"
+      ? "rgba(230,232,238,0.38)"
+      : "var(--lab-safe)";
+  const activityOpacity = baselineReady && baseline ? 0.75 : 0.5;
 
   return (
     <MetricCard
-      title="Load analytics"
-      subtitle="Real session load from logged sets (weight x reps, RPE-adjusted when present)."
-      actions={<StatusChip label={riskState} tone={tone} />}
+      title="Overall recent training load"
+      subtitle="Seven-day logged workout load compared with your workload baseline."
+      actions={
+        <StatusChip
+          label={
+            !baselineReady || !baseline
+              ? "Baseline pending"
+              : tone === "danger"
+              ? "Spike"
+              : tone === "watch"
+              ? "Monitor"
+              : "Stable"
+          }
+          tone={tone}
+        />
+      }
     >
-      <div className="flex flex-wrap gap-2 text-xs">
-        <StatusChip
-          label={`Weekly Load: ${Math.round(weeklyLoad).toLocaleString()}`}
-          tone="neutral"
-          showDot={false}
-          className="lab-num text-[rgba(230,232,238,0.92)]"
-        />
-        <StatusChip
-          label={baselinePending ? "Baseline: pending" : `Baseline: ${Math.round(baseline7d).toLocaleString()}`}
-          tone="neutral"
-          showDot={false}
-          className="lab-num text-[rgba(230,232,238,0.92)]"
-        />
-        <StatusChip
-          label={`WoW: ${wowPct >= 0 ? "+" : ""}${wowPct.toFixed(1)}%`}
-          tone={tone}
-          showDot={false}
-          className="text-[rgba(230,232,238,0.92)]"
-        />
-        <StatusChip
-          label={`A:C Ratio: ${ratio.toFixed(2)}`}
-          tone={tone}
-          showDot={false}
-          className="text-[rgba(230,232,238,0.92)]"
-        />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div>
+          <div className="text-xs lab-muted">7-day load</div>
+          <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
+            {Math.round(recentLoad).toLocaleString()}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs lab-muted">Baseline</div>
+          <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
+            {baselineReady && baseline ? Math.round(baseline).toLocaleString() : "-"}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs lab-muted">Change</div>
+          <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
+            {baselineReady && baseline && deltaPct !== null ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "-"}
+          </div>
+        </div>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[rgba(15,21,32,0.6)] p-4">
+      <div className="mt-5 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <div className="flex items-center justify-between text-xs lab-muted">
-          <span>Recent 8 sessions</span>
-          <span>{driver}</span>
+          <span>Load trend</span>
+          <span className="lab-num">Saved workouts</span>
         </div>
 
-        {hasTrend ? (
-          <svg
-            viewBox="0 0 100 100"
-            className="mt-3 h-28 w-full rounded-xl bg-[rgba(255,255,255,0.02)] p-2"
-            preserveAspectRatio="none"
-            role="img"
-            aria-label="Session load trend"
-          >
-            <rect
-              x="0"
-              y={Math.min(bandTop, bandBottom)}
-              width="100"
-              height={Math.abs(bandBottom - bandTop)}
-              fill="rgba(34,197,94,0.08)"
-            />
-            <path d={areaPath} fill="rgba(34,197,94,0.14)" />
-            <path
-              d={linePath}
-              fill="none"
-              stroke="#22c55e"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <line
-              x1="0"
-              y1={yFor(baseline7d)}
-              x2="100"
-              y2={yFor(baseline7d)}
-              stroke="rgba(255,255,255,0.18)"
-              strokeWidth="1.25"
-              strokeDasharray="4 4"
-            />
-          </svg>
-        ) : (
-          <div className="mt-3 flex h-28 items-center justify-center rounded-xl bg-[rgba(255,255,255,0.02)] px-4 text-sm text-white/65">
-            Log workouts to see your load trend
-          </div>
-        )}
-      </div>
+        <svg viewBox="0 0 260 80" className="mt-4 h-24 w-full" aria-hidden="true">
+          <path d="M8 58H252" stroke="rgba(255,255,255,0.10)" strokeWidth="2" />
+          <path
+            d="M10 54C38 50 55 42 80 44C110 47 124 31 151 34C181 37 192 25 218 23C234 22 244 24 252 20"
+            fill="none"
+            stroke={color}
+            strokeLinecap="round"
+            strokeWidth="3"
+            opacity={activityOpacity}
+          />
+        </svg>
 
-      {baselinePending ? (
-        <div className="mt-3 text-xs lab-muted">Need 2+ weeks of sessions to compute baseline.</div>
-      ) : null}
+        <div className="text-xs lab-muted">
+          {!baselineReady || !baseline
+            ? "Log workouts across 7+ days to establish a baseline."
+            : tone === "danger"
+            ? "Recent load is materially above baseline."
+            : tone === "watch"
+            ? "Recent load is above baseline."
+            : "Recent load is within baseline range."}
+        </div>
+      </div>
     </MetricCard>
   );
 }

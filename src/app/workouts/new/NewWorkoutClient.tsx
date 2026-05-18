@@ -22,7 +22,8 @@ export default function NewWorkoutClient({
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    const timeout = window.setTimeout(() => setIsMounted(true), 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   useEffect(() => {

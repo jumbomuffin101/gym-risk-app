@@ -1,9 +1,9 @@
 import Link from "next/link";
 
-import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
+import { prisma } from "@/app/lib/prisma";
 import { cleanWorkoutName } from "@/app/lib/workouts";
-import { WorkoutBuilder } from "./WorkoutBuilder";
+import { WorkoutBuilder } from "@/app/workouts/new/WorkoutBuilder";
 
 export const runtime = "nodejs";
 
@@ -20,10 +20,10 @@ function formatPreviousWorkoutLabel(startedAt: Date, note: string | null) {
   return name ? `${date} - ${name}` : date;
 }
 
-export default async function NewWorkoutPage() {
+export default async function LogWorkoutPage() {
   const userId = await requireDbUserId();
 
-  const [exercises, recentWorkouts] = await Promise.all([
+  const [exercises, recentLogs] = await Promise.all([
     prisma.exercise.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, category: true },
@@ -56,7 +56,7 @@ export default async function NewWorkoutPage() {
     }),
   ]);
 
-  const previousWorkouts = recentWorkouts.map((workout) => {
+  const previousWorkouts = recentLogs.map((workout) => {
     const exerciseMap = new Map<
       string,
       {
@@ -100,34 +100,37 @@ export default async function NewWorkoutPage() {
       <header className="lab-card rounded-2xl p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <div className="text-xs uppercase tracking-wide lab-muted">New Workout</div>
+            <div className="text-xs uppercase tracking-wide lab-muted">Log</div>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/95">
-              Create workout template
+              Log completed workout
             </h1>
             <p className="mt-1 max-w-2xl text-sm lab-muted">
-              Build a reusable workout shape you can log later. Template storage is not separate
-              yet, so use Log when you want to save a completed session for analytics.
+              Save a training session from scratch or start from a previous workout. Logged
+              workouts power the dashboard, training load, heatmap, and risk feed.
             </p>
           </div>
-          <Link href="/log" className="btn-primary w-fit text-sm">
-            Log workout
+          <Link href="/workouts/new" className="btn-secondary w-fit text-sm">
+            New Workout builder
           </Link>
         </div>
       </header>
 
-      <WorkoutBuilder
-        exercises={exercises}
-        previousWorkouts={previousWorkouts}
-        copy={{
-          builderEyebrow: "Workout builder",
-          builderTitle: "Reusable workout shape",
-          saveLabel: "Log this workout now",
-          previousLabel: "Use previous logged workout",
-          previousConfirm: "Replace the current workout builder with this previous workout?",
-          emptyMessage: "Select exercises from the library to build a workout shape.",
-          redirectTo: "/dashboard",
-        }}
-      />
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="lab-card rounded-2xl p-4">
+          <div className="text-sm font-medium text-white/90">Log from existing workout</div>
+          <p className="mt-1 text-xs leading-5 lab-muted">
+            Choose a previous workout to pre-fill exercises and sets, then edit before saving.
+          </p>
+        </div>
+        <div className="lab-card rounded-2xl p-4">
+          <div className="text-sm font-medium text-white/90">Log from scratch</div>
+          <p className="mt-1 text-xs leading-5 lab-muted">
+            Search exercises, add set rows, duplicate sets, and save the completed session.
+          </p>
+        </div>
+      </div>
+
+      <WorkoutBuilder exercises={exercises} previousWorkouts={previousWorkouts} />
     </div>
   );
 }
