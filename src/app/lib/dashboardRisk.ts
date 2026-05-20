@@ -1,3 +1,5 @@
+import { formatPercentChange } from "@/app/lib/workouts";
+
 export type MuscleRegionId =
   | "chest"
   | "frontDelts"
@@ -267,7 +269,7 @@ function inWindow(date: Date, start: Date, end: Date) {
 }
 
 function formatPct(value: number) {
-  return `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
+  return formatPercentChange(value);
 }
 
 export function changePct(current: number, baseline: number | null) {

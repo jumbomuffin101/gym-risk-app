@@ -13,7 +13,13 @@ import {
   type DashboardAnalytics,
   type DashboardMetricSet,
 } from "@/app/lib/dashboardRisk";
-import { cleanWorkoutName, formatLoad, setLoad, summarizeWorkoutSets } from "@/app/lib/workouts";
+import {
+  cleanWorkoutName,
+  formatLoad,
+  formatPercentChange,
+  setLoad,
+  summarizeWorkoutSets,
+} from "@/app/lib/workouts";
 
 import DashboardActions from "./DashboardActions";
 import { DashboardWorkoutSelector } from "./DashboardWorkoutSelector";
@@ -88,11 +94,6 @@ function riskStateLabel(state: AnalyticsRiskState) {
   return state === "Baseline" ? "Baseline pending" : state;
 }
 
-function formatChangePct(value: number | null) {
-  if (value === null) return "-";
-  return `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
-}
-
 function buildRiskFeedEvents(analytics: DashboardAnalytics): RiskFeedEvent[] {
   const events: RiskFeedEvent[] = [];
 
@@ -111,7 +112,7 @@ function buildRiskFeedEvents(analytics: DashboardAnalytics): RiskFeedEvent[] {
   if (analytics.baselineReady && analytics.wowChangePct !== null && analytics.wowChangePct >= 30) {
     events.push({
       id: "load-spike",
-      title: `7-day load increased ${formatChangePct(analytics.wowChangePct)} vs baseline`,
+      title: `7-day load increased ${formatPercentChange(analytics.wowChangePct)} vs baseline`,
       meta: "Current 7-day load",
       badgeLabel: "High",
       tone: "danger",
@@ -247,7 +248,7 @@ function buildSelectedWorkoutSignal(
   const topDriver = severePain
     ? "Pain flags logged"
     : loadChangePct !== null && loadChangePct >= 30
-    ? `Session load was ${formatChangePct(loadChangePct)} above recent session baseline`
+    ? `Session load was ${formatPercentChange(loadChangePct)} above recent session baseline`
     : risingHighRpe
     ? "High RPE exposure with rising session load"
     : highRpe
@@ -261,7 +262,7 @@ function buildSelectedWorkoutSignal(
       : severePain
       ? "Pain flags were logged in this workout."
       : loadChangePct !== null && loadChangePct >= 30
-      ? `This workout was ${formatChangePct(loadChangePct)} above your recent session baseline.`
+      ? `This workout was ${formatPercentChange(loadChangePct)} above your recent session baseline.`
       : highRpe && loadChangePct !== null && loadChangePct < 0
       ? "This workout was below your recent session baseline, but high-RPE sets were logged."
       : highRpe
@@ -484,7 +485,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             analytics.baselineReady
               ? analytics.wowChangePct === null
                 ? analytics.baselineLabel
-                : formatChangePct(analytics.wowChangePct)
+                : formatPercentChange(analytics.wowChangePct)
               : "Baseline pending"
           }
           badgeTone={!analytics.baselineReady ? "neutral" : analytics.overallRiskState === "High" ? "danger" : analytics.overallRiskState === "Monitor" ? "watch" : "safe"}
@@ -532,7 +533,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   selectedAnalytics?.baselineReady
                     ? selectedAnalytics.changePct === null
                       ? "Compared with recent session baseline"
-                      : `${formatChangePct(selectedAnalytics.changePct)} vs session baseline`
+                      : `${formatPercentChange(selectedAnalytics.changePct)} vs session baseline`
                     : "This workout contributes to baseline formation."
                 }
               />

@@ -3,7 +3,7 @@
 import { KeyboardEvent, useMemo, useState } from "react";
 
 import type { MuscleRegionId, RegionRisk, RegionalRiskState } from "@/app/lib/dashboardRisk";
-import { formatLoad } from "@/app/lib/workouts";
+import { formatLoad, formatPercentChange } from "@/app/lib/workouts";
 
 import { MetricCard } from "./components/MetricCard";
 import { StatusChip } from "./components/StatusChip";
@@ -74,11 +74,6 @@ function stateLabel(state: RegionalRiskState) {
   if (state === "monitor") return "Monitor";
   if (state === "baseline") return "Baseline pending";
   return "Stable";
-}
-
-function changeLabel(value: number | null) {
-  if (value === null) return "-";
-  return `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
 }
 
 function RegionZone({
@@ -297,7 +292,7 @@ export function MuscleHeatmap({
                 <div>
                   <dt className="text-xs lab-muted">Change</dt>
                   <dd className="mt-1 text-sm font-semibold lab-num text-white/90">
-                    {changeLabel(selectedRegion.changePct)}
+                    {formatPercentChange(selectedRegion.changePct)}
                   </dd>
                 </div>
                 <div>

@@ -4,6 +4,7 @@ import {
   type DashboardMetricSet,
 } from "src/app/lib/dashboardRisk";
 import { prisma } from "src/app/lib/prisma";
+import { formatPercentChange } from "@/app/lib/workouts";
 
 type RiskReason = {
   kind: string;
@@ -98,7 +99,7 @@ export function deriveRiskReasonsForSets(
       const increasePct = ((currentLoad - baselineAverage) / baselineAverage) * 100;
       reasons.push({
         kind: "volume_spike",
-        title: `${category} load increased ${Math.round(increasePct)}% vs recent baseline`,
+        title: `${category} load increased ${formatPercentChange(increasePct)} vs recent baseline`,
         score: clamp(45 + increasePct / 2, 45, 95),
         details: {
           category,
@@ -189,7 +190,7 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
 
   const workloadDriver =
     baselineReadiness.comparisonReady && riskSignal.wowChangePct !== null && riskSignal.wowChangePct >= 15
-      ? `Weekly load increased ${riskSignal.wowChangePct >= 0 ? "+" : ""}${Math.round(riskSignal.wowChangePct)}% vs prior week`
+      ? `Weekly load increased ${formatPercentChange(riskSignal.wowChangePct)} vs prior week`
       : baselineReadiness.comparisonReady &&
         riskSignal.acuteChronicRatio !== null &&
         riskSignal.acuteChronicRatio > 1.3

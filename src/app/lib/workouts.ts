@@ -40,6 +40,18 @@ export function formatLoad(value: number) {
   return Math.round(value).toLocaleString();
 }
 
+export function formatPercentChange(
+  value: number | null | undefined,
+  decimals = 0
+) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+
+  const rounded = Number(value.toFixed(decimals));
+  const sign = rounded > 0 ? "+" : "";
+
+  return `${sign}${rounded}%`;
+}
+
 export function summarizeWorkoutSets(sets: WorkoutMetricSet[]) {
   const sessionLoad = sets.reduce((sum, set) => sum + setLoad(set), 0);
   const exerciseCount = new Set(sets.map((set) => set.exerciseId)).size;
@@ -63,4 +75,3 @@ export function summarizeWorkoutSets(sets: WorkoutMetricSet[]) {
     painSetCount: painValues.filter((value) => value > 0).length,
   };
 }
-

@@ -1,5 +1,7 @@
 import React from "react";
 
+import { formatPercentChange } from "@/app/lib/workouts";
+
 import { MetricCard } from "./components/MetricCard";
 import { StatusChip } from "./components/StatusChip";
 
@@ -74,7 +76,7 @@ export function LoadPanel({
         <div>
           <div className="text-xs lab-muted">Change</div>
           <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
-            {baselineReady && baseline !== null && deltaPct !== null ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "-"}
+            {baselineReady && baseline !== null ? formatPercentChange(deltaPct) : "-"}
           </div>
         </div>
       </div>
