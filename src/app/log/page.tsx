@@ -40,6 +40,10 @@ type LoggedWorkout = {
   _count: { sets: number };
 };
 
+type LogPageProps = {
+  searchParams?: Promise<{ templateId?: string | string[]; workoutId?: string | string[] }>;
+};
+
 async function getSafeUserId() {
   try {
     return await getOptionalDbUserId();
@@ -65,6 +69,39 @@ async function getSafeLoggedWorkouts(userId: string): Promise<LoggedWorkout[]> {
       where: {
         userId,
         endedAt: { not: null },
+        sets: { some: {} },
+      },
+      orderBy: { startedAt: "desc" },
+      select: {
+        id: true,
+        startedAt: true,
+        note: true,
+        sets: {
+          orderBy: { performedAt: "asc" },
+          select: {
+            id: true,
+            exerciseId: true,
+            exercise: { select: { id: true, name: true, category: true } },
+            reps: true,
+            weight: true,
+            rpe: true,
+            pain: true,
+          },
+        },
+        _count: { select: { sets: true } },
+      },
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function getSafeTemplateWorkouts(userId: string): Promise<LoggedWorkout[]> {
+  try {
+    return await prisma.workoutSession.findMany({
+      where: {
+        userId,
+        endedAt: null,
         sets: { some: {} },
       },
       orderBy: { startedAt: "desc" },
@@ -127,7 +164,7 @@ function buildPreviousWorkoutExercises(workout: LoggedWorkout) {
   return Array.from(exercises.values());
 }
 
-export default async function LogWorkoutPage() {
+export default async function LogWorkoutPage({ searchParams }: LogPageProps) {
   const userId = await getSafeUserId();
 
   if (!userId) {
@@ -149,17 +186,33 @@ export default async function LogWorkoutPage() {
     );
   }
 
-  const [exercises, loggedWorkouts] = await Promise.all([
+  const params = searchParams ? await searchParams : {};
+  const rawTemplateId = params.templateId;
+  const rawWorkoutId = params.workoutId;
+  const initialPreviousWorkoutId =
+    (Array.isArray(rawTemplateId) ? rawTemplateId[0] : rawTemplateId) ??
+    (Array.isArray(rawWorkoutId) ? rawWorkoutId[0] : rawWorkoutId) ??
+    null;
+
+  const [exercises, templateWorkouts, loggedWorkouts] = await Promise.all([
     getSafeExercises(),
+    getSafeTemplateWorkouts(userId),
     getSafeLoggedWorkouts(userId),
   ]);
 
-  const previousWorkouts = loggedWorkouts.map((workout) => ({
+  const templateOptions = templateWorkouts.map((workout) => ({
     id: workout.id,
-    label: `${cleanWorkoutName(workout.note) ?? "Untitled workout"} - ${formatWorkoutDateTime(workout.startedAt)}`,
+    label: `Template: ${cleanWorkoutName(workout.note) ?? "Untitled template"}`,
     name: cleanWorkoutName(workout.note) ?? "",
     exercises: buildPreviousWorkoutExercises(workout),
   }));
+  const previousLogOptions = loggedWorkouts.map((workout) => ({
+    id: workout.id,
+    label: `Previous log: ${cleanWorkoutName(workout.note) ?? "Untitled workout"} - ${formatWorkoutDateTime(workout.startedAt)}`,
+    name: cleanWorkoutName(workout.note) ?? "",
+    exercises: buildPreviousWorkoutExercises(workout),
+  }));
+  const previousWorkouts = [...templateOptions, ...previousLogOptions];
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -185,7 +238,7 @@ export default async function LogWorkoutPage() {
         <div className="lab-card rounded-2xl p-4">
           <div className="text-sm font-medium text-white/90">Log from existing workout</div>
           <p className="mt-1 text-xs leading-5 lab-muted">
-            Choose a previous logged workout to pre-fill exercises and sets, then edit before saving.
+            Choose a template or previous logged workout to pre-fill exercises and sets, then edit before saving.
           </p>
         </div>
         <div className="lab-card rounded-2xl p-4">
@@ -199,11 +252,12 @@ export default async function LogWorkoutPage() {
       <WorkoutBuilder
         exercises={exercises}
         previousWorkouts={previousWorkouts}
+        initialPreviousWorkoutId={initialPreviousWorkoutId}
         copy={{
-          previousLabel: "Use previous logged workout",
-          previousEmptyLabel: "No previous logs yet",
+          previousLabel: "Use template or previous log",
+          previousEmptyLabel: "No templates or previous logs yet",
           previousSelectLabel: "Select workout",
-          previousConfirm: "Replace the current log with this previous workout?",
+          previousConfirm: "Replace the current log with this workout?",
           redirectTo: "/log",
         }}
       />

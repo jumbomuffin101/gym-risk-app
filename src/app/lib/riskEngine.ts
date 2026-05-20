@@ -244,14 +244,16 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
   const hardSets = sets.filter((s) => (s.rpe ?? 0) >= 9);
   if (hardSets.length >= 3) {
     const severeHighRpe = hardSets.length >= 6;
+    const highRpeWithRisingLoad =
+      riskSignal.wowChangePct !== null && riskSignal.wowChangePct >= 10;
     reasons.push({
       kind: "rpe_spike",
-      title: `High intensity streak (${hardSets.length} sets at RPE >= 9)`,
+      title: `High RPE exposure (${hardSets.length} sets at RPE >= 9)`,
       score:
-        baselineReadiness.comparisonReady && severeHighRpe
+        baselineReadiness.comparisonReady && severeHighRpe && highRpeWithRisingLoad
           ? clamp(70 + hardSets.length * 4, 70, 95)
-          : baselineReadiness.comparisonReady
-          ? clamp(40 + hardSets.length * 8, 50, 95)
+        : baselineReadiness.comparisonReady
+          ? clamp(40 + hardSets.length * 5, 40, 69)
           : clamp(40 + hardSets.length * 5, 40, 69),
       details: {
         baselineReady: baselineReadiness.comparisonReady,
@@ -265,7 +267,7 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
   } else if (hardSets.length > 0) {
     reasons.push({
       kind: "rpe_warning",
-      title: `High intensity present (${hardSets.length} sets at RPE >= 9)`,
+      title: `High RPE exposure (${hardSets.length} sets at RPE >= 9)`,
       score: baselineReadiness.comparisonReady
         ? clamp(25 + hardSets.length * 10, 25, 60)
         : clamp(40 + hardSets.length * 5, 40, 69),

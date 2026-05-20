@@ -89,17 +89,19 @@ function formatDateTimeLocal(date: Date) {
 export function WorkoutBuilder({
   exercises,
   previousWorkouts,
+  initialPreviousWorkoutId,
   copy,
 }: {
   exercises: ExerciseOption[];
   previousWorkouts: PreviousWorkout[];
+  initialPreviousWorkoutId?: string | null;
   copy?: WorkoutBuilderCopy;
 }) {
   const ui = { ...defaultCopy, ...copy };
   const [query, setQuery] = useState("");
   const [workoutName, setWorkoutName] = useState("");
   const [workoutDate, setWorkoutDate] = useState(() => formatDateTimeLocal(new Date()));
-  const [previousWorkoutId, setPreviousWorkoutId] = useState("");
+  const [previousWorkoutId, setPreviousWorkoutId] = useState(initialPreviousWorkoutId ?? "");
   const [selected, setSelected] = useState<BuilderExercise[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

@@ -5,10 +5,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth/authOptions";
 import { prisma } from "@/app/lib/prisma";
 import { requireDbUserId } from "@/app/lib/auth/requireUser";
-import { computeSessionRisk } from "@/app/lib/riskEngine";
 import {
   buildMuscleRegionRisks,
   buildDashboardAnalytics,
+  changePct,
   type AnalyticsRiskState,
   type DashboardAnalytics,
   type DashboardMetricSet,
@@ -30,15 +30,6 @@ import { StatusChip } from "src/app/dashboard/components/StatusChip";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-type DashboardRiskReason = {
-  kind: string;
-  title: string;
-  score: number;
-  details: Record<string, unknown>;
-  sessionId: string;
-  startedAt: Date;
-};
 
 type RiskFeedTone = "safe" | "watch" | "danger" | "neutral";
 
@@ -68,13 +59,6 @@ type DashboardSession = {
     };
   }>;
 };
-
-function cleanDisplayText(value: string) {
-  return value
-    .replaceAll("\u00e2\u2030\u00a5", ">=")
-    .replaceAll("\u00e2\u20ac\u201c", "-")
-    .replaceAll("\u00e2\u20ac\u201d", "-");
-}
 
 function formatWorkoutDateTime(startedAt: Date) {
   return new Date(startedAt).toLocaleString(undefined, {
@@ -109,38 +93,59 @@ function formatChangePct(value: number | null) {
   return `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
 }
 
-function riskFeedTone(score: number): RiskFeedTone {
-  if (score >= 70) return "danger";
-  if (score >= 40) return "watch";
-  return "safe";
-}
-
-function riskFeedLabel(score: number) {
-  if (score >= 70) return "High";
-  if (score >= 40) return "Monitor";
-  return "Stable";
-}
-
-function riskReasonGroupKey(reason: DashboardRiskReason) {
-  const day = reason.startedAt.toISOString().slice(0, 10);
-  const kind = reason.kind.startsWith("rpe")
-    ? "rpe"
-    : reason.kind.startsWith("pain")
-    ? "pain"
-    : reason.kind.startsWith("workload")
-    ? "workload"
-    : reason.kind;
-  const category =
-    typeof reason.details.category === "string" ? reason.details.category : "overall";
-
-  return `${day}-${kind}-${category}`;
-}
-
-function buildRiskFeedEvents(
-  reasons: DashboardRiskReason[],
-  analytics: DashboardAnalytics
-): RiskFeedEvent[] {
+function buildRiskFeedEvents(analytics: DashboardAnalytics): RiskFeedEvent[] {
   const events: RiskFeedEvent[] = [];
+
+  if (analytics.painFlagCount > 0) {
+    events.push({
+      id: "pain-flags",
+      title: `Pain flags logged: ${analytics.painFlagCount} entr${
+        analytics.painFlagCount === 1 ? "y" : "ies"
+      } at pain >= 7 this week`,
+      meta: "User-reported pain signal",
+      badgeLabel: "High",
+      tone: "danger",
+    });
+  }
+
+  if (analytics.baselineReady && analytics.wowChangePct !== null && analytics.wowChangePct >= 30) {
+    events.push({
+      id: "load-spike",
+      title: `7-day load increased ${formatChangePct(analytics.wowChangePct)} vs baseline`,
+      meta: "Current 7-day load",
+      badgeLabel: "High",
+      tone: "danger",
+    });
+  }
+
+  if (
+    analytics.baselineReady &&
+    analytics.acuteChronicRatio !== null &&
+    analytics.acuteChronicRatio >= 1.5
+  ) {
+    events.push({
+      id: "acute-chronic",
+      title: `Acute:chronic ratio ${analytics.acuteChronicRatio.toFixed(2)}`,
+      meta: "7-day load vs chronic baseline",
+      badgeLabel: "High",
+      tone: "danger",
+    });
+  }
+
+  if (analytics.highRpeSetCount > 0) {
+    events.push({
+      id: "high-rpe-week",
+      title: `High RPE exposure: ${analytics.highRpeSetCount} set${
+        analytics.highRpeSetCount === 1 ? "" : "s"
+      } at RPE >= 9 this week`,
+      meta:
+        analytics.wowChangePct !== null && analytics.wowChangePct < 0
+          ? "Load is below baseline"
+          : "Effort signal in current 7-day window",
+      badgeLabel: "Monitor",
+      tone: "watch",
+    });
+  }
 
   if (analytics.baselineStatus === "pending") {
     const days = Math.floor(analytics.baselineSpanDays);
@@ -163,29 +168,7 @@ function buildRiskFeedEvents(
     });
   }
 
-  const grouped = new Map<string, DashboardRiskReason>();
-  for (const reason of reasons.sort((a, b) => b.score - a.score)) {
-    const key = riskReasonGroupKey(reason);
-    const existing = grouped.get(key);
-    if (!existing || reason.score > existing.score) grouped.set(key, reason);
-  }
-
-  const remainingSlots = Math.max(0, 5 - events.length);
-  const reasonEvents = Array.from(grouped.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, remainingSlots)
-    .map((reason) => ({
-      id: `${reason.sessionId}-${reason.kind}-${reason.startedAt.toISOString()}`,
-      title: cleanDisplayText(reason.title),
-      meta: new Date(reason.startedAt).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      }),
-      badgeLabel: riskFeedLabel(reason.score),
-      tone: riskFeedTone(reason.score),
-    }));
-
-  return [...events, ...reasonEvents];
+  return events.slice(0, 5);
 }
 
 function toMetricSets(sessions: DashboardSession[]): DashboardMetricSet[] {
@@ -205,6 +188,95 @@ function toMetricSets(sessions: DashboardSession[]): DashboardMetricSet[] {
       ];
     })
   );
+}
+
+function sessionLoad(workout: DashboardSession) {
+  return workout.sets.reduce((sum, set) => sum + setLoad(set), 0);
+}
+
+function buildSelectedWorkoutSignal(
+  selectedWorkout: DashboardSession,
+  allWorkouts: DashboardSession[],
+  selectedSummary: ReturnType<typeof summarizeWorkoutSets>
+) {
+  const selectedLoad = selectedSummary.sessionLoad;
+  const previousLoads = allWorkouts
+    .filter((workout) => workout.startedAt.getTime() < selectedWorkout.startedAt.getTime())
+    .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+    .slice(0, 8)
+    .map(sessionLoad)
+    .filter((load) => load > 0);
+  const baselineLoad =
+    previousLoads.length > 0
+      ? previousLoads.reduce((sum, load) => sum + load, 0) / previousLoads.length
+      : null;
+  const loadChangePct = changePct(selectedLoad, baselineLoad);
+  const severePain = (selectedSummary.maxPain ?? 0) >= 7;
+  const highRpe = selectedSummary.highRpeSetCount > 0;
+  const risingHighRpe = highRpe && loadChangePct !== null && loadChangePct >= 10;
+
+  let state: AnalyticsRiskState = baselineLoad === null ? "Baseline" : "Stable";
+  if (
+    severePain ||
+    (loadChangePct !== null && loadChangePct >= 30) ||
+    risingHighRpe
+  ) {
+    state = "High";
+  } else if (
+    highRpe ||
+    (selectedSummary.maxPain ?? 0) > 0 ||
+    (loadChangePct !== null && loadChangePct >= 15)
+  ) {
+    state = "Monitor";
+  }
+
+  const score =
+    state === "Baseline"
+      ? null
+      : Math.max(
+          state === "High" ? 70 : state === "Monitor" ? 40 : 20,
+          Math.min(
+            100,
+            20 +
+              (loadChangePct === null ? 0 : Math.max(0, Math.min(30, loadChangePct))) +
+              Math.min(15, selectedSummary.highRpeSetCount * 3) +
+              (severePain ? 20 : 0)
+          )
+        );
+
+  const topDriver = severePain
+    ? "Pain flags logged"
+    : loadChangePct !== null && loadChangePct >= 30
+    ? `Session load was ${formatChangePct(loadChangePct)} above recent session baseline`
+    : risingHighRpe
+    ? "High RPE exposure with rising session load"
+    : highRpe
+    ? "High RPE exposure"
+    : baselineLoad === null
+    ? "Need prior logged workouts"
+    : "Session load is within baseline range";
+  const interpretation =
+    baselineLoad === null
+      ? "This workout contributes to baseline formation."
+      : severePain
+      ? "Pain flags were logged in this workout."
+      : loadChangePct !== null && loadChangePct >= 30
+      ? `This workout was ${formatChangePct(loadChangePct)} above your recent session baseline.`
+      : highRpe && loadChangePct !== null && loadChangePct < 0
+      ? "This workout was below your recent session baseline, but high-RPE sets were logged."
+      : highRpe
+      ? "This workout had elevated effort, but session load was not a high spike."
+      : "This workout was within your recent session baseline.";
+
+  return {
+    baselineReady: baselineLoad !== null,
+    baselineLoad,
+    changePct: loadChangePct,
+    overallRiskState: state,
+    riskScore: score === null ? null : Math.round(score),
+    topDriver,
+    interpretation,
+  };
 }
 
 function AnalysisMetric({
@@ -296,35 +368,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const selectedWorkout =
     analyticsSessions.find((workout) => workout.id === requestedWorkoutId) ?? sessions[0] ?? null;
-  const selectedRiskAnchor = selectedWorkout
-    ? new Date(selectedWorkout.startedAt.getTime() + 60 * 1000)
-    : now;
   const metricSets = toMetricSets(analyticsSessions);
   const baselineWorkouts = analyticsSessions.map((workout) => ({
     startedAt: workout.startedAt,
     endedAt: workout.endedAt,
   }));
 
-  const recentRiskReasonGroups = await Promise.all(
-    analyticsSessions.slice(0, 5).map(async (workout) => {
-      const reasons = await computeSessionRisk(userId, workout.id);
-      return reasons.map((reason) => ({
-        ...reason,
-        sessionId: workout.id,
-        startedAt: workout.startedAt,
-      }));
-    })
-  );
-
-  const recentRiskReasons: DashboardRiskReason[] = recentRiskReasonGroups
-    .flat()
-    .sort((a, b) => b.score - a.score);
-
   const analytics = buildDashboardAnalytics(metricSets, baselineWorkouts, now);
-  const riskFeedEvents = buildRiskFeedEvents(recentRiskReasons, analytics);
-  const selectedAnalytics = selectedWorkout
-    ? buildDashboardAnalytics(metricSets, baselineWorkouts, selectedRiskAnchor)
-    : null;
+  const riskFeedEvents = buildRiskFeedEvents(analytics);
   const riskTone = toneForRiskState(analytics.overallRiskState);
   const heatmap = buildMuscleRegionRisks(metricSets, now, analytics.baselineReady);
   const lastWorkout = sessions[0] ?? null;
@@ -336,6 +387,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     label: formatWorkoutOptionLabel(workout),
   }));
   const selectedSummary = selectedWorkout ? summarizeWorkoutSets(selectedWorkout.sets) : null;
+  const selectedAnalytics =
+    selectedWorkout && selectedSummary
+      ? buildSelectedWorkoutSignal(selectedWorkout, analyticsSessions, selectedSummary)
+      : null;
   const selectedWorkoutName = selectedWorkout
     ? cleanWorkoutName(selectedWorkout.note) ?? "Untitled workout"
     : "No completed workout";
@@ -475,9 +530,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 value={formatLoad(selectedSummary.sessionLoad) ?? "0"}
                 subline={
                   selectedAnalytics?.baselineReady
-                    ? selectedAnalytics.wowChangePct === null
-                      ? `Compared with ${selectedAnalytics.baselineLabel.toLowerCase()}`
-                      : `${formatChangePct(selectedAnalytics.wowChangePct)} vs baseline`
+                    ? selectedAnalytics.changePct === null
+                      ? "Compared with recent session baseline"
+                      : `${formatChangePct(selectedAnalytics.changePct)} vs session baseline`
                     : "This workout contributes to baseline formation."
                 }
               />
@@ -506,8 +561,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     label={
                       !selectedAnalytics?.baselineReady
                         ? "Baseline pending"
-                        : selectedAnalytics.baselineStatus === "provisional"
-                        ? "Provisional baseline"
                         : riskStateLabel(selectedAnalytics.overallRiskState)
                     }
                     tone={selectedLoadTone}
@@ -569,9 +622,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
               <p className="mt-2 text-xs leading-5 lab-muted">
                 {selectedAnalytics?.baselineReady
-                  ? selectedAnalytics.baselineStatus === "provisional"
-                    ? "Uses the same deterministic workload signal with a provisional baseline."
-                    : "Uses the same deterministic workload signal as the dashboard Risk Status."
+                  ? selectedAnalytics.interpretation
                   : "This workout contributes to baseline formation."}
               </p>
             </div>
@@ -591,7 +642,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <section className="grid gap-4 md:grid-cols-2">
         <LabCard className="rounded-2xl p-5">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-white/90">Recent workouts</div>
+            <div className="text-sm font-medium text-white/90">Recent logs</div>
             <div className="text-xs lab-muted">{sessions.length} shown</div>
           </div>
 
@@ -636,15 +687,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         <LabCard className="rounded-2xl p-5">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-white/90">Risk feed</div>
+            <div className="text-sm font-medium text-white/90">Workload feed</div>
             <div className="text-xs lab-muted">{riskFeedEvents.length} events</div>
           </div>
 
           {riskFeedEvents.length === 0 ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="text-sm text-white/85">No risk events</div>
+              <div className="text-sm text-white/85">No workload flags</div>
               <div className="mt-1 text-xs lab-muted">
-                Recent workouts have not triggered a pain, RPE, or load flag.
+                No workload flags in the current window.
               </div>
             </div>
           ) : (

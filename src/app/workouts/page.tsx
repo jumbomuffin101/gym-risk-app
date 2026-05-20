@@ -100,7 +100,10 @@ export default async function WorkoutPage() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 flex justify-start md:justify-end">
+                <div className="mt-4 flex flex-wrap justify-start gap-2 md:justify-end">
+                  <Link href={`/log?templateId=${template.id}`} className="btn-primary text-xs">
+                    Log workout
+                  </Link>
                   <WorkoutHistoryActions
                     workoutId={template.id}
                     initialName={template.note ?? "Untitled template"}

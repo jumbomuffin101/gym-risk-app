@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildMuscleRegionRisks,
+  computeDashboardRiskSignal,
   getBaselineReadiness,
   regionsForExercise,
 } from "./dashboardRisk";
@@ -99,4 +100,30 @@ test("first regional load is baseline pending, not high", () => {
   );
 
   assert.equal(regions.find((region) => region.id === "quads")?.state, "baseline");
+});
+
+test("high RPE with lower load returns monitor, not high", () => {
+  const asOf = new Date("2026-05-17T12:00:00Z");
+  const baselineSets = Array.from({ length: 4 }, (_, index) => ({
+    performedAt: new Date(`2026-05-${10 + index}T12:00:00Z`),
+    reps: 10,
+    weight: 100,
+    rpe: 8,
+    pain: null,
+    exercise: { name: "Bicep Curl", category: "arms" },
+  }));
+  const recentSets = Array.from({ length: 18 }, () => ({
+    performedAt: new Date("2026-05-17T11:00:00Z"),
+    reps: 5,
+    weight: 5,
+    rpe: 9,
+    pain: null,
+    exercise: { name: "Bicep Curl", category: "arms" },
+  }));
+
+  const signal = computeDashboardRiskSignal([...baselineSets, ...recentSets], asOf, true);
+  const regions = buildMuscleRegionRisks([...baselineSets, ...recentSets], asOf, true);
+
+  assert.equal(signal.state, "monitor");
+  assert.equal(regions.find((region) => region.id === "biceps")?.state, "monitor");
 });

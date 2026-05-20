@@ -111,7 +111,7 @@ export function WorkoutHistoryActions({
           }}
           className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/70 hover:bg-white/[0.04] hover:text-white/90"
         >
-          Rename template
+          Edit
         </button>
         <button
           type="button"
@@ -119,7 +119,7 @@ export function WorkoutHistoryActions({
           disabled={pending}
           className="rounded-lg border border-[rgba(239,68,68,0.28)] px-3 py-2 text-xs text-red-200/80 hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Delete template
+          Delete
         </button>
       </div>
       {error ? <div className="text-xs text-red-200/85 md:text-right">{error}</div> : null}
