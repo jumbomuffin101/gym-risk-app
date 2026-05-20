@@ -23,7 +23,11 @@ export type BaselineWorkout = {
 
 export type BaselineReadiness = {
   isReady: boolean;
+  isPending: boolean;
+  isProvisional: boolean;
+  comparisonReady: boolean;
   workoutCount: number;
+  uniqueDays: number;
   spanDays: number;
   firstWorkoutAt: Date | null;
   latestWorkoutAt: Date | null;
@@ -76,8 +80,12 @@ export type AnalyticsRiskState = "Baseline" | "Stable" | "Monitor" | "High";
 
 export type DashboardAnalytics = {
   baselineReady: boolean;
+  baselineEstablished: boolean;
+  baselineStatus: "pending" | "provisional" | "established";
+  baselineLabel: "Baseline pending" | "Provisional baseline" | "Baseline established";
   baselineReason: string;
   baselineWorkoutCount: number;
+  baselineUniqueDays: number;
   baselineSpanDays: number;
   overallRiskState: AnalyticsRiskState;
   riskScore: number | null;
@@ -263,15 +271,49 @@ function formatPct(value: number) {
 }
 
 function formatBaselineReason(readiness: BaselineReadiness) {
-  if (readiness.isReady) return "Baseline established.";
+  if (readiness.isReady) {
+    return `Baseline established from ${readiness.workoutCount} workouts across ${readiness.uniqueDays} unique day${
+      readiness.uniqueDays === 1 ? "" : "s"
+    }.`;
+  }
   if (readiness.workoutCount === 0) {
-    return "No workouts logged yet. Need 3 workouts across 7+ days.";
+    return "No workouts logged yet. Need 3 workouts to start a baseline.";
+  }
+  if (readiness.isPending) {
+    return `${readiness.workoutCount} workout${
+      readiness.workoutCount === 1 ? "" : "s"
+    } logged. Need 3 workouts to start a baseline.`;
   }
 
-  const days = Math.floor(readiness.spanDays);
-  return `${readiness.workoutCount} workout${
-    readiness.workoutCount === 1 ? "" : "s"
-  } logged across ${days} day${days === 1 ? "" : "s"}. Need 3 workouts across 7+ days.`;
+  return `Provisional baseline from ${readiness.workoutCount} workouts across ${readiness.uniqueDays} unique day${
+    readiness.uniqueDays === 1 ? "" : "s"
+  }.`;
+}
+
+function formatWorkoutDay(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function baselineStatus(readiness: BaselineReadiness): DashboardAnalytics["baselineStatus"] {
+  if (readiness.isPending) return "pending";
+  if (readiness.isProvisional) return "provisional";
+  return "established";
+}
+
+function baselineLabel(readiness: BaselineReadiness): DashboardAnalytics["baselineLabel"] {
+  if (readiness.isPending) return "Baseline pending";
+  if (readiness.isProvisional) return "Provisional baseline";
+  return "Baseline established";
+}
+
+function observedDayCount(dates: Date[], now: Date) {
+  if (dates.length === 0) return 0;
+  const first = dates[0];
+  const latest = dates[dates.length - 1];
+  const spanFromFirstToLatest = Math.floor((latest.getTime() - first.getTime()) / DAY_MS) + 1;
+  const spanFromFirstToNow = Math.floor((now.getTime() - first.getTime()) / DAY_MS) + 1;
+
+  return clamp(Math.max(1, Math.min(spanFromFirstToLatest, spanFromFirstToNow)), 1, 7);
 }
 
 export function getBaselineReadiness(
@@ -284,14 +326,21 @@ export function getBaselineReadiness(
 
   const firstWorkoutAt = completed[0] ?? null;
   const latestWorkoutAt = completed[completed.length - 1] ?? null;
+  const uniqueDays = new Set(completed.map(formatWorkoutDay)).size;
   const spanDays =
     firstWorkoutAt && latestWorkoutAt
       ? (latestWorkoutAt.getTime() - firstWorkoutAt.getTime()) / DAY_MS
       : 0;
+  const isPending = completed.length < 3;
+  const isReady = completed.length >= 8 || uniqueDays >= 5;
 
   return {
-    isReady: completed.length >= 3 && spanDays >= 7,
+    isReady,
+    isPending,
+    isProvisional: !isPending && !isReady,
+    comparisonReady: !isPending,
     workoutCount: completed.length,
+    uniqueDays,
     spanDays,
     firstWorkoutAt,
     latestWorkoutAt,
@@ -301,7 +350,9 @@ export function getBaselineReadiness(
 export function getCompletedWorkouts(workouts: BaselineWorkout[], asOf = new Date()) {
   const asOfTime = asOf.getTime();
 
-  return workouts.filter((workout) => workout.startedAt.getTime() <= asOfTime);
+  return workouts.filter(
+    (workout) => workout.endedAt !== null && workout.startedAt.getTime() <= asOfTime
+  );
 }
 
 export function isBaselineReady(workouts: BaselineWorkout[], asOf = new Date()) {
@@ -330,7 +381,20 @@ export function computeBaselineLoad(sets: DashboardMetricSet[], now = new Date()
     sets.filter((set) => inWindow(set.performedAt, chronicStart, acuteStart))
   );
 
-  return chronicLoad > 0 ? chronicLoad / 4 : null;
+  if (chronicLoad > 0) return chronicLoad / 4;
+
+  const availableSets = sets
+    .filter((set) => set.performedAt.getTime() <= now.getTime())
+    .sort((a, b) => a.performedAt.getTime() - b.performedAt.getTime());
+  const availableLoad = computeWorkoutLoad(availableSets);
+  if (availableLoad <= 0) return null;
+
+  const days = observedDayCount(
+    availableSets.map((set) => set.performedAt),
+    now
+  );
+
+  return days > 0 ? availableLoad / days * 7 : null;
 }
 
 function emptyRegion(id: MuscleRegionId, hasCompletedSets: boolean): RegionRisk {
@@ -367,6 +431,8 @@ export function buildMuscleRegionRisks(
     {
       currentLoad: number;
       baselineLoad: number;
+      availableLoad: number;
+      activeDates: Date[];
       highRpeSetCount: number;
       painFlagCount: number;
       maxRpe: number;
@@ -382,6 +448,8 @@ export function buildMuscleRegionRisks(
     const created = {
       currentLoad: 0,
       baselineLoad: 0,
+      availableLoad: 0,
+      activeDates: [],
       highRpeSetCount: 0,
       painFlagCount: 0,
       maxRpe: 0,
@@ -398,12 +466,17 @@ export function buildMuscleRegionRisks(
 
     const isRecent = inWindow(set.performedAt, recentStart, now);
     const isBaseline = inWindow(set.performedAt, baselineStart, recentStart);
-    if (!isRecent && !isBaseline) continue;
+    const isAvailable = set.performedAt.getTime() <= now.getTime();
+    if (!isRecent && !isBaseline && !isAvailable) continue;
 
     // Split set tonnage evenly so multi-region exercises do not double-count load.
     const setLoad = tonnage(set) / regions.length;
     for (const region of regions) {
       const regionStats = ensure(region);
+      if (isAvailable) {
+        regionStats.availableLoad += setLoad;
+        regionStats.activeDates.push(set.performedAt);
+      }
       if (isRecent) {
         regionStats.currentLoad += setLoad;
         regionStats.maxRpe = Math.max(regionStats.maxRpe, set.rpe ?? 0);
@@ -425,7 +498,16 @@ export function buildMuscleRegionRisks(
     const regionStats = stats.get(id);
     if (!regionStats) return emptyRegion(id, hasCompletedSets);
 
-    const weeklyBaselineLoad = regionStats.baselineLoad > 0 ? regionStats.baselineLoad / 4 : 0;
+    const provisionalBaselineLoad =
+      regionStats.availableLoad > 0
+        ? regionStats.availableLoad / observedDayCount(regionStats.activeDates.sort((a, b) => a.getTime() - b.getTime()), now) * 7
+        : 0;
+    const weeklyBaselineLoad =
+      regionStats.baselineLoad > 0
+        ? regionStats.baselineLoad / 4
+        : baselineReady
+        ? provisionalBaselineLoad
+        : 0;
     const hasRegionalBaseline = baselineReady && weeklyBaselineLoad > 0;
     const changePct = hasRegionalBaseline
       ? ((regionStats.currentLoad - weeklyBaselineLoad) / weeklyBaselineLoad) * 100
@@ -476,6 +558,8 @@ export function buildMuscleRegionRisks(
           : `Regional load is within baseline range.${signals.length ? ` ${signals.join(", ")}.` : ""}`
         : signals.length
         ? `Recent regional load exists before a baseline is ready. ${signals.join(", ")}.`
+        : baselineReady
+        ? "Regional load is compared against a provisional baseline from available history."
         : "Recent regional load exists, but there is not enough history for comparison yet.";
 
     const action =
@@ -486,7 +570,7 @@ export function buildMuscleRegionRisks(
           ? "Keep the next exposure controlled and watch RPE or pain closely."
           : "Keep the next exposure controlled and avoid another sharp load increase."
         : state === "baseline"
-        ? "Log more workouts to establish a regional baseline."
+        ? "Log at least 3 workouts to start a baseline."
         : "No adjustment indicated from logged workload.";
 
     return {
@@ -640,7 +724,7 @@ export function scoreWorkloadRiskSignal(input: WorkloadRiskScoreInput): Dashboar
       ? "Baseline pending"
       : "Recent workload is within formula thresholds";
   const interpretation = !input.baselineReady
-    ? "Log at least 3 workouts across 7+ days to establish a baseline."
+    ? "Log at least 3 workouts to start a baseline."
     : "Workload signal based on saved sets, RPE, and pain notes.";
 
   return {
@@ -691,30 +775,38 @@ export function buildDashboardAnalytics(
   now = new Date()
 ): DashboardAnalytics {
   const baseline = getBaselineReadiness(workouts, now);
-  const riskSignal = computeDashboardRiskSignal(sets, now, baseline.isReady);
+  const riskSignal = computeDashboardRiskSignal(sets, now, baseline.comparisonReady);
   const hasEffortOrPainSignal = riskSignal.highRpeSetCount > 0 || riskSignal.painFlagCount > 0;
+  const status = baselineStatus(baseline);
+  const label = baselineLabel(baseline);
 
   return {
-    baselineReady: baseline.isReady,
+    baselineReady: baseline.comparisonReady,
+    baselineEstablished: baseline.isReady,
+    baselineStatus: status,
+    baselineLabel: label,
     baselineReason: formatBaselineReason(baseline),
     baselineWorkoutCount: baseline.workoutCount,
+    baselineUniqueDays: baseline.uniqueDays,
     baselineSpanDays: baseline.spanDays,
     overallRiskState: analyticsState(riskSignal.state),
-    riskScore: baseline.isReady ? riskSignal.score : null,
+    riskScore: baseline.comparisonReady ? riskSignal.score : null,
     topDriver:
-      !baseline.isReady && !hasEffortOrPainSignal
+      baseline.isPending && !hasEffortOrPainSignal
         ? "Need more workout history"
         : riskSignal.topDriver,
     interpretation:
-      !baseline.isReady && hasEffortOrPainSignal
+      baseline.isPending && hasEffortOrPainSignal
         ? `Baseline is pending, but effort or pain signals are raised. ${formatBaselineReason(baseline)}`
-        : !baseline.isReady
+        : baseline.isPending
         ? formatBaselineReason(baseline)
+        : baseline.isProvisional
+        ? `Using a provisional baseline. ${formatBaselineReason(baseline)}`
         : riskSignal.interpretation,
     sevenDayLoad: riskSignal.acuteLoad,
-    baselineLoad: baseline.isReady ? riskSignal.chronicWeeklyLoad : null,
-    wowChangePct: baseline.isReady ? riskSignal.wowChangePct : null,
-    acuteChronicRatio: baseline.isReady ? riskSignal.acuteChronicRatio : null,
+    baselineLoad: baseline.comparisonReady ? riskSignal.chronicWeeklyLoad : null,
+    wowChangePct: baseline.comparisonReady ? riskSignal.wowChangePct : null,
+    acuteChronicRatio: baseline.comparisonReady ? riskSignal.acuteChronicRatio : null,
     highRpeSetCount: riskSignal.highRpeSetCount,
     painFlagCount: riskSignal.painFlagCount,
     riskSignal,

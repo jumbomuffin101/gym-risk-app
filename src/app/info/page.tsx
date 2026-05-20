@@ -101,9 +101,9 @@ export default function InfoPage() {
         <MethodSection title="Risk Score Formula">
           <p>The dashboard Risk Status and Selected Workout Analysis use the same scoring function.</p>
           <p>
-            Workload comparisons only activate after a baseline is ready: at least 3 saved workouts
-            across 7 or more days. Before that, the app shows Baseline pending unless RPE or pain
-            signals warrant Monitor.
+            Baseline pending is shown only before 3 completed workouts. From 3 workouts onward,
+            the app uses a provisional baseline from available history. The baseline is considered
+            established after 8 completed workouts or workouts on 5 unique days.
           </p>
           <div className="space-y-2">
             <FormulaItem label="Base score" value="20 points" />
@@ -121,15 +121,17 @@ export default function InfoPage() {
         <MethodSection title="Status Bands">
           <div className="flex flex-wrap gap-2">
             <StatusChip label="Baseline pending" tone="neutral" />
+            <StatusChip label="Provisional baseline" tone="neutral" />
             <StatusChip label="Stable 0-39" tone="safe" />
             <StatusChip label="Monitor 40-69" tone="watch" />
             <StatusChip label="High 70-100" tone="danger" />
           </div>
           <p>
-            Baseline pending means there is not enough workout history for workload comparisons.
-            Stable means the saved workload signal is within the current thresholds. Monitor means
-            there is at least one meaningful workload, RPE, or pain signal worth watching. High means
-            the formula found an established workload spike or a severe RPE or pain signal.
+            Baseline pending means fewer than 3 workouts have been logged. Provisional baseline
+            means the app is using limited history instead of blocking analytics. Stable means the
+            saved workload signal is within the current thresholds. Monitor means there is at least
+            one meaningful workload, RPE, or pain signal worth watching. High means the formula
+            found a workload spike or a severe RPE or pain signal.
           </p>
         </MethodSection>
 

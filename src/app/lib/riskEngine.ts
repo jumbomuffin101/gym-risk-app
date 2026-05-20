@@ -12,8 +12,105 @@ type RiskReason = {
   details: Record<string, unknown>;
 };
 
+type RiskSet = {
+  sessionId?: string;
+  weight: number;
+  reps: number;
+  durationSeconds: number | null;
+  distanceMeters: number | null;
+  rpe: number | null;
+  pain: number | null;
+  exercise: {
+    category: string | null;
+    name: string;
+  };
+};
+
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
+}
+
+function setExternalLoad(set: Pick<RiskSet, "weight" | "reps">) {
+  return set.weight * set.reps;
+}
+
+export function deriveRiskReasonsForSets(
+  sets: RiskSet[],
+  baselineByCategory: Record<string, RiskSet[]> = {}
+): RiskReason[] {
+  const reasons: RiskReason[] = [];
+  const conditioningSets = sets.filter((set) => set.exercise.category === "conditioning");
+  const conditioningSeconds = conditioningSets.reduce(
+    (sum, set) => sum + (set.durationSeconds ?? 0),
+    0
+  );
+  const conditioningDistance = conditioningSets.reduce(
+    (sum, set) => sum + (set.distanceMeters ?? 0),
+    0
+  );
+  const conditioningAverageRpe =
+    conditioningSets.length > 0
+      ? conditioningSets.reduce((sum, set) => sum + (set.rpe ?? 0), 0) / conditioningSets.length
+      : 0;
+
+  if (
+    conditioningSets.length >= 3 &&
+    conditioningAverageRpe >= 8 &&
+    (conditioningSeconds >= 1500 || conditioningDistance >= 4000)
+  ) {
+    reasons.push({
+      kind: "conditioning_density",
+      title: "Conditioning density is elevated",
+      score: clamp(40 + conditioningSets.length * 8, 40, 85),
+      details: {
+        setCount: conditioningSets.length,
+        durationSeconds: conditioningSeconds,
+        distanceMeters: conditioningDistance,
+        averageRpe: conditioningAverageRpe,
+      },
+    });
+  }
+
+  const currentLoadByCategory = new Map<string, number>();
+  for (const set of sets) {
+    const category = set.exercise.category;
+    if (!category) continue;
+    currentLoadByCategory.set(
+      category,
+      (currentLoadByCategory.get(category) ?? 0) + setExternalLoad(set)
+    );
+  }
+
+  for (const [category, currentLoad] of currentLoadByCategory) {
+    const baselineSets = baselineByCategory[category] ?? [];
+    if (baselineSets.length === 0) continue;
+
+    const baselineSessionLoads = new Map<string, number>();
+    for (const set of baselineSets) {
+      const key = set.sessionId ?? `${set.exercise.name}-${baselineSessionLoads.size}`;
+      baselineSessionLoads.set(key, (baselineSessionLoads.get(key) ?? 0) + setExternalLoad(set));
+    }
+
+    const baselineLoads = Array.from(baselineSessionLoads.values());
+    const baselineAverage =
+      baselineLoads.reduce((sum, load) => sum + load, 0) / baselineLoads.length;
+    if (baselineAverage > 0 && currentLoad >= baselineAverage * 1.3) {
+      const increasePct = ((currentLoad - baselineAverage) / baselineAverage) * 100;
+      reasons.push({
+        kind: "volume_spike",
+        title: `${category} load increased ${Math.round(increasePct)}% vs recent baseline`,
+        score: clamp(45 + increasePct / 2, 45, 95),
+        details: {
+          category,
+          currentLoad,
+          baselineAverage,
+          increasePct,
+        },
+      });
+    }
+  }
+
+  return reasons.sort((a, b) => b.score - a.score).slice(0, 5);
 }
 
 /**
@@ -71,14 +168,14 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
   const riskSignal = computeDashboardRiskSignal(
     windowSets,
     riskAsOf,
-    baselineReadiness.isReady
+    baselineReadiness.comparisonReady
   );
   const reasons: RiskReason[] = [];
 
   const workloadDriver =
-    baselineReadiness.isReady && riskSignal.wowChangePct !== null && riskSignal.wowChangePct >= 15
+    baselineReadiness.comparisonReady && riskSignal.wowChangePct !== null && riskSignal.wowChangePct >= 15
       ? `Weekly load increased ${riskSignal.wowChangePct >= 0 ? "+" : ""}${Math.round(riskSignal.wowChangePct)}% vs prior week`
-      : baselineReadiness.isReady &&
+      : baselineReadiness.comparisonReady &&
         riskSignal.acuteChronicRatio !== null &&
         riskSignal.acuteChronicRatio > 1.3
       ? `Acute:chronic ratio ${riskSignal.acuteChronicRatio.toFixed(2)}`
@@ -90,7 +187,7 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
       title: workloadDriver,
       score: riskSignal.score,
       details: {
-        baselineReady: baselineReadiness.isReady,
+        baselineReady: baselineReadiness.comparisonReady,
         wowChangePct: riskSignal.wowChangePct,
         acuteChronicRatio: riskSignal.acuteChronicRatio,
         acuteLoad: Math.round(riskSignal.acuteLoad),
@@ -113,13 +210,13 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
       score:
         severePain
           ? clamp(70 + (maxPain - 9) * 10 + painSets.length * 2, 70, 95)
-          : baselineReadiness.isReady
+          : baselineReadiness.comparisonReady
           ? clamp(50 + (maxPain - 7) * 10, 50, 90)
           : clamp(45 + (maxPain - 7) * 8, 45, 69),
       details: {
         maxPain,
         count: painSets.length,
-        baselineReady: baselineReadiness.isReady,
+        baselineReady: baselineReadiness.comparisonReady,
         examples: painSets.slice(0, 3).map((s) => ({
           exercise: s.exercise.name,
           category: s.exercise.category,
@@ -136,13 +233,13 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
       kind: "rpe_spike",
       title: `High intensity streak (${hardSets.length} sets at RPE >= 9)`,
       score:
-        baselineReadiness.isReady && severeHighRpe
+        baselineReadiness.comparisonReady && severeHighRpe
           ? clamp(70 + hardSets.length * 4, 70, 95)
-          : baselineReadiness.isReady
+          : baselineReadiness.comparisonReady
           ? clamp(40 + hardSets.length * 8, 50, 95)
           : clamp(40 + hardSets.length * 5, 40, 69),
       details: {
-        baselineReady: baselineReadiness.isReady,
+        baselineReady: baselineReadiness.comparisonReady,
         hardSets: hardSets.slice(0, 5).map((s) => ({
           exercise: s.exercise.name,
           category: s.exercise.category,
@@ -154,11 +251,11 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
     reasons.push({
       kind: "rpe_warning",
       title: `High intensity present (${hardSets.length} sets at RPE >= 9)`,
-      score: baselineReadiness.isReady
+      score: baselineReadiness.comparisonReady
         ? clamp(25 + hardSets.length * 10, 25, 60)
         : clamp(40 + hardSets.length * 5, 40, 69),
       details: {
-        baselineReady: baselineReadiness.isReady,
+        baselineReady: baselineReadiness.comparisonReady,
         hardSets: hardSets.slice(0, 5).map((s) => ({
           exercise: s.exercise.name,
           category: s.exercise.category,

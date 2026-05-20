@@ -84,7 +84,7 @@ function riskStateLabel(state: AnalyticsRiskState) {
 }
 
 function formatChangePct(value: number | null) {
-  if (value === null) return "Baseline pending";
+  if (value === null) return "-";
   return `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
 }
 
@@ -121,7 +121,7 @@ function buildRiskFeedEvents(
 ): RiskFeedEvent[] {
   const events: RiskFeedEvent[] = [];
 
-  if (!analytics.baselineReady) {
+  if (analytics.baselineStatus === "pending") {
     const days = Math.floor(analytics.baselineSpanDays);
     events.push({
       id: "baseline-building",
@@ -130,6 +130,14 @@ function buildRiskFeedEvents(
       } logged across ${days} day${days === 1 ? "" : "s"}`,
       meta: analytics.baselineReason,
       badgeLabel: "Baseline",
+      tone: "neutral",
+    });
+  } else if (analytics.baselineStatus === "provisional") {
+    events.push({
+      id: "baseline-provisional",
+      title: "Provisional baseline active",
+      meta: analytics.baselineReason,
+      badgeLabel: "Provisional",
       tone: "neutral",
     });
   }
@@ -380,11 +388,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <KpiCard
           title="7-day load"
           value={formatLoad(analytics.sevenDayLoad) ?? "0"}
-          badge={analytics.baselineReady ? formatChangePct(analytics.wowChangePct) : "Baseline pending"}
+          badge={
+            analytics.baselineReady
+              ? analytics.wowChangePct === null
+                ? analytics.baselineLabel
+                : formatChangePct(analytics.wowChangePct)
+              : "Baseline pending"
+          }
           badgeTone={!analytics.baselineReady ? "neutral" : analytics.overallRiskState === "High" ? "danger" : analytics.overallRiskState === "Monitor" ? "watch" : "safe"}
           subline={
             analytics.baselineReady
-              ? "Compared with workload baseline."
+              ? analytics.baselineStatus === "provisional"
+                ? "Compared with provisional workload baseline."
+                : "Compared with workload baseline."
               : analytics.baselineReason
           }
           progress={analytics.baselineReady && analytics.baselineLoad ? Math.min(100, Math.max(8, (analytics.sevenDayLoad / analytics.baselineLoad) * 50)) : 8}
@@ -396,6 +412,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         baseline={analytics.baselineLoad}
         deltaPct={analytics.wowChangePct}
         baselineReady={analytics.baselineReady}
+        baselineLabel={analytics.baselineLabel}
       />
 
       <MetricCard
@@ -421,7 +438,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 value={formatLoad(selectedSummary.sessionLoad) ?? "0"}
                 subline={
                   selectedAnalytics?.baselineReady
-                    ? `${formatChangePct(selectedAnalytics.wowChangePct)} vs baseline`
+                    ? selectedAnalytics.wowChangePct === null
+                      ? `Compared with ${selectedAnalytics.baselineLabel.toLowerCase()}`
+                      : `${formatChangePct(selectedAnalytics.wowChangePct)} vs baseline`
                     : "This workout contributes to baseline formation."
                 }
               />
@@ -450,6 +469,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     label={
                       !selectedAnalytics?.baselineReady
                         ? "Baseline pending"
+                        : selectedAnalytics.baselineStatus === "provisional"
+                        ? "Provisional baseline"
                         : riskStateLabel(selectedAnalytics.overallRiskState)
                     }
                     tone={selectedLoadTone}
@@ -511,7 +532,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
               <p className="mt-2 text-xs leading-5 lab-muted">
                 {selectedAnalytics?.baselineReady
-                  ? "Uses the same deterministic workload signal as the dashboard Risk Status."
+                  ? selectedAnalytics.baselineStatus === "provisional"
+                    ? "Uses the same deterministic workload signal with a provisional baseline."
+                    : "Uses the same deterministic workload signal as the dashboard Risk Status."
                   : "This workout contributes to baseline formation."}
               </p>
             </div>

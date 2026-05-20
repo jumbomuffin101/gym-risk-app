@@ -77,7 +77,7 @@ function stateLabel(state: RegionalRiskState) {
 }
 
 function changeLabel(value: number | null) {
-  if (value === null) return "Baseline pending";
+  if (value === null) return "-";
   return `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
 }
 
