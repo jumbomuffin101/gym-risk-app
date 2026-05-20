@@ -150,21 +150,36 @@ export async function computeSessionRisk(userId: string, sessionId: string): Pro
   });
   const baselineReadiness = getBaselineReadiness(baselineWorkouts, riskAsOf);
   const windowStart = new Date(riskAsOf.getTime() - 35 * 24 * 60 * 60 * 1000);
-  const windowSets: DashboardMetricSet[] = await prisma.setEntry.findMany({
+  const windowSessions = await prisma.workoutSession.findMany({
     where: {
       userId,
-      performedAt: { gte: windowStart, lte: riskAsOf },
-      session: { endedAt: { not: null } },
+      endedAt: { not: null },
+      sets: { some: {} },
+      startedAt: { gte: windowStart, lte: riskAsOf },
     },
     select: {
-      performedAt: true,
-      reps: true,
-      weight: true,
-      rpe: true,
-      pain: true,
-      exercise: { select: { name: true, category: true } },
+      startedAt: true,
+      sets: {
+        select: {
+          reps: true,
+          weight: true,
+          rpe: true,
+          pain: true,
+          exercise: { select: { name: true, category: true } },
+        },
+      },
     },
   });
+  const windowSets: DashboardMetricSet[] = windowSessions.flatMap((session) =>
+    session.sets.map((set) => ({
+      performedAt: session.startedAt,
+      reps: set.reps,
+      weight: set.weight,
+      rpe: set.rpe,
+      pain: set.pain,
+      exercise: set.exercise,
+    }))
+  );
   const riskSignal = computeDashboardRiskSignal(
     windowSets,
     riskAsOf,

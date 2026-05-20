@@ -750,9 +750,9 @@ export function computeDashboardRiskSignal(
   now = new Date(),
   baselineReady = true
 ): DashboardRiskSignal {
-  // Date windows are based on SetEntry.performedAt, which the workout builder saves
-  // from WorkoutSession.startedAt. Current 7 days are acute load; 7-14 days ago
-  // are the WoW comparison; 7-35 days ago form the chronic weekly baseline.
+  // Date windows use each logged workout's session date. Dashboard callers map
+  // WorkoutSession.startedAt onto performedAt so backdated logs are counted by
+  // workout date even if older SetEntry rows have drifted timestamps.
   const acuteStart = new Date(now.getTime() - 7 * DAY_MS);
   const acuteSets = sets.filter((set) => inWindow(set.performedAt, acuteStart, now));
 

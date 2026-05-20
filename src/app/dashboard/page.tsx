@@ -11,6 +11,7 @@ import {
   buildDashboardAnalytics,
   type AnalyticsRiskState,
   type DashboardAnalytics,
+  type DashboardMetricSet,
 } from "@/app/lib/dashboardRisk";
 import { cleanWorkoutName, formatLoad, setLoad, summarizeWorkoutSets } from "@/app/lib/workouts";
 
@@ -27,6 +28,8 @@ import { SectionHeader } from "src/app/dashboard/components/SectionHeader";
 import { StatusChip } from "src/app/dashboard/components/StatusChip";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type DashboardRiskReason = {
   kind: string;
@@ -37,7 +40,6 @@ type DashboardRiskReason = {
   startedAt: Date;
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 type RiskFeedTone = "safe" | "watch" | "danger" | "neutral";
 
 type RiskFeedEvent = {
@@ -46,6 +48,25 @@ type RiskFeedEvent = {
   meta: string;
   badgeLabel: string;
   tone: RiskFeedTone;
+};
+
+type DashboardSession = {
+  id: string;
+  startedAt: Date;
+  endedAt: Date | null;
+  note: string | null;
+  _count: { sets: number };
+  sets: Array<{
+    exerciseId: string;
+    reps: number;
+    weight: number;
+    rpe: number | null;
+    pain: number | null;
+    exercise?: {
+      name: string;
+      category: string | null;
+    };
+  }>;
 };
 
 function cleanDisplayText(value: string) {
@@ -167,6 +188,25 @@ function buildRiskFeedEvents(
   return [...events, ...reasonEvents];
 }
 
+function toMetricSets(sessions: DashboardSession[]): DashboardMetricSet[] {
+  return sessions.flatMap((workout) =>
+    workout.sets.flatMap((set) => {
+      if (!set.exercise) return [];
+
+      return [
+        {
+          performedAt: workout.startedAt,
+          reps: set.reps,
+          weight: set.weight,
+          rpe: set.rpe,
+          pain: set.pain,
+          exercise: set.exercise,
+        },
+      ];
+    })
+  );
+}
+
 function AnalysisMetric({
   label,
   value,
@@ -201,7 +241,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const requestedWorkoutId = Array.isArray(rawWorkoutId) ? rawWorkoutId[0] : rawWorkoutId;
   const now = new Date();
 
-  const [sessions, baselineWorkouts] = await Promise.all([
+  const [sessions, analyticsSessions] = await Promise.all([
     prisma.workoutSession.findMany({
       where: {
         userId,
@@ -233,51 +273,48 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         endedAt: { not: null },
         sets: { some: {} },
       },
-      orderBy: { startedAt: "asc" },
+      orderBy: { startedAt: "desc" },
       select: {
+        id: true,
         startedAt: true,
         endedAt: true,
+        note: true,
+        _count: { select: { sets: true } },
+        sets: {
+          select: {
+            exerciseId: true,
+            reps: true,
+            weight: true,
+            rpe: true,
+            pain: true,
+            exercise: { select: { name: true, category: true } },
+          },
+        },
       },
     }),
   ]);
 
   const selectedWorkout =
-    sessions.find((workout) => workout.id === requestedWorkoutId) ?? sessions[0] ?? null;
+    analyticsSessions.find((workout) => workout.id === requestedWorkoutId) ?? sessions[0] ?? null;
   const selectedRiskAnchor = selectedWorkout
     ? new Date(selectedWorkout.startedAt.getTime() + 60 * 1000)
     : now;
-  const metricsSince = new Date(
-    Math.min(now.getTime(), selectedRiskAnchor.getTime()) - 35 * DAY_MS
-  );
-  const metricsUntil = new Date(Math.max(now.getTime(), selectedRiskAnchor.getTime()));
+  const metricSets = toMetricSets(analyticsSessions);
+  const baselineWorkouts = analyticsSessions.map((workout) => ({
+    startedAt: workout.startedAt,
+    endedAt: workout.endedAt,
+  }));
 
-  const [metricSets, recentRiskReasonGroups] = await Promise.all([
-    prisma.setEntry.findMany({
-      where: {
-        userId,
-        performedAt: { gte: metricsSince, lte: metricsUntil },
-        session: { endedAt: { not: null } },
-      },
-      select: {
-        performedAt: true,
-        reps: true,
-        weight: true,
-        rpe: true,
-        pain: true,
-        exercise: { select: { name: true, category: true } },
-      },
-    }),
-    Promise.all(
-      sessions.slice(0, 5).map(async (workout) => {
-        const reasons = await computeSessionRisk(userId, workout.id);
-        return reasons.map((reason) => ({
-          ...reason,
-          sessionId: workout.id,
-          startedAt: workout.startedAt,
-        }));
-      })
-    ),
-  ]);
+  const recentRiskReasonGroups = await Promise.all(
+    analyticsSessions.slice(0, 5).map(async (workout) => {
+      const reasons = await computeSessionRisk(userId, workout.id);
+      return reasons.map((reason) => ({
+        ...reason,
+        sessionId: workout.id,
+        startedAt: workout.startedAt,
+      }));
+    })
+  );
 
   const recentRiskReasons: DashboardRiskReason[] = recentRiskReasonGroups
     .flat()
