@@ -3,16 +3,47 @@ import { prisma } from "@/app/lib/prisma";
 import { createPasswordResetToken } from "@/app/lib/auth/passwordReset";
 import { sendResetEmail } from "@/app/lib/email/sendResetEmail";
 
+const RESET_EMAIL_SENT = "Reset email sent. Check your inbox and spam folder.";
+const EMAIL_NOT_FOUND = "We couldn't find an account with that email.";
+const EMAIL_SEND_FAILED = "We couldn't send the reset email. Please try again.";
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function getResetBaseUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
+
+  if (!configuredUrl) {
+    throw new Error("Missing NEXT_PUBLIC_APP_URL or NEXTAUTH_URL");
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(configuredUrl);
+  } catch {
+    throw new Error("Invalid NEXT_PUBLIC_APP_URL or NEXTAUTH_URL");
+  }
+
+  if (
+    process.env.NODE_ENV === "production" &&
+    ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)
+  ) {
+    throw new Error("Password reset base URL points to localhost in production");
+  }
+
+  return parsed.origin;
+}
+
 export async function POST(req: Request) {
   const { email } = (await req.json().catch(() => ({}))) as { email?: string };
 
-  // Always return ok to prevent account enumeration
-  const safeOk = NextResponse.json({ ok: true });
-
   const e = String(email ?? "").toLowerCase().trim();
-  if (!e) {
-    // Still safe to return a 400 here; this doesn't reveal account existence
-    return NextResponse.json({ ok: false, error: "Email is required" }, { status: 400 });
+  if (!e || !isValidEmail(e)) {
+    return NextResponse.json(
+      { success: false, code: "INVALID_EMAIL", message: "Enter a valid email address." },
+      { status: 400 },
+    );
   }
 
   const user = await prisma.user.findUnique({
@@ -20,28 +51,36 @@ export async function POST(req: Request) {
     select: { id: true, email: true },
   });
 
-  // If user doesn't exist, exit quietly
-  if (!user) return safeOk;
-
-  const { token, expiresAt } = await createPasswordResetToken(user.id, 30);
-
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-
-  const resetUrl = baseUrl
-    ? `${baseUrl}/reset-password/confirm?token=${encodeURIComponent(token)}`
-    : `/reset-password/confirm?token=${encodeURIComponent(token)}`;
-
-  const emailResult = await sendResetEmail({ to: user.email, resetUrl });
-
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[reset] emailResult", emailResult);
-    // Helpful in dev only
-    return NextResponse.json({ ok: true, devLink: resetUrl, expiresAt, email: emailResult });
+  if (!user) {
+    return NextResponse.json(
+      { success: false, code: "EMAIL_NOT_FOUND", message: EMAIL_NOT_FOUND },
+      { status: 404 },
+    );
   }
 
-  // In prod, always safe ok
-  return safeOk;
+  try {
+    const baseUrl = getResetBaseUrl();
+    const { token } = await createPasswordResetToken(user.id, 30);
+    const resetUrl = `${baseUrl}/reset-password/confirm?token=${encodeURIComponent(token)}`;
+
+    const emailResult = await sendResetEmail({ to: user.email, resetUrl });
+
+    if (!emailResult.ok) {
+      console.error("[reset] Password reset email was not sent:", emailResult.reason);
+      return NextResponse.json(
+        { success: false, code: "EMAIL_SEND_FAILED", message: EMAIL_SEND_FAILED },
+        { status: 500 },
+      );
+    }
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown reset error";
+    console.error("[reset] Password reset email failed:", message);
+    return NextResponse.json(
+      { success: false, code: "EMAIL_SEND_FAILED", message: EMAIL_SEND_FAILED },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ success: true, message: RESET_EMAIL_SENT });
 }
