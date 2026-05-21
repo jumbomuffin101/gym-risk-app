@@ -6,23 +6,25 @@ import { sendResetEmail } from "@/app/lib/email/sendResetEmail";
 const RESET_EMAIL_SENT = "Reset email sent. Check your inbox and spam folder.";
 const EMAIL_NOT_FOUND = "We couldn't find an account with that email.";
 const EMAIL_SEND_FAILED = "We couldn't send the reset email. Please try again.";
+const RESET_CONFIG_FAILED = "Password reset is not configured. Please try again later.";
+const RESET_TOKEN_FAILED = "We couldn't create a reset link. Please try again.";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function getResetBaseUrl() {
-  const configuredUrl = process.env.NEXTAUTH_URL;
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
 
   if (!configuredUrl) {
-    throw new Error("Missing NEXTAUTH_URL");
+    throw new Error("Missing NEXT_PUBLIC_APP_URL or NEXTAUTH_URL");
   }
 
   let parsed: URL;
   try {
     parsed = new URL(configuredUrl);
   } catch {
-    throw new Error("Invalid NEXTAUTH_URL");
+    throw new Error("Invalid NEXT_PUBLIC_APP_URL or NEXTAUTH_URL");
   }
 
   if (
@@ -58,11 +60,36 @@ export async function POST(req: Request) {
     );
   }
 
+  let baseUrl: string;
   try {
-    const baseUrl = getResetBaseUrl();
-    const { token: rawToken } = await createPasswordResetToken(user.id, 30);
-    const resetUrl = `${baseUrl}/reset-password/confirm?token=${rawToken}`;
+    baseUrl = getResetBaseUrl();
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown reset error";
+    console.error("[reset] Password reset base URL failed:", message);
+    return NextResponse.json(
+      { success: false, code: "RESET_CONFIG_FAILED", message: RESET_CONFIG_FAILED },
+      { status: 500 },
+    );
+  }
 
+  let rawToken: string;
+  try {
+    const tokenResult = await createPasswordResetToken(user.id, 30);
+    rawToken = tokenResult.token;
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown reset error";
+    console.error("[reset] Password reset token creation failed:", message);
+    return NextResponse.json(
+      { success: false, code: "RESET_TOKEN_FAILED", message: RESET_TOKEN_FAILED },
+      { status: 500 },
+    );
+  }
+
+  const resetUrl = `${baseUrl}/reset-password/confirm?token=${rawToken}`;
+
+  try {
     const emailResult = await sendResetEmail({ to: user.email, resetUrl });
 
     if (!emailResult.ok) {
@@ -75,7 +102,7 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     const message =
       err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown reset error";
-    console.error("[reset] Password reset email failed:", message);
+    console.error("[reset] Resend password reset email failed:", message);
     return NextResponse.json(
       { success: false, code: "EMAIL_SEND_FAILED", message: EMAIL_SEND_FAILED },
       { status: 500 },
