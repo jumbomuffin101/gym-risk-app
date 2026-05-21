@@ -10,12 +10,12 @@ export async function POST(req: Request) {
   const token = String(body.token ?? "").trim();
   const newPassword = String(body.newPassword ?? "");
 
-  if (!token) return NextResponse.json({ ok: false, reason: "Missing token" }, { status: 400 });
+  if (!token) return NextResponse.json({ ok: false, reason: "Invalid reset link" }, { status: 400 });
   if (newPassword.length < 8)
     return NextResponse.json({ ok: false, reason: "Password too short" }, { status: 400 });
 
   const result = await consumePasswordReset(token, newPassword);
   if (!result.ok) return NextResponse.json(result, { status: 400 });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, message: "Password updated successfully" });
 }

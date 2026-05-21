@@ -12,17 +12,17 @@ function isValidEmail(email: string) {
 }
 
 function getResetBaseUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
+  const configuredUrl = process.env.NEXTAUTH_URL;
 
   if (!configuredUrl) {
-    throw new Error("Missing NEXT_PUBLIC_APP_URL or NEXTAUTH_URL");
+    throw new Error("Missing NEXTAUTH_URL");
   }
 
   let parsed: URL;
   try {
     parsed = new URL(configuredUrl);
   } catch {
-    throw new Error("Invalid NEXT_PUBLIC_APP_URL or NEXTAUTH_URL");
+    throw new Error("Invalid NEXTAUTH_URL");
   }
 
   if (
@@ -60,8 +60,8 @@ export async function POST(req: Request) {
 
   try {
     const baseUrl = getResetBaseUrl();
-    const { token } = await createPasswordResetToken(user.id, 30);
-    const resetUrl = `${baseUrl}/reset-password/confirm?token=${encodeURIComponent(token)}`;
+    const { token: rawToken } = await createPasswordResetToken(user.id, 30);
+    const resetUrl = `${baseUrl}/reset-password/confirm?token=${rawToken}`;
 
     const emailResult = await sendResetEmail({ to: user.email, resetUrl });
 

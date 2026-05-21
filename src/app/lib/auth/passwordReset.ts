@@ -14,28 +14,33 @@ function newToken() {
 export async function consumePasswordReset(token: string, newPassword: string) {
   const tokenHash = sha256(token);
 
-  const record = await prisma.passwordResetToken.findUnique({
-    where: { tokenHash },
-    select: { id: true, userId: true, expiresAt: true, usedAt: true },
+  const user = await prisma.user.findUnique({
+    where: { resetToken: tokenHash },
+    select: { id: true, resetTokenExpiry: true },
   });
 
-  if (!record) return { ok: false as const, reason: "Invalid or expired token" };
-  if (record.usedAt) return { ok: false as const, reason: "Token already used" };
-  if (record.expiresAt.getTime() < Date.now())
-    return { ok: false as const, reason: "Token expired" };
+  if (!user || !user.resetTokenExpiry) {
+    return { ok: false as const, reason: "Invalid reset link" };
+  }
+
+  if (user.resetTokenExpiry.getTime() < Date.now()) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { resetToken: null, resetTokenExpiry: null },
+    });
+    return { ok: false as const, reason: "Reset link expired" };
+  }
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: record.userId },
-      data: { passwordHash },
-    }),
-    prisma.passwordResetToken.update({
-      where: { id: record.id },
-      data: { usedAt: new Date() },
-    }),
-  ]);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash,
+      resetToken: null,
+      resetTokenExpiry: null,
+    },
+  });
 
   return { ok: true as const };
 }
@@ -45,15 +50,13 @@ export async function createPasswordResetToken(userId: string, minutes = 30) {
   const tokenHash = sha256(token);
   const expiresAt = new Date(Date.now() + minutes * 60 * 1000);
 
-  await prisma.$transaction([
-    prisma.passwordResetToken.updateMany({
-      where: { userId, usedAt: null },
-      data: { usedAt: new Date() },
-    }),
-    prisma.passwordResetToken.create({
-      data: { userId, tokenHash, expiresAt },
-    }),
-  ]);
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      resetToken: tokenHash,
+      resetTokenExpiry: expiresAt,
+    },
+  });
 
   return { token, expiresAt };
 }

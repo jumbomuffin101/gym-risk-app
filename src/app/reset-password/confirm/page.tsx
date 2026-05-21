@@ -18,7 +18,7 @@ function ResetPasswordConfirmInner() {
     e.preventDefault();
     setMsg(null);
 
-    if (!token) return setMsg("Missing token. Use the link from your email.");
+    if (!token) return setMsg("Reset link is invalid or expired");
     if (pw1.length < 8) return setMsg("Password must be at least 8 characters.");
     if (pw1 !== pw2) return setMsg("Passwords do not match.");
 
@@ -37,7 +37,7 @@ function ResetPasswordConfirmInner() {
       return;
     }
 
-    setMsg("Password updated. Redirecting to sign in…");
+    setMsg(data?.message ?? "Password updated successfully");
     setTimeout(() => router.push("/signin"), 900);
   }
 
@@ -53,7 +53,7 @@ function ResetPasswordConfirmInner() {
 
           {!token && (
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm text-white/80">
-              Missing token. Go back and request a new reset link.
+              Reset link is invalid or expired.
             </div>
           )}
 
@@ -79,7 +79,7 @@ function ResetPasswordConfirmInner() {
 
             <button
               className="lab-hover w-full rounded-xl bg-[rgba(34,197,94,0.92)] p-3 text-sm font-medium text-black disabled:opacity-60"
-              disabled={loading}
+              disabled={loading || !token}
               type="submit"
               style={{
                 boxShadow:
@@ -108,7 +108,7 @@ export default function ResetPasswordConfirmPage() {
         <div className="mx-auto flex min-h-[calc(100vh-64px)] max-w-6xl items-center justify-center px-6 py-10">
           <div className="w-full max-w-md">
             <div className="lab-card rounded-3xl p-6 md:p-7">
-              <div className="text-sm lab-muted">Loading reset link…</div>
+              <div className="text-sm lab-muted">Loading reset link...</div>
             </div>
           </div>
         </div>
