@@ -14,33 +14,35 @@ function newToken() {
 export async function consumePasswordReset(token: string, newPassword: string) {
   const tokenHash = sha256(token);
 
-  const user = await prisma.user.findUnique({
-    where: { resetToken: tokenHash },
-    select: { id: true, resetTokenExpiry: true },
+  const record = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+    include: { user: { select: { id: true } } },
   });
 
-  if (!user || !user.resetTokenExpiry) {
+  if (!record) {
     return { ok: false as const, reason: "Invalid reset link" };
   }
 
-  if (user.resetTokenExpiry.getTime() < Date.now()) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { resetToken: null, resetTokenExpiry: null },
-    });
+  if (record.usedAt) {
+    return { ok: false as const, reason: "Invalid reset link" };
+  }
+
+  if (record.expiresAt.getTime() < Date.now()) {
     return { ok: false as const, reason: "Reset link expired" };
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      passwordHash,
-      resetToken: null,
-      resetTokenExpiry: null,
-    },
-  });
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: record.user.id },
+      data: { passwordHash },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: record.id },
+      data: { usedAt: new Date() },
+    }),
+  ]);
 
   return { ok: true as const };
 }
@@ -50,13 +52,15 @@ export async function createPasswordResetToken(userId: string, minutes = 30) {
   const tokenHash = sha256(token);
   const expiresAt = new Date(Date.now() + minutes * 60 * 1000);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      resetToken: tokenHash,
-      resetTokenExpiry: expiresAt,
-    },
-  });
+  await prisma.$transaction([
+    prisma.passwordResetToken.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    }),
+    prisma.passwordResetToken.create({
+      data: { userId, tokenHash, expiresAt },
+    }),
+  ]);
 
   return { token, expiresAt };
 }
