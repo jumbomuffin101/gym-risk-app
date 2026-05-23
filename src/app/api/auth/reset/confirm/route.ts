@@ -8,14 +8,15 @@ function hashToken(rawToken: string) {
 }
 
 export async function POST(req: Request) {
-  console.log("[reset-confirm] request received");
-
   try {
+    console.log("[reset-confirm] request received");
+
     const body = (await req.json().catch(() => ({}))) as {
       token?: string;
       newPassword?: string;
       password?: string;
     };
+    console.log("[reset-confirm] body parsed");
 
     const token = String(body.token ?? "").trim();
     const password = String(body.newPassword ?? body.password ?? "");
@@ -24,60 +25,71 @@ export async function POST(req: Request) {
     console.log("[reset-confirm] password present:", !!password);
 
     if (!token) {
-      return NextResponse.json({ ok: false, reason: "Invalid reset link" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "Invalid reset link" },
+        { status: 400 },
+      );
     }
 
     if (!password) {
-      return NextResponse.json({ ok: false, reason: "Password is required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "Password is required" },
+        { status: 400 },
+      );
     }
 
     if (password.length < 8) {
-      return NextResponse.json({ ok: false, reason: "Password too short" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "Password too short" },
+        { status: 400 },
+      );
     }
 
     console.log("[reset-confirm] hashing token");
     const tokenHash = hashToken(token);
 
-    console.log("[reset-confirm] token lookup");
-    const resetTokenRecord = await prisma.passwordResetToken.findFirst({
-      where: {
-        tokenHash,
-        usedAt: null,
-        expiresAt: { gt: new Date() },
-      },
+    console.log("[reset-confirm] looking up token");
+    const resetTokenRecord = await prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
       include: { user: true },
     });
 
     console.log("[reset-confirm] token found:", !!resetTokenRecord);
 
-    const existingToken = resetTokenRecord
-      ? resetTokenRecord
-      : await prisma.passwordResetToken.findUnique({
-          where: { tokenHash },
-          select: { expiresAt: true, usedAt: true },
-        });
-
-    const expired = existingToken ? existingToken.expiresAt.getTime() <= Date.now() : false;
-    const used = existingToken ? existingToken.usedAt !== null : false;
-
-    console.log("[reset-confirm] expired:", expired);
-    console.log("[reset-confirm] used:", used);
-
     if (!resetTokenRecord) {
-      if (existingToken?.usedAt) {
-        return NextResponse.json({ ok: false, reason: "Invalid reset link" }, { status: 400 });
-      }
-
-      if (existingToken && existingToken.expiresAt.getTime() <= Date.now()) {
-        return NextResponse.json({ ok: false, reason: "Reset link expired" }, { status: 400 });
-      }
-
-      return NextResponse.json({ ok: false, reason: "Invalid reset link" }, { status: 400 });
+      console.log("[reset-confirm] token not found");
+      return NextResponse.json(
+        { success: false, message: "Invalid reset link" },
+        { status: 400 },
+      );
     }
 
-    console.log("[reset-confirm] updating password");
+    const expired = resetTokenRecord.expiresAt.getTime() <= Date.now();
+    const used = resetTokenRecord.usedAt !== null;
+
+    console.log("[reset-confirm] token expired:", expired);
+    console.log("[reset-confirm] expired:", expired);
+    console.log("[reset-confirm] token used:", used);
+    console.log("[reset-confirm] used:", used);
+
+    if (expired) {
+      return NextResponse.json(
+        { success: false, message: "Reset link expired" },
+        { status: 400 },
+      );
+    }
+
+    if (used) {
+      return NextResponse.json(
+        { success: false, message: "Invalid reset link" },
+        { status: 400 },
+      );
+    }
+
+    console.log("[reset-confirm] hashing password");
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    console.log("[reset-confirm] updating user password");
     await prisma.user.update({
       where: { id: resetTokenRecord.user.id },
       data: {
@@ -85,19 +97,18 @@ export async function POST(req: Request) {
       },
     });
 
+    console.log("[reset-confirm] marking token used");
     await prisma.passwordResetToken.update({
       where: { id: resetTokenRecord.id },
       data: { usedAt: new Date() },
     });
 
     console.log("[reset-confirm] success");
-    return NextResponse.json({ ok: true, message: "Password updated successfully" });
+    return NextResponse.json({ success: true, message: "Password updated successfully" });
   } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
-    console.error("[reset-confirm] server error:", message);
+    console.error("[reset-confirm] unexpected error:", err);
     return NextResponse.json(
-      { ok: false, reason: "Reset failed. Please try again." },
+      { success: false, message: "Reset failed. Please try again." },
       { status: 500 },
     );
   }

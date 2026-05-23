@@ -32,8 +32,8 @@ function ResetPasswordConfirmInner() {
     const data = await res.json().catch(() => ({}));
     setLoading(false);
 
-    if (!res.ok || !data?.ok) {
-      setMsg(data?.reason ?? data?.error ?? "Reset failed. Try again.");
+    if (!res.ok || (!data?.ok && !data?.success)) {
+      setMsg(data?.message ?? data?.reason ?? data?.error ?? "Reset failed. Try again.");
       return;
     }
 
