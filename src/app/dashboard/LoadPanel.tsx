@@ -1,5 +1,7 @@
 import React from "react";
 
+import { formatPercentChange } from "@/app/lib/workouts";
+
 import { MetricCard } from "./components/MetricCard";
 import { StatusChip } from "./components/StatusChip";
 
@@ -8,14 +10,16 @@ export function LoadPanel({
   baseline,
   deltaPct,
   baselineReady,
+  baselineLabel,
 }: {
   recentLoad: number;
   baseline: number | null;
   deltaPct: number | null;
   baselineReady: boolean;
+  baselineLabel: string;
 }) {
   const tone =
-    !baselineReady || !baseline || deltaPct === null
+    !baselineReady || baseline === null || deltaPct === null
       ? "neutral"
       : deltaPct >= 20
       ? "danger"
@@ -31,7 +35,7 @@ export function LoadPanel({
       : tone === "neutral"
       ? "rgba(230,232,238,0.38)"
       : "var(--lab-safe)";
-  const activityOpacity = baselineReady && baseline ? 0.75 : 0.5;
+  const activityOpacity = baselineReady && baseline !== null ? 0.75 : 0.5;
 
   return (
     <MetricCard
@@ -40,8 +44,12 @@ export function LoadPanel({
       actions={
         <StatusChip
           label={
-            !baselineReady || !baseline
+            !baselineReady
               ? "Baseline pending"
+              : baseline === null
+              ? baselineLabel
+              : baselineLabel === "Provisional baseline" && deltaPct === null
+              ? baselineLabel
               : tone === "danger"
               ? "Spike"
               : tone === "watch"
@@ -62,13 +70,13 @@ export function LoadPanel({
         <div>
           <div className="text-xs lab-muted">Baseline</div>
           <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
-            {baselineReady && baseline ? Math.round(baseline).toLocaleString() : "-"}
+            {baselineReady && baseline !== null ? Math.round(baseline).toLocaleString() : "-"}
           </div>
         </div>
         <div>
           <div className="text-xs lab-muted">Change</div>
           <div className="mt-1 text-2xl font-semibold lab-num text-white/90">
-            {baselineReady && baseline && deltaPct !== null ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}%` : "-"}
+            {baselineReady && baseline !== null ? formatPercentChange(deltaPct) : "-"}
           </div>
         </div>
       </div>
@@ -92,8 +100,12 @@ export function LoadPanel({
         </svg>
 
         <div className="text-xs lab-muted">
-          {!baselineReady || !baseline
-            ? "Log workouts across 7+ days to establish a baseline."
+          {!baselineReady
+            ? "Log 3 workouts to start a baseline."
+            : baseline === null
+            ? "Saved workouts exist, but no weighted load has been recorded yet."
+            : baselineLabel === "Provisional baseline"
+            ? "Using a provisional baseline from available workout history."
             : tone === "danger"
             ? "Recent load is materially above baseline."
             : tone === "watch"

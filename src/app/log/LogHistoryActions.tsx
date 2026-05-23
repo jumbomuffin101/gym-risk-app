@@ -3,32 +3,47 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
 
-import { deleteWorkoutAction, renameWorkoutAction } from "./actions";
+import { deleteWorkoutLogAction, updateWorkoutLogAction } from "./actions";
 
-export function WorkoutHistoryActions({
+function formatDateTimeLocal(value: string) {
+  const date = new Date(value);
+  const pad = (part: number) => String(part).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function LogHistoryActions({
   workoutId,
   initialName,
+  initialStartedAt,
 }: {
   workoutId: string;
   initialName: string;
+  initialStartedAt: string;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(initialName);
+  const [draftDate, setDraftDate] = useState(() => formatDateTimeLocal(initialStartedAt));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function submitRename(event: FormEvent<HTMLFormElement>) {
+  function submitEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = draftName.trim();
     if (!name) {
-      setError("Template name cannot be empty.");
+      setError("Workout name cannot be empty.");
       return;
     }
 
     setError(null);
     startTransition(async () => {
-      const result = await renameWorkoutAction({ workoutId, name });
+      const result = await updateWorkoutLogAction({
+        workoutId,
+        name,
+        workoutDate: draftDate,
+      });
+
       if (!result.ok) {
         setError(result.error);
         return;
@@ -40,12 +55,12 @@ export function WorkoutHistoryActions({
     });
   }
 
-  function deleteWorkout() {
-    if (!window.confirm("Delete this workout template? This cannot be undone.")) return;
+  function deleteLog() {
+    if (!window.confirm("Delete this logged workout? This cannot be undone.")) return;
 
     setError(null);
     startTransition(async () => {
-      const result = await deleteWorkoutAction({ workoutId });
+      const result = await deleteWorkoutLogAction({ workoutId });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -57,14 +72,21 @@ export function WorkoutHistoryActions({
 
   if (editing) {
     return (
-      <div className="min-w-0 space-y-2 md:min-w-72">
-        <form onSubmit={submitRename} className="flex gap-2">
+      <div className="min-w-0 space-y-2 md:min-w-80">
+        <form onSubmit={submitEdit} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_190px_auto]">
           <input
             value={draftName}
             onChange={(event) => setDraftName(event.target.value)}
-            placeholder="Template name"
+            placeholder="Workout name"
             maxLength={120}
-            className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
+            className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-[rgba(34,197,94,0.35)]"
+          />
+          <input
+            type="datetime-local"
+            value={draftDate}
+            onChange={(event) => setDraftDate(event.target.value)}
+            required
+            className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 outline-none focus:border-[rgba(34,197,94,0.35)]"
           />
           <button
             type="submit"
@@ -79,6 +101,7 @@ export function WorkoutHistoryActions({
             type="button"
             onClick={() => {
               setDraftName(initialName);
+              setDraftDate(formatDateTimeLocal(initialStartedAt));
               setEditing(false);
               setError(null);
             }}
@@ -88,7 +111,7 @@ export function WorkoutHistoryActions({
           </button>
           <button
             type="button"
-            onClick={deleteWorkout}
+            onClick={deleteLog}
             disabled={pending}
             className="rounded-lg border border-[rgba(239,68,68,0.28)] px-3 py-2 text-xs text-red-200/80 hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -115,7 +138,7 @@ export function WorkoutHistoryActions({
         </button>
         <button
           type="button"
-          onClick={deleteWorkout}
+          onClick={deleteLog}
           disabled={pending}
           className="rounded-lg border border-[rgba(239,68,68,0.28)] px-3 py-2 text-xs text-red-200/80 hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
         >

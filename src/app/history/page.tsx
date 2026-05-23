@@ -3,6 +3,7 @@ import { requireDbUserId } from "@/app/lib/auth/requireUser";
 import { supportsExtendedSetEntryFields } from "@/app/lib/data/setEntrySchema";
 import { computeSessionRisk } from "@/app/lib/riskEngine";
 import { prisma } from "@/app/lib/prisma";
+import { formatPercentChange } from "@/app/lib/workouts";
 import { computeSessionLoad } from "@/lib/metrics/load";
 
 export const runtime = "nodejs";
@@ -320,7 +321,7 @@ function mapHistoryWatchout(reason: Awaited<ReturnType<typeof computeSessionRisk
         title: "Conditioning drove most of the strain",
         detail:
           typeof reason.details.pct === "number"
-            ? `Conditioning load ran about ${reason.details.pct}% above baseline.`
+            ? `Conditioning load ran about ${formatPercentChange(reason.details.pct)} above baseline.`
             : "Long or dense conditioning work pushed fatigue higher.",
       };
     case "volume_spike":
@@ -330,7 +331,7 @@ function mapHistoryWatchout(reason: Awaited<ReturnType<typeof computeSessionRisk
         title: "One movement bucket ran ahead of baseline",
         detail:
           typeof reason.details.category === "string" && typeof reason.details.pct === "number"
-            ? `${reason.details.category} load was about ${reason.details.pct}% above baseline.`
+            ? `${reason.details.category} load was about ${formatPercentChange(reason.details.pct)} above baseline.`
             : "Load rose faster than the recent pattern.",
       };
     case "rpe_spike":

@@ -3,26 +3,57 @@
 import Link from "next/link";
 import { useState } from "react";
 
+type Notice = {
+  kind: "success" | "error";
+  message: string;
+};
+
 export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [sent, setSent] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+    setNotice(null);
+    setSent(false);
 
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") ?? "").toLowerCase().trim();
 
     try {
-      await fetch("/api/auth/reset", {
+      const res = await fetch("/api/auth/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
+
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        message?: string;
+      };
+
+      if (res.ok && data.success) {
+        setNotice({
+          kind: "success",
+          message: data.message ?? "Reset email sent. Check your inbox and spam folder.",
+        });
+        setSent(true);
+        return;
+      }
+
+      setNotice({
+        kind: "error",
+        message: data.message ?? "We couldn't send the reset email. Please try again.",
+      });
+    } catch {
+      setNotice({
+        kind: "error",
+        message: "We couldn't send the reset email. Please try again.",
+      });
     } finally {
       setLoading(false);
-      setDone(true);
     }
   }
 
@@ -34,16 +65,24 @@ export default function ResetPasswordPage() {
             <div className="text-xs uppercase tracking-wide lab-muted">Reset password</div>
             <h1 className="text-2xl font-semibold tracking-tight">Get a reset link</h1>
             <p className="text-sm lab-muted">
-              Enter your email. If it exists, we’ll email you a reset link.
+              Enter your email and we&apos;ll send you a reset link.
             </p>
           </div>
 
-          {done ? (
-            <div className="space-y-3">
-              <p className="text-sm lab-muted">
-                If that email exists, we sent a password reset link. Check your inbox (and spam).
-              </p>
+          {notice && (
+            <div
+              className={`mb-4 rounded-xl border p-3 text-sm ${
+                notice.kind === "success"
+                  ? "border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] text-[rgba(220,252,231,0.95)]"
+                  : "border-[rgba(248,113,113,0.35)] bg-[rgba(248,113,113,0.08)] text-[rgba(254,226,226,0.95)]"
+              }`}
+            >
+              {notice.message}
+            </div>
+          )}
 
+          {sent ? (
+            <div className="space-y-3">
               <Link className="lab-muted hover:underline text-sm" href="/signin">
                 Back to sign in
               </Link>
