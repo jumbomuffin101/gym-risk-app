@@ -3,105 +3,139 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { hashResetToken } from "@/app/lib/auth/passwordReset";
 
-export async function POST(request: Request) {
-  try {
-    console.log("[reset-confirm] request received");
+type DebugStep =
+  | "BODY_PARSED"
+  | "TOKEN_MISSING"
+  | "PASSWORD_MISSING"
+  | "TOKEN_NOT_FOUND"
+  | "TOKEN_EXPIRED"
+  | "TOKEN_USED"
+  | "PASSWORD_UPDATE_FAILED"
+  | "SUCCESS";
 
+type ConfirmResponse = {
+  success: boolean;
+  code?: string;
+  message: string;
+  debugStep?: DebugStep;
+};
+
+function shouldIncludeDebugStep(): boolean {
+  return process.env.VERCEL_ENV === "preview" || process.env.NODE_ENV !== "production";
+}
+
+function jsonResponse(
+  response: Omit<ConfirmResponse, "debugStep">,
+  status: number,
+  debugStep: DebugStep,
+) {
+  const responseBody: ConfirmResponse = { ...response };
+
+  if (shouldIncludeDebugStep()) {
+    responseBody.debugStep = debugStep;
+  }
+
+  return NextResponse.json(responseBody, { status });
+}
+
+export async function POST(request: Request) {
+  let unexpectedErrorStep: DebugStep = "BODY_PARSED";
+
+  try {
     const parsedBody: unknown = await request.json().catch(() => ({}));
     const body =
       parsedBody && typeof parsedBody === "object"
         ? (parsedBody as Record<string, unknown>)
         : {};
 
-    console.log("[reset-confirm] body parsed");
+    console.log("[reset-confirm] BODY_PARSED");
 
     const token = typeof body.token === "string" ? body.token.trim() : "";
-    const password =
-      typeof body.password === "string"
-        ? body.password
-        : typeof body.newPassword === "string"
-          ? body.newPassword
-          : "";
+    const submittedPassword = body.password ?? body.newPassword;
+    const submittedConfirmPassword =
+      body.confirmPassword ?? body.confirmNewPassword ?? submittedPassword;
+    const password = typeof submittedPassword === "string" ? submittedPassword : "";
     const confirmPassword =
-      typeof body.confirmPassword === "string" ? body.confirmPassword : undefined;
+      typeof submittedConfirmPassword === "string" ? submittedConfirmPassword : "";
 
     if (!token) {
-      console.log("[reset-confirm] token invalid");
-      return NextResponse.json(
-        { success: false, code: "INVALID_TOKEN", message: "Invalid or expired reset link." },
-        { status: 400 },
+      return jsonResponse(
+        { success: false, code: "TOKEN_MISSING", message: "Invalid or expired reset link." },
+        400,
+        "TOKEN_MISSING",
       );
     }
 
-    console.log("[reset-confirm] token present");
-
     if (!password) {
-      return NextResponse.json(
-        { success: false, code: "PASSWORD_REQUIRED", message: "Password is required." },
-        { status: 400 },
+      return jsonResponse(
+        { success: false, code: "PASSWORD_MISSING", message: "Password is required." },
+        400,
+        "PASSWORD_MISSING",
       );
     }
 
     if (password.length < 8) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           code: "PASSWORD_TOO_SHORT",
           message: "Password must be at least 8 characters.",
         },
-        { status: 400 },
+        400,
+        "BODY_PARSED",
       );
     }
 
-    if (confirmPassword !== undefined && confirmPassword !== password) {
-      return NextResponse.json(
+    if (confirmPassword !== password) {
+      return jsonResponse(
         { success: false, code: "PASSWORD_MISMATCH", message: "Passwords do not match." },
-        { status: 400 },
+        400,
+        "BODY_PARSED",
       );
     }
 
     const tokenHash = hashResetToken(token);
+    console.log("[reset-confirm] TOKEN_HASHED");
 
-    console.log("[reset-confirm] token lookup started");
+    console.log("[reset-confirm] TOKEN_LOOKUP");
     const resetToken = await prisma.passwordResetToken.findUnique({
       where: { tokenHash },
-      include: { user: true },
     });
+    console.log("[reset-confirm] TOKEN_FOUND", Boolean(resetToken));
 
     if (!resetToken) {
-      console.log("[reset-confirm] token invalid");
-      return NextResponse.json(
-        { success: false, code: "INVALID_TOKEN", message: "Invalid or expired reset link." },
-        { status: 400 },
+      return jsonResponse(
+        { success: false, code: "TOKEN_NOT_FOUND", message: "Invalid or expired reset link." },
+        400,
+        "TOKEN_NOT_FOUND",
       );
     }
 
-    console.log("[reset-confirm] token found");
-
     if (resetToken.usedAt !== null) {
-      console.log("[reset-confirm] token already used");
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           code: "TOKEN_USED",
           message: "This reset link has already been used.",
         },
-        { status: 400 },
+        400,
+        "TOKEN_USED",
       );
     }
 
     if (resetToken.expiresAt < new Date()) {
-      console.log("[reset-confirm] token expired");
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           code: "TOKEN_EXPIRED",
           message: "Reset link expired. Please request a new one.",
         },
-        { status: 400 },
+        400,
+        "TOKEN_EXPIRED",
       );
     }
 
+    unexpectedErrorStep = "PASSWORD_UPDATE_FAILED";
     const passwordHash = await bcrypt.hash(password, 12);
 
     await prisma.$transaction([
@@ -115,17 +149,19 @@ export async function POST(request: Request) {
       }),
     ]);
 
-    console.log("[reset-confirm] password updated");
-    return NextResponse.json({ success: true, message: "Password updated successfully." });
+    console.log("[reset-confirm] PASSWORD_UPDATED");
+    console.log("[reset-confirm] TOKEN_USED_MARKED");
+    return jsonResponse({ success: true, message: "Password updated successfully." }, 200, "SUCCESS");
   } catch {
     console.error("[reset-confirm] unexpected error");
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
         code: "RESET_CONFIRM_FAILED",
         message: "Reset failed. Please try again.",
       },
-      { status: 500 },
+      500,
+      unexpectedErrorStep,
     );
   }
 }

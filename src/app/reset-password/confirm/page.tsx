@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 type Notice = {
   kind: "success" | "error";
   message: string;
+  code?: string;
 };
 
 function ResetPasswordConfirmInner() {
@@ -46,12 +47,14 @@ function ResetPasswordConfirmInner() {
 
       const data = (await response.json().catch(() => ({}))) as {
         success?: boolean;
+        code?: string;
         message?: string;
       };
 
       if (response.ok && data.success) {
         setNotice({
           kind: "success",
+          code: data.code,
           message: data.message ?? "Password updated successfully.",
         });
         setSucceeded(true);
@@ -60,6 +63,7 @@ function ResetPasswordConfirmInner() {
 
       setNotice({
         kind: "error",
+        code: data.code,
         message: data.message ?? "Unable to complete password reset. Please try again.",
       });
     } catch {
@@ -96,7 +100,10 @@ function ResetPasswordConfirmInner() {
                   : "border-[rgba(248,113,113,0.35)] bg-[rgba(248,113,113,0.08)] text-[rgba(254,226,226,0.95)]"
               }`}
             >
-              {notice.message}
+              {notice.code && (
+                <div className="mb-1 font-mono text-xs uppercase tracking-wide">{notice.code}</div>
+              )}
+              <div>{notice.message}</div>
             </div>
           )}
 
