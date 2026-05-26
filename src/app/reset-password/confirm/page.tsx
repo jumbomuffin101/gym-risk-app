@@ -13,7 +13,7 @@ function ResetPasswordConfirmInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
 
-  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -27,11 +27,11 @@ function ResetPasswordConfirmInner() {
       setNotice({ kind: "error", message: "Reset link is invalid or expired." });
       return;
     }
-    if (password.length < 8) {
+    if (newPassword.length < 8) {
       setNotice({ kind: "error", message: "Password must be at least 8 characters." });
       return;
     }
-    if (password !== confirmPassword) {
+    if (newPassword !== confirmPassword) {
       setNotice({ kind: "error", message: "Passwords do not match." });
       return;
     }
@@ -41,7 +41,7 @@ function ResetPasswordConfirmInner() {
       const response = await fetch("/api/auth/reset/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password, confirmPassword }),
+        body: JSON.stringify({ token, password: newPassword, confirmPassword }),
       });
 
       const data = (await response.json().catch(() => ({}))) as {
@@ -113,8 +113,8 @@ function ResetPasswordConfirmInner() {
                   className="w-full rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(15,21,32,0.55)] p-3 text-sm outline-none placeholder:text-[rgba(230,232,238,0.45)] focus:border-[rgba(34,197,94,0.35)]"
                   placeholder="New password"
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
                   required
                 />
                 <input

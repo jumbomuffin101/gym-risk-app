@@ -16,7 +16,12 @@ export async function POST(request: Request) {
     console.log("[reset-confirm] body parsed");
 
     const token = typeof body.token === "string" ? body.token.trim() : "";
-    const password = typeof body.password === "string" ? body.password : "";
+    const password =
+      typeof body.password === "string"
+        ? body.password
+        : typeof body.newPassword === "string"
+          ? body.newPassword
+          : "";
     const confirmPassword =
       typeof body.confirmPassword === "string" ? body.confirmPassword : undefined;
 
