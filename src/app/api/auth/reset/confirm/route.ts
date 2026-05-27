@@ -1,141 +1,88 @@
-import bcrypt from "bcrypt";
 import { NextResponse } from "next/server";
+import bcrypt from "bcrypt";
 import { prisma } from "@/app/lib/prisma";
 import { hashResetToken } from "@/app/lib/auth/passwordReset";
 
-type DebugStep =
-  | "BODY_PARSED"
-  | "TOKEN_MISSING"
-  | "PASSWORD_MISSING"
-  | "TOKEN_NOT_FOUND"
-  | "TOKEN_EXPIRED"
-  | "TOKEN_USED"
-  | "PASSWORD_UPDATE_FAILED"
-  | "SUCCESS";
-
-type ConfirmResponse = {
-  success: boolean;
-  code?: string;
-  message: string;
-  debugStep?: DebugStep;
-};
-
-function shouldIncludeDebugStep(): boolean {
-  return process.env.VERCEL_ENV === "preview" || process.env.NODE_ENV !== "production";
-}
-
-function jsonResponse(
-  response: Omit<ConfirmResponse, "debugStep">,
-  status: number,
-  debugStep: DebugStep,
-) {
-  const responseBody: ConfirmResponse = { ...response };
-
-  if (shouldIncludeDebugStep()) {
-    responseBody.debugStep = debugStep;
-  }
-
-  return NextResponse.json(responseBody, { status });
-}
-
 export async function POST(request: Request) {
-  let unexpectedErrorStep: DebugStep = "BODY_PARSED";
-
   try {
-    const parsedBody: unknown = await request.json().catch(() => ({}));
-    const body =
-      parsedBody && typeof parsedBody === "object"
-        ? (parsedBody as Record<string, unknown>)
-        : {};
+    console.log("[reset-confirm] request received");
 
-    console.log("[reset-confirm] BODY_PARSED");
-
-    const token = typeof body.token === "string" ? body.token.trim() : "";
-    const submittedPassword = body.password ?? body.newPassword;
-    const submittedConfirmPassword =
-      body.confirmPassword ?? body.confirmNewPassword ?? submittedPassword;
-    const password = typeof submittedPassword === "string" ? submittedPassword : "";
+    const body = await request.json().catch(() => null);
+    const token = typeof body?.token === "string" ? body.token.trim() : "";
+    const password =
+      typeof body?.password === "string"
+        ? body.password
+        : typeof body?.newPassword === "string"
+          ? body.newPassword
+          : "";
     const confirmPassword =
-      typeof submittedConfirmPassword === "string" ? submittedConfirmPassword : "";
+      typeof body?.confirmPassword === "string"
+        ? body.confirmPassword
+        : typeof body?.confirmNewPassword === "string"
+          ? body.confirmNewPassword
+          : password;
+
+    console.log("[reset-confirm] body parsed");
+    console.log("[reset-confirm] token present", Boolean(token));
+    console.log("[reset-confirm] password present", Boolean(password));
 
     if (!token) {
-      return jsonResponse(
-        { success: false, code: "TOKEN_MISSING", message: "Invalid or expired reset link." },
-        400,
-        "TOKEN_MISSING",
+      return NextResponse.json(
+        { success: false, message: "Invalid reset link" },
+        { status: 400 },
       );
     }
 
     if (!password) {
-      return jsonResponse(
-        { success: false, code: "PASSWORD_MISSING", message: "Password is required." },
-        400,
-        "PASSWORD_MISSING",
+      return NextResponse.json(
+        { success: false, message: "Password is required." },
+        { status: 400 },
       );
     }
 
     if (password.length < 8) {
-      return jsonResponse(
-        {
-          success: false,
-          code: "PASSWORD_TOO_SHORT",
-          message: "Password must be at least 8 characters.",
-        },
-        400,
-        "BODY_PARSED",
+      return NextResponse.json(
+        { success: false, message: "Password must be at least 8 characters." },
+        { status: 400 },
       );
     }
 
     if (confirmPassword !== password) {
-      return jsonResponse(
-        { success: false, code: "PASSWORD_MISMATCH", message: "Passwords do not match." },
-        400,
-        "BODY_PARSED",
+      return NextResponse.json(
+        { success: false, message: "Passwords do not match." },
+        { status: 400 },
       );
     }
 
     const tokenHash = hashResetToken(token);
-    console.log("[reset-confirm] TOKEN_HASHED");
-
-    console.log("[reset-confirm] TOKEN_LOOKUP");
     const resetToken = await prisma.passwordResetToken.findUnique({
       where: { tokenHash },
+      include: { user: true },
     });
-    console.log("[reset-confirm] TOKEN_FOUND", Boolean(resetToken));
+
+    console.log("[reset-confirm] token lookup", Boolean(resetToken));
 
     if (!resetToken) {
-      return jsonResponse(
-        { success: false, code: "TOKEN_NOT_FOUND", message: "Invalid or expired reset link." },
-        400,
-        "TOKEN_NOT_FOUND",
+      return NextResponse.json(
+        { success: false, message: "Invalid reset link" },
+        { status: 400 },
       );
     }
 
-    if (resetToken.usedAt !== null) {
-      return jsonResponse(
-        {
-          success: false,
-          code: "TOKEN_USED",
-          message: "This reset link has already been used.",
-        },
-        400,
-        "TOKEN_USED",
+    if (resetToken.usedAt) {
+      return NextResponse.json(
+        { success: false, message: "This reset link has already been used." },
+        { status: 400 },
       );
     }
 
     if (resetToken.expiresAt < new Date()) {
-      return jsonResponse(
-        {
-          success: false,
-          code: "TOKEN_EXPIRED",
-          message: "Reset link expired. Please request a new one.",
-        },
-        400,
-        "TOKEN_EXPIRED",
+      return NextResponse.json(
+        { success: false, message: "Reset link expired. Please request a new one." },
+        { status: 400 },
       );
     }
 
-    unexpectedErrorStep = "PASSWORD_UPDATE_FAILED";
     const passwordHash = await bcrypt.hash(password, 12);
 
     await prisma.$transaction([
@@ -149,19 +96,27 @@ export async function POST(request: Request) {
       }),
     ]);
 
-    console.log("[reset-confirm] PASSWORD_UPDATED");
-    console.log("[reset-confirm] TOKEN_USED_MARKED");
-    return jsonResponse({ success: true, message: "Password updated successfully." }, 200, "SUCCESS");
-  } catch {
-    console.error("[reset-confirm] unexpected error");
-    return jsonResponse(
-      {
-        success: false,
-        code: "RESET_CONFIRM_FAILED",
-        message: "Reset failed. Please try again.",
-      },
-      500,
-      unexpectedErrorStep,
+    console.log("[reset-confirm] password updated");
+
+    return NextResponse.json({
+      success: true,
+      message: "Password updated successfully.",
+    });
+  } catch (error: unknown) {
+    const errorCode =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof error.code === "string"
+        ? error.code
+        : error instanceof Error
+          ? error.name
+          : "Unknown error";
+    console.error("[reset-confirm] unexpected error", errorCode);
+
+    return NextResponse.json(
+      { success: false, message: "Reset failed. Please try again." },
+      { status: 500 },
     );
   }
 }
