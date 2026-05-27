@@ -3,6 +3,32 @@ import bcrypt from "bcrypt";
 import { prisma } from "@/app/lib/prisma";
 import { hashResetToken } from "@/app/lib/auth/passwordReset";
 
+type UpdateFailureStep = "USER_PASSWORD_UPDATE_FAILED" | "TOKEN_MARK_USED_FAILED";
+
+class UpdateFailure extends Error {
+  constructor(readonly step: UpdateFailureStep) {
+    super(step);
+    this.name = "UpdateFailure";
+  }
+}
+
+function failure(reason: string, status = 400) {
+  return NextResponse.json({ ok: false, reason }, { status });
+}
+
+function safeErrorType(error: unknown): string {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    return error.code;
+  }
+
+  return error instanceof Error ? error.name : "UnknownError";
+}
+
 export async function POST(request: Request) {
   try {
     console.log("[reset-confirm] request received");
@@ -27,96 +53,96 @@ export async function POST(request: Request) {
     console.log("[reset-confirm] password present", Boolean(password));
 
     if (!token) {
-      return NextResponse.json(
-        { success: false, message: "Invalid reset link" },
-        { status: 400 },
-      );
+      return failure("Invalid reset link");
     }
 
     if (!password) {
-      return NextResponse.json(
-        { success: false, message: "Password is required." },
-        { status: 400 },
-      );
+      return failure("Password is required.");
     }
 
     if (password.length < 8) {
-      return NextResponse.json(
-        { success: false, message: "Password must be at least 8 characters." },
-        { status: 400 },
-      );
+      return failure("Password must be at least 8 characters.");
     }
 
     if (confirmPassword !== password) {
-      return NextResponse.json(
-        { success: false, message: "Passwords do not match." },
-        { status: 400 },
-      );
+      return failure("Passwords do not match.");
     }
 
     const tokenHash = hashResetToken(token);
-    const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { tokenHash },
-      include: { user: true },
-    });
 
-    console.log("[reset-confirm] token lookup", Boolean(resetToken));
+    let resetToken;
+    try {
+      resetToken = await prisma.passwordResetToken.findUnique({
+        where: { tokenHash },
+        include: { user: true },
+      });
+    } catch (error: unknown) {
+      console.error("[reset-confirm] TOKEN_LOOKUP_FAILED", safeErrorType(error));
+      return failure("TOKEN_LOOKUP_FAILED", 500);
+    }
 
     if (!resetToken) {
-      return NextResponse.json(
-        { success: false, message: "Invalid reset link" },
-        { status: 400 },
-      );
+      console.log("[reset-confirm] TOKEN_NOT_FOUND");
+      return failure("Invalid reset link");
     }
 
     if (resetToken.usedAt) {
-      return NextResponse.json(
-        { success: false, message: "This reset link has already been used." },
-        { status: 400 },
-      );
+      console.log("[reset-confirm] TOKEN_USED");
+      return failure("This reset link has already been used.");
     }
 
     if (resetToken.expiresAt < new Date()) {
-      return NextResponse.json(
-        { success: false, message: "Reset link expired. Please request a new one." },
-        { status: 400 },
-      );
+      console.log("[reset-confirm] TOKEN_EXPIRED");
+      return failure("Reset link expired. Please request a new one.");
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    let passwordHash: string;
+    try {
+      passwordHash = await bcrypt.hash(password, 12);
+    } catch (error: unknown) {
+      console.error("[reset-confirm] PASSWORD_HASH_FAILED", safeErrorType(error));
+      return failure("PASSWORD_HASH_FAILED", 500);
+    }
 
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: resetToken.userId },
-        data: { passwordHash },
-      }),
-      prisma.passwordResetToken.update({
-        where: { id: resetToken.id },
-        data: { usedAt: new Date() },
-      }),
-    ]);
+    try {
+      await prisma.$transaction(async (transaction) => {
+        try {
+          await transaction.user.update({
+            where: { id: resetToken.userId },
+            data: { passwordHash },
+          });
+        } catch (error: unknown) {
+          console.error("[reset-confirm] USER_PASSWORD_UPDATE_FAILED", safeErrorType(error));
+          throw new UpdateFailure("USER_PASSWORD_UPDATE_FAILED");
+        }
+
+        try {
+          await transaction.passwordResetToken.update({
+            where: { id: resetToken.id },
+            data: { usedAt: new Date() },
+          });
+        } catch (error: unknown) {
+          console.error("[reset-confirm] TOKEN_MARK_USED_FAILED", safeErrorType(error));
+          throw new UpdateFailure("TOKEN_MARK_USED_FAILED");
+        }
+      });
+    } catch (error: unknown) {
+      if (error instanceof UpdateFailure) {
+        return failure(error.step, 500);
+      }
+
+      console.error("[reset-confirm] USER_PASSWORD_UPDATE_FAILED", safeErrorType(error));
+      return failure("USER_PASSWORD_UPDATE_FAILED", 500);
+    }
 
     console.log("[reset-confirm] password updated");
 
     return NextResponse.json({
-      success: true,
+      ok: true,
       message: "Password updated successfully.",
     });
   } catch (error: unknown) {
-    const errorCode =
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      typeof error.code === "string"
-        ? error.code
-        : error instanceof Error
-          ? error.name
-          : "Unknown error";
-    console.error("[reset-confirm] unexpected error", errorCode);
-
-    return NextResponse.json(
-      { success: false, message: "Reset failed. Please try again." },
-      { status: 500 },
-    );
+    console.error("[reset-confirm] unexpected error", safeErrorType(error));
+    return failure("Reset failed. Please try again.", 500);
   }
 }

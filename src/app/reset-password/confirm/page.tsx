@@ -46,12 +46,14 @@ function ResetPasswordConfirmInner() {
       });
 
       const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
         success?: boolean;
         code?: string;
         message?: string;
+        reason?: string;
       };
 
-      if (response.ok && data.success) {
+      if (response.ok && (data.ok || data.success)) {
         setNotice({
           kind: "success",
           code: data.code,
@@ -64,7 +66,8 @@ function ResetPasswordConfirmInner() {
       setNotice({
         kind: "error",
         code: data.code,
-        message: data.message ?? "Unable to complete password reset. Please try again.",
+        message:
+          data.message ?? data.reason ?? "Unable to complete password reset. Please try again.",
       });
     } catch {
       setNotice({
