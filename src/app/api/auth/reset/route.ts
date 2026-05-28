@@ -21,6 +21,23 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function getResetBaseUrl(): string {
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
+  const baseUrl = configuredBaseUrl?.trim().replace(/\/+$/, "");
+
+  if (!baseUrl) {
+    throw new Error("Missing reset URL configuration");
+  }
+
+  const parsedBaseUrl = new URL(baseUrl);
+
+  if (parsedBaseUrl.protocol !== "https:" && parsedBaseUrl.protocol !== "http:") {
+    throw new Error("Invalid reset URL protocol");
+  }
+
+  return parsedBaseUrl.origin;
+}
+
 export async function POST(request: Request) {
   try {
     console.log("[reset] request received");
@@ -71,13 +88,7 @@ export async function POST(request: Request) {
 
     console.log("[reset] token row created");
 
-    const configuredBaseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
-    const baseUrl = configuredBaseUrl?.replace(/\/+$/, "");
-
-    if (!baseUrl) {
-      throw new Error("Missing reset URL configuration");
-    }
-
+    const baseUrl = getResetBaseUrl();
     const resetLink = `${baseUrl}/reset-password/confirm?token=${encodeURIComponent(rawToken)}`;
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.RESEND_FROM;
