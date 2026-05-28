@@ -3,6 +3,9 @@ import bcrypt from "bcrypt";
 import { prisma } from "@/app/lib/prisma";
 import { hashResetToken } from "@/app/lib/auth/passwordReset";
 
+const INVALID_RESET_LINK_REASON =
+  "This reset link is invalid, expired, or has already been replaced by a newer request.";
+
 type UpdateFailureStep = "USER_PASSWORD_UPDATE_FAILED" | "TOKEN_MARK_USED_FAILED";
 
 class UpdateFailure extends Error {
@@ -53,7 +56,7 @@ export async function POST(request: Request) {
     console.log("[reset-confirm] password present", Boolean(password));
 
     if (!token) {
-      return failure("Invalid reset link");
+      return failure(INVALID_RESET_LINK_REASON);
     }
 
     if (!password) {
@@ -83,17 +86,17 @@ export async function POST(request: Request) {
 
     if (!resetToken) {
       console.log("[reset-confirm] TOKEN_NOT_FOUND");
-      return failure("Invalid reset link");
+      return failure(INVALID_RESET_LINK_REASON);
     }
 
     if (resetToken.usedAt) {
       console.log("[reset-confirm] TOKEN_USED");
-      return failure("This reset link has already been used.");
+      return failure(INVALID_RESET_LINK_REASON);
     }
 
     if (resetToken.expiresAt < new Date()) {
       console.log("[reset-confirm] TOKEN_EXPIRED");
-      return failure("Reset link expired. Please request a new one.");
+      return failure(INVALID_RESET_LINK_REASON);
     }
 
     let passwordHash: string;

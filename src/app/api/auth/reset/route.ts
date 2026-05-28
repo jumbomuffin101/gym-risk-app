@@ -8,6 +8,7 @@ const RESET_EMAIL_SENT = "Reset email sent. Check your inbox and spam folder.";
 const EMAIL_NOT_FOUND = "We couldn't find an account with that email.";
 const EMAIL_SEND_FAILED = "We couldn't send the reset email. Please try again.";
 const RESET_LINK_CREATE_FAILED = "We couldn't create a reset link. Please try again.";
+const RESET_EMAIL_SUBJECT_PREFIX = "Reset your Gym Risk password";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -83,6 +84,18 @@ export async function POST(request: Request) {
     const appUrl = baseUrl.replace(/\/$/, "");
     const resetLink = `${appUrl}/reset-password/confirm?token=${encodeURIComponent(rawToken)}`;
     console.log("[reset] appUrl host:", new URL(appUrl).host);
+    const requestedAt = new Date();
+    const requestedAtLabel = requestedAt.toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "America/New_York",
+    });
+    const subjectTime = requestedAt.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "America/New_York",
+    });
 
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.RESEND_FROM;
@@ -100,12 +113,14 @@ export async function POST(request: Request) {
       const result = await resend.emails.send({
         from,
         to: user.email,
-        subject: "Reset your Gym-Risk password",
+        subject: `${RESET_EMAIL_SUBJECT_PREFIX} - ${subjectTime}`,
         text:
-          `Use this link to reset your Gym-Risk password:\n\n${resetLink}\n\n` +
+          `This reset link was requested at ${requestedAtLabel}.\n\n` +
+          `Use this link to reset your Gym Risk password:\n\n${resetLink}\n\n` +
           "This link expires in 30 minutes. If you did not request this, you can ignore this email.",
         html:
-          "<p>Use this link to reset your Gym-Risk password:</p>" +
+          `<p>This reset link was requested at ${escapeHtml(requestedAtLabel)}.</p>` +
+          "<p>Use this link to reset your Gym Risk password:</p>" +
           `<p><a href="${escapeHtml(resetLink)}">Reset your password</a></p>` +
           "<p>This link expires in 30 minutes. If you did not request this, you can ignore this email.</p>",
       });

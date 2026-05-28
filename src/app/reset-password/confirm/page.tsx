@@ -8,6 +8,7 @@ type Notice = {
   kind: "success" | "error";
   message: string;
   code?: string;
+  showResetRequest?: boolean;
 };
 
 function ResetPasswordConfirmInner() {
@@ -68,6 +69,8 @@ function ResetPasswordConfirmInner() {
         code: data.code,
         message:
           data.message ?? data.reason ?? "Unable to complete password reset. Please try again.",
+        showResetRequest:
+          (data.message ?? data.reason ?? "").toLowerCase().includes("reset link"),
       });
     } catch {
       setNotice({
@@ -155,6 +158,15 @@ function ResetPasswordConfirmInner() {
                 </Link>
               </p>
             </>
+          )}
+
+          {notice?.showResetRequest && !succeeded && (
+            <Link
+              className="lab-hover mt-4 block w-full rounded-xl border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.10)] p-3 text-center text-sm font-medium text-[var(--lab-safe)] hover:underline"
+              href="/reset-password"
+            >
+              Request a new reset email
+            </Link>
           )}
         </div>
       </div>
