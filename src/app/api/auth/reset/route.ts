@@ -74,12 +74,15 @@ export async function POST(request: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
 
     if (!baseUrl) {
-      throw new Error("Missing reset URL configuration");
+      return NextResponse.json(
+        { success: false, message: "App URL is not configured." },
+        { status: 500 },
+      );
     }
 
     const appUrl = baseUrl.replace(/\/$/, "");
     const resetLink = `${appUrl}/reset-password/confirm?token=${encodeURIComponent(rawToken)}`;
-    console.log("[reset] reset link host:", new URL(resetLink).host);
+    console.log("[reset] appUrl host:", new URL(appUrl).host);
 
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.RESEND_FROM;
