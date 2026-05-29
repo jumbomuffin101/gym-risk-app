@@ -1,41 +1,107 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { AuthShell } from "@/app/components/AuthShell";
 import { AuthInput } from "@/app/components/AuthInput";
 
+type Notice = {
+  kind: "success" | "error";
+  message: string;
+  subtext?: string;
+};
+
 export default function SignupPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError(null);
+    setNotice(null);
     setLoading(true);
 
     const form = new FormData(e.currentTarget);
     const name = String(form.get("name") ?? "");
-    const email = String(form.get("email") ?? "");
+    const email = String(form.get("email") ?? "").toLowerCase().trim();
     const password = String(form.get("password") ?? "");
 
-    const res = await fetch("/api/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
-    });
+    try {
+      const res = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
 
-    setLoading(false);
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+      };
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data?.error ?? "Signup failed.");
+      if (!res.ok || !data.ok) {
+        setNotice({
+          kind: "error",
+          message: data.message ?? data.error ?? "Signup failed.",
+        });
+        setPendingEmail(null);
+        return;
+      }
+
+      setNotice({
+        kind: "success",
+        message: data.message ?? "Check your email to verify your account.",
+        subtext: "Your account will be created after you click the verification link.",
+      });
+      setPendingEmail(email);
+    } catch {
+      setNotice({
+        kind: "error",
+        message: "Signup failed. Please try again.",
+      });
+      setPendingEmail(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onResendVerification() {
+    if (!pendingEmail) {
       return;
     }
 
-    router.push("/signin");
+    setResending(true);
+    setNotice(null);
+
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: pendingEmail }),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        message?: string;
+      };
+
+      setNotice({
+        kind: res.ok && data.ok ? "success" : "error",
+        message: data.message ?? "We couldn't send the verification email. Please try again.",
+        subtext:
+          res.ok && data.ok
+            ? "Your account will be created after you click the verification link."
+            : undefined,
+      });
+    } catch {
+      setNotice({
+        kind: "error",
+        message: "We couldn't send the verification email. Please try again.",
+      });
+    } finally {
+      setResending(false);
+    }
   }
 
   return (
@@ -67,10 +133,17 @@ export default function SignupPage() {
           type="password"
         />
 
-        {error ? (
-          <p className="rounded-xl border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.12)] px-3 py-2 text-sm text-white/90">
-            {error}
-          </p>
+        {notice ? (
+          <div
+            className={`rounded-xl border px-3 py-2 text-sm text-white/90 ${
+              notice.kind === "success"
+                ? "border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)]"
+                : "border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.12)]"
+            }`}
+          >
+            <p>{notice.message}</p>
+            {notice.subtext ? <p className="mt-1 text-white/65">{notice.subtext}</p> : null}
+          </div>
         ) : null}
 
         <button
@@ -78,8 +151,19 @@ export default function SignupPage() {
           disabled={loading}
           type="submit"
         >
-          {loading ? "Creating..." : "Create account"}
+          {loading ? "Sending verification..." : "Create account"}
         </button>
+
+        {pendingEmail ? (
+          <button
+            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-white/75 transition hover:border-[rgba(56,189,248,0.35)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(56,189,248,0.35)] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
+            disabled={resending}
+            onClick={onResendVerification}
+            type="button"
+          >
+            {resending ? "Resending..." : "Resend verification email"}
+          </button>
+        ) : null}
       </form>
 
       <div className="flex items-center justify-between text-sm text-white/65">

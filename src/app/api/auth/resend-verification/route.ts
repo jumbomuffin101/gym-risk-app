@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcrypt";
 import { prisma } from "@/app/lib/prisma";
 import {
   buildVerificationLink,
@@ -16,33 +15,30 @@ function isValidEmail(email: string): boolean {
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
-
-    const nameRaw = typeof body?.name === "string" ? body.name.trim() : "";
     const email = typeof body?.email === "string" ? body.email.toLowerCase().trim() : "";
-    const password = typeof body?.password === "string" ? body.password : "";
-    const name = nameRaw.length > 0 ? nameRaw : null;
 
     if (!email || !isValidEmail(email)) {
       return NextResponse.json({ ok: false, message: "Please enter a valid email." }, { status: 400 });
-    }
-
-    if (!password || password.length < 8) {
-      return NextResponse.json(
-        { ok: false, message: "Password must be at least 8 characters." },
-        { status: 400 },
-      );
     }
 
     const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
 
     if (existing) {
       return NextResponse.json(
-        { ok: false, message: "An account with this email already exists." },
+        { ok: false, message: "An account with this email already exists. Please sign in." },
         { status: 409 },
       );
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const pendingSignup = await prisma.pendingSignup.findUnique({ where: { email } });
+
+    if (!pendingSignup || pendingSignup.usedAt) {
+      return NextResponse.json(
+        { ok: false, message: "No pending signup found. Please create an account first." },
+        { status: 404 },
+      );
+    }
+
     const rawToken = createSignupVerificationToken();
     const tokenHash = hashSignupVerificationToken(rawToken);
     const expiresAt = getSignupVerificationExpiresAt();
@@ -55,26 +51,17 @@ export async function POST(request: Request) {
       );
     }
 
-    await prisma.pendingSignup.upsert({
-      where: { email },
-      update: {
-        name,
-        passwordHash,
+    await prisma.pendingSignup.update({
+      where: { id: pendingSignup.id },
+      data: {
         tokenHash,
         expiresAt,
         usedAt: null,
       },
-      create: {
-        email,
-        name,
-        passwordHash,
-        tokenHash,
-        expiresAt,
-      },
     });
 
     const emailResult = await sendSignupVerificationEmail({
-      to: email,
+      to: pendingSignup.email,
       verificationLink,
     });
 
@@ -91,7 +78,7 @@ export async function POST(request: Request) {
     });
   } catch {
     return NextResponse.json(
-      { ok: false, message: "Signup failed. Please try again." },
+      { ok: false, message: "We couldn't resend the verification email. Please try again." },
       { status: 500 },
     );
   }

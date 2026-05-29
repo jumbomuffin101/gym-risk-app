@@ -24,6 +24,20 @@ model User {
   passwordResetTokens PasswordResetToken[]
 }
 
+model PendingSignup {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  tokenHash    String   @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+}
+
 model PasswordResetToken {
   id        String   @id @default(cuid())
   tokenHash String   @unique
