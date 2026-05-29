@@ -49,7 +49,11 @@ export async function sendSignupVerificationEmail({
   const from = process.env.RESEND_FROM;
 
   if (!apiKey || !from) {
-    return { ok: false as const };
+    return {
+      ok: false as const,
+      status: null,
+      message: !apiKey ? "RESEND_API_KEY is not configured." : "RESEND_FROM is not configured.",
+    };
   }
 
   const issuedAt = new Date();
@@ -84,11 +88,24 @@ export async function sendSignupVerificationEmail({
     });
 
     if (result.error) {
-      return { ok: false as const };
+      return {
+        ok: false as const,
+        status: "statusCode" in result.error ? result.error.statusCode : null,
+        message: result.error.message,
+        name: result.error.name,
+      };
     }
 
     return { ok: true as const };
-  } catch {
-    return { ok: false as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Resend error.";
+    const name = error instanceof Error ? error.name : "UnknownError";
+
+    return {
+      ok: false as const,
+      status: null,
+      message,
+      name,
+    };
   }
 }

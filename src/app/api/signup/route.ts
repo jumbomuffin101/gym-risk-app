@@ -79,8 +79,29 @@ export async function POST(request: Request) {
     });
 
     if (!emailResult.ok) {
+      const appUrlHost = (() => {
+        try {
+          return new URL(verificationLink).host;
+        } catch {
+          return "invalid";
+        }
+      })();
+
+      console.error("[signup] verification email send failed", {
+        hasResendApiKey: Boolean(process.env.RESEND_API_KEY),
+        resendFrom: process.env.RESEND_FROM ?? null,
+        appUrlHost,
+        resendStatus: emailResult.status ?? null,
+        resendError: emailResult.name ?? null,
+        resendMessage: emailResult.message ?? null,
+      });
+
       return NextResponse.json(
-        { ok: false, message: "We couldn't send the verification email. Please try again." },
+        {
+          ok: false,
+          code: "VERIFICATION_EMAIL_SEND_FAILED",
+          message: "We couldn't send the verification email. Please try again.",
+        },
         { status: 500 },
       );
     }
