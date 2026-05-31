@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { AuthShell } from "@/app/components/AuthShell";
 import { AuthInput } from "@/app/components/AuthInput";
+import { OAuthButtons } from "@/app/components/OAuthButtons";
 
 type Notice = {
   kind: "success" | "error";
@@ -105,7 +106,21 @@ export default function SignupPage() {
   }
 
   return (
-    <AuthShell title="Create account" description="Start tracking training risk.">
+    <AuthShell title="Create account" description="Use OAuth, or the demo email fallback.">
+      <OAuthButtons callbackUrl="/dashboard" />
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-white/35">
+          <div className="h-px flex-1 bg-white/10" />
+          <span>Demo email fallback</span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+        <p className="text-xs leading-5 text-white/55">
+          Email/password signup is limited to the configured Resend test email. OAuth creates your
+          account immediately after provider sign-in.
+        </p>
+      </div>
+
       <form onSubmit={onSubmit} className="space-y-4">
         <AuthInput
           autoComplete="name"
