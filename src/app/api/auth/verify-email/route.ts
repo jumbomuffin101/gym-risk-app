@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
-import { hashSignupVerificationToken } from "@/app/lib/auth/signupVerification";
+import {
+  DEMO_EMAIL_UNSUPPORTED_MESSAGE,
+  hashSignupVerificationToken,
+  isAllowedDemoSignupEmail,
+} from "@/app/lib/auth/signupVerification";
 
 const INVALID_VERIFICATION_LINK = "Verification link is invalid or expired.";
 
@@ -20,6 +24,13 @@ export async function POST(request: Request) {
 
     if (!pendingSignup || pendingSignup.usedAt || pendingSignup.expiresAt < new Date()) {
       return NextResponse.json({ ok: false, message: INVALID_VERIFICATION_LINK }, { status: 400 });
+    }
+
+    if (!isAllowedDemoSignupEmail(pendingSignup.email)) {
+      return NextResponse.json(
+        { ok: false, message: DEMO_EMAIL_UNSUPPORTED_MESSAGE },
+        { status: 400 },
+      );
     }
 
     const existing = await prisma.user.findUnique({

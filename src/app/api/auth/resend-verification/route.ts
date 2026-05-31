@@ -3,8 +3,11 @@ import { prisma } from "@/app/lib/prisma";
 import {
   buildVerificationLink,
   createSignupVerificationToken,
+  DEMO_EMAIL_UNSUPPORTED_MESSAGE,
   getSignupVerificationExpiresAt,
   hashSignupVerificationToken,
+  isAllowedDemoSignupEmail,
+  RESEND_TEST_MODE_MESSAGE,
   sendSignupVerificationEmail,
 } from "@/app/lib/auth/signupVerification";
 
@@ -19,6 +22,13 @@ export async function POST(request: Request) {
 
     if (!email || !isValidEmail(email)) {
       return NextResponse.json({ ok: false, message: "Please enter a valid email." }, { status: 400 });
+    }
+
+    if (!isAllowedDemoSignupEmail(email)) {
+      return NextResponse.json(
+        { ok: false, message: DEMO_EMAIL_UNSUPPORTED_MESSAGE },
+        { status: 400 },
+      );
     }
 
     const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -66,6 +76,13 @@ export async function POST(request: Request) {
     });
 
     if (!emailResult.ok) {
+      if (emailResult.code === "RESEND_TEST_MODE_RECIPIENT_RESTRICTED") {
+        return NextResponse.json(
+          { ok: false, message: RESEND_TEST_MODE_MESSAGE },
+          { status: 500 },
+        );
+      }
+
       return NextResponse.json(
         { ok: false, message: "We couldn't send the verification email. Please try again." },
         { status: 500 },

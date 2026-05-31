@@ -4,8 +4,11 @@ import { prisma } from "@/app/lib/prisma";
 import {
   buildVerificationLink,
   createSignupVerificationToken,
+  DEMO_EMAIL_UNSUPPORTED_MESSAGE,
   getSignupVerificationExpiresAt,
   hashSignupVerificationToken,
+  isAllowedDemoSignupEmail,
+  RESEND_TEST_MODE_MESSAGE,
   sendSignupVerificationEmail,
 } from "@/app/lib/auth/signupVerification";
 
@@ -29,6 +32,13 @@ export async function POST(request: Request) {
     if (!password || password.length < 8) {
       return NextResponse.json(
         { ok: false, message: "Password must be at least 8 characters." },
+        { status: 400 },
+      );
+    }
+
+    if (!isAllowedDemoSignupEmail(email)) {
+      return NextResponse.json(
+        { ok: false, message: DEMO_EMAIL_UNSUPPORTED_MESSAGE },
         { status: 400 },
       );
     }
@@ -95,6 +105,17 @@ export async function POST(request: Request) {
         resendError: emailResult.name ?? null,
         resendMessage: emailResult.message ?? null,
       });
+
+      if (emailResult.code === "RESEND_TEST_MODE_RECIPIENT_RESTRICTED") {
+        return NextResponse.json(
+          {
+            ok: false,
+            code: "VERIFICATION_EMAIL_SEND_FAILED",
+            message: RESEND_TEST_MODE_MESSAGE,
+          },
+          { status: 500 },
+        );
+      }
 
       return NextResponse.json(
         {

@@ -2,6 +2,21 @@ import { createHash, randomBytes } from "crypto";
 import { Resend } from "resend";
 
 const VERIFICATION_EXPIRES_MS = 1000 * 60 * 60 * 24;
+export const DEMO_SIGNUP_VERIFICATION_EMAIL = "ryanrawat@gmail.com";
+export const DEMO_EMAIL_UNSUPPORTED_MESSAGE =
+  "Demo email verification only supports the configured test email.";
+export const RESEND_TEST_MODE_MESSAGE =
+  "Email verification is in demo mode. Please use the configured test email.";
+
+type SignupVerificationEmailResult =
+  | { ok: true }
+  | {
+      ok: false;
+      status: number | string | null;
+      message: string;
+      name?: string;
+      code?: "RESEND_TEST_MODE_RECIPIENT_RESTRICTED";
+    };
 
 export function createSignupVerificationToken(): string {
   return randomBytes(32).toString("hex");
@@ -13,6 +28,10 @@ export function hashSignupVerificationToken(rawToken: string): string {
 
 export function getSignupVerificationExpiresAt(): Date {
   return new Date(Date.now() + VERIFICATION_EXPIRES_MS);
+}
+
+export function isAllowedDemoSignupEmail(email: string): boolean {
+  return email.toLowerCase().trim() === DEMO_SIGNUP_VERIFICATION_EMAIL;
 }
 
 export function getAppBaseUrl(): string | null {
@@ -38,13 +57,26 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function isResendTestingRecipientRestriction({
+  status,
+  message,
+}: {
+  status: number | string | null;
+  message: string;
+}): boolean {
+  return (
+    String(status) === "403" &&
+    /testing emails|own email address|verify a domain|onboarding@resend\.dev/i.test(message)
+  );
+}
+
 export async function sendSignupVerificationEmail({
   to,
   verificationLink,
 }: {
   to: string;
   verificationLink: string;
-}) {
+}): Promise<SignupVerificationEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM;
 
@@ -88,24 +120,56 @@ export async function sendSignupVerificationEmail({
     });
 
     if (result.error) {
+      const status = "statusCode" in result.error ? result.error.statusCode : null;
+      const code = isResendTestingRecipientRestriction({
+        status,
+        message: result.error.message,
+      })
+        ? "RESEND_TEST_MODE_RECIPIENT_RESTRICTED"
+        : undefined;
+
       return {
         ok: false as const,
-        status: "statusCode" in result.error ? result.error.statusCode : null,
+        status,
         message: result.error.message,
         name: result.error.name,
+        code,
       };
     }
 
     return { ok: true as const };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown Resend error.";
-    const name = error instanceof Error ? error.name : "UnknownError";
+    const resendError = error as {
+      message?: unknown;
+      name?: unknown;
+      status?: unknown;
+      statusCode?: unknown;
+    };
+    const statusValue = resendError.statusCode ?? resendError.status ?? null;
+    const status =
+      typeof statusValue === "number" || typeof statusValue === "string" ? statusValue : null;
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof resendError.message === "string"
+          ? resendError.message
+          : "Unknown Resend error.";
+    const name =
+      error instanceof Error
+        ? error.name
+        : typeof resendError.name === "string"
+          ? resendError.name
+          : "UnknownError";
+    const code = isResendTestingRecipientRestriction({ status, message })
+      ? "RESEND_TEST_MODE_RECIPIENT_RESTRICTED"
+      : undefined;
 
     return {
       ok: false as const,
-      status: null,
+      status,
       message,
       name,
+      code,
     };
   }
 }
