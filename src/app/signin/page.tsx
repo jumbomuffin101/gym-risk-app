@@ -6,13 +6,17 @@ import { signIn } from "next-auth/react";
 import { Suspense, useMemo, useState } from "react";
 import { AuthShell } from "@/app/components/AuthShell";
 import { AuthInput } from "@/app/components/AuthInput";
+import { OAuthButtons } from "@/app/components/OAuthButtons";
 
 function SigninInner() {
   const router = useRouter();
   const sp = useSearchParams();
 
-  // memoize to avoid recomputing, but still fine without
   const callbackUrl = useMemo(() => sp.get("callbackUrl") ?? "/dashboard", [sp]);
+  const oauthError = sp.get("error");
+  const oauthErrorMessage = oauthError
+    ? "OAuth sign-in failed. Please try another sign-in method."
+    : null;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +53,14 @@ function SigninInner() {
 
   return (
     <AuthShell title="Sign in" description="Track training load and recovery.">
+      <OAuthButtons />
+
+      <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-white/35">
+        <div className="h-px flex-1 bg-white/10" />
+        <span>Email fallback</span>
+        <div className="h-px flex-1 bg-white/10" />
+      </div>
+
       <form onSubmit={onSubmit} className="space-y-4">
         <AuthInput
           autoComplete="email"
@@ -69,9 +81,9 @@ function SigninInner() {
           type="password"
         />
 
-        {error ? (
+        {error || oauthErrorMessage ? (
           <p className="rounded-xl border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.12)] px-3 py-2 text-sm text-white/90">
-            {error}
+            {error ?? oauthErrorMessage}
           </p>
         ) : null}
 

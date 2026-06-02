@@ -1,44 +1,85 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+
+type Notice = {
+  kind: "success" | "error";
+  message: string;
+  code?: string;
+  showResetRequest?: boolean;
+};
 
 function ResetPasswordConfirmInner() {
-  const sp = useSearchParams();
-  const router = useRouter();
-  const token = useMemo(() => sp.get("token") ?? "", [sp]);
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token") ?? "";
 
-  const [pw1, setPw1] = useState("");
-  const [pw2, setPw2] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [succeeded, setSucceeded] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setMsg(null);
+    setNotice(null);
 
-    if (!token) return setMsg("Reset link is invalid or expired");
-    if (pw1.length < 8) return setMsg("Password must be at least 8 characters.");
-    if (pw1 !== pw2) return setMsg("Passwords do not match.");
-
-    setLoading(true);
-    const res = await fetch("/api/auth/reset/confirm", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, newPassword: pw1 }),
-    });
-
-    const data = await res.json().catch(() => ({}));
-    setLoading(false);
-
-    if (!res.ok || (!data?.ok && !data?.success)) {
-      setMsg(data?.message ?? data?.reason ?? data?.error ?? "Reset failed. Try again.");
+    if (!token) {
+      setNotice({ kind: "error", message: "Reset link is invalid or expired." });
+      return;
+    }
+    if (newPassword.length < 8) {
+      setNotice({ kind: "error", message: "Password must be at least 8 characters." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setNotice({ kind: "error", message: "Passwords do not match." });
       return;
     }
 
-    setMsg(data?.message ?? "Password updated successfully");
-    setTimeout(() => router.push("/signin"), 900);
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/reset/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password: newPassword, confirmPassword }),
+      });
+
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        success?: boolean;
+        code?: string;
+        message?: string;
+        reason?: string;
+      };
+
+      if (response.ok && (data.ok || data.success)) {
+        setNotice({
+          kind: "success",
+          code: data.code,
+          message: data.message ?? "Password updated successfully.",
+        });
+        setSucceeded(true);
+        return;
+      }
+
+      setNotice({
+        kind: "error",
+        code: data.code,
+        message:
+          data.message ?? data.reason ?? "Unable to complete password reset. Please try again.",
+        showResetRequest:
+          (data.message ?? data.reason ?? "").toLowerCase().includes("reset link"),
+      });
+    } catch {
+      setNotice({
+        kind: "error",
+        message: "Unable to complete password reset. Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -57,44 +98,76 @@ function ResetPasswordConfirmInner() {
             </div>
           )}
 
-          <form onSubmit={onSubmit} className="mt-4 space-y-3">
-            <input
-              className="w-full rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(15,21,32,0.55)] p-3 text-sm outline-none placeholder:text-[rgba(230,232,238,0.45)] focus:border-[rgba(34,197,94,0.35)]"
-              placeholder="New password"
-              type="password"
-              value={pw1}
-              onChange={(e) => setPw1(e.target.value)}
-              required
-            />
-            <input
-              className="w-full rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(15,21,32,0.55)] p-3 text-sm outline-none placeholder:text-[rgba(230,232,238,0.45)] focus:border-[rgba(34,197,94,0.35)]"
-              placeholder="Confirm new password"
-              type="password"
-              value={pw2}
-              onChange={(e) => setPw2(e.target.value)}
-              required
-            />
-
-            {msg && <div className="text-sm text-white/70">{msg}</div>}
-
-            <button
-              className="lab-hover w-full rounded-xl bg-[rgba(34,197,94,0.92)] p-3 text-sm font-medium text-black disabled:opacity-60"
-              disabled={loading || !token}
-              type="submit"
-              style={{
-                boxShadow:
-                  "0 0 0 1px rgba(34,197,94,0.25), 0 18px 55px rgba(34,197,94,0.10)",
-              }}
+          {notice && (
+            <div
+              className={`mt-4 rounded-xl border p-3 text-sm ${
+                notice.kind === "success"
+                  ? "border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] text-[rgba(220,252,231,0.95)]"
+                  : "border-[rgba(248,113,113,0.35)] bg-[rgba(248,113,113,0.08)] text-[rgba(254,226,226,0.95)]"
+              }`}
             >
-              {loading ? "Updating..." : "Update password"}
-            </button>
-          </form>
+              {notice.code && (
+                <div className="mb-1 font-mono text-xs uppercase tracking-wide">{notice.code}</div>
+              )}
+              <div>{notice.message}</div>
+            </div>
+          )}
 
-          <p className="mt-5 text-sm lab-muted">
-            <Link className="text-[var(--lab-safe)] hover:underline" href="/signin">
-              Back to sign in
+          {succeeded ? (
+            <p className="mt-5 text-sm">
+              <Link className="text-[var(--lab-safe)] hover:underline" href="/signin">
+                Sign in with your new password
+              </Link>
+            </p>
+          ) : (
+            <>
+              <form onSubmit={onSubmit} className="mt-4 space-y-3">
+                <input
+                  className="w-full rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(15,21,32,0.55)] p-3 text-sm outline-none placeholder:text-[rgba(230,232,238,0.45)] focus:border-[rgba(34,197,94,0.35)]"
+                  placeholder="New password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                />
+                <input
+                  className="w-full rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(15,21,32,0.55)] p-3 text-sm outline-none placeholder:text-[rgba(230,232,238,0.45)] focus:border-[rgba(34,197,94,0.35)]"
+                  placeholder="Confirm new password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+
+                <button
+                  className="lab-hover w-full rounded-xl bg-[rgba(34,197,94,0.92)] p-3 text-sm font-medium text-black disabled:opacity-60"
+                  disabled={loading || !token}
+                  type="submit"
+                  style={{
+                    boxShadow:
+                      "0 0 0 1px rgba(34,197,94,0.25), 0 18px 55px rgba(34,197,94,0.10)",
+                  }}
+                >
+                  {loading ? "Updating..." : "Update password"}
+                </button>
+              </form>
+
+              <p className="mt-5 text-sm lab-muted">
+                <Link className="text-[var(--lab-safe)] hover:underline" href="/signin">
+                  Back to sign in
+                </Link>
+              </p>
+            </>
+          )}
+
+          {notice?.showResetRequest && !succeeded && (
+            <Link
+              className="lab-hover mt-4 block w-full rounded-xl border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.10)] p-3 text-center text-sm font-medium text-[var(--lab-safe)] hover:underline"
+              href="/reset-password"
+            >
+              Request a new reset email
             </Link>
-          </p>
+          )}
         </div>
       </div>
     </div>

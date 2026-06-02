@@ -1,113 +1,156 @@
+import { randomBytes } from "crypto";
+import { Resend } from "resend";
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
-import { createPasswordResetToken } from "@/app/lib/auth/passwordReset";
-import { sendResetEmail } from "@/app/lib/email/sendResetEmail";
+import { hashResetToken } from "@/app/lib/auth/passwordReset";
 
 const RESET_EMAIL_SENT = "Reset email sent. Check your inbox and spam folder.";
 const EMAIL_NOT_FOUND = "We couldn't find an account with that email.";
 const EMAIL_SEND_FAILED = "We couldn't send the reset email. Please try again.";
-const RESET_CONFIG_FAILED = "Password reset is not configured. Please try again later.";
-const RESET_TOKEN_FAILED = "We couldn't create a reset link. Please try again.";
+const RESET_LINK_CREATE_FAILED = "We couldn't create a reset link. Please try again.";
+const RESET_EMAIL_SUBJECT_PREFIX = "Reset your Gym Risk password";
 
-function isValidEmail(email: string) {
+function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function getResetBaseUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
-
-  if (!configuredUrl) {
-    throw new Error("Missing NEXT_PUBLIC_APP_URL or NEXTAUTH_URL");
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(configuredUrl);
-  } catch {
-    throw new Error("Invalid NEXT_PUBLIC_APP_URL or NEXTAUTH_URL");
-  }
-
-  if (
-    process.env.NODE_ENV === "production" &&
-    ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)
-  ) {
-    throw new Error("Password reset base URL points to localhost in production");
-  }
-
-  return parsed.origin;
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
-export async function POST(req: Request) {
-  const { email } = (await req.json().catch(() => ({}))) as { email?: string };
-
-  const e = String(email ?? "").toLowerCase().trim();
-  if (!e || !isValidEmail(e)) {
-    return NextResponse.json(
-      { success: false, code: "INVALID_EMAIL", message: "Enter a valid email address." },
-      { status: 400 },
-    );
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { email: e },
-    select: { id: true, email: true },
-  });
-
-  if (!user) {
-    return NextResponse.json(
-      { success: false, code: "EMAIL_NOT_FOUND", message: EMAIL_NOT_FOUND },
-      { status: 404 },
-    );
-  }
-
-  let baseUrl: string;
+export async function POST(request: Request) {
   try {
-    baseUrl = getResetBaseUrl();
-  } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown reset error";
-    console.error("[reset] Password reset base URL failed:", message);
-    return NextResponse.json(
-      { success: false, code: "RESET_CONFIG_FAILED", message: RESET_CONFIG_FAILED },
-      { status: 500 },
-    );
-  }
+    console.log("[reset] request received");
 
-  let rawToken: string;
-  try {
-    const tokenResult = await createPasswordResetToken(user.id, 30);
-    rawToken = tokenResult.token;
-  } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown reset error";
-    console.error("[reset] Password reset token creation failed:", message);
-    return NextResponse.json(
-      { success: false, code: "RESET_TOKEN_FAILED", message: RESET_TOKEN_FAILED },
-      { status: 500 },
-    );
-  }
+    const parsedBody: unknown = await request.json().catch(() => ({}));
+    const body =
+      parsedBody && typeof parsedBody === "object"
+        ? (parsedBody as Record<string, unknown>)
+        : {};
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
 
-  const resetUrl = `${baseUrl}/reset-password/confirm?token=${rawToken}`;
+    if (!email || !isValidEmail(email)) {
+      return NextResponse.json(
+        { success: false, code: "INVALID_EMAIL", message: "Enter a valid email address." },
+        { status: 400 },
+      );
+    }
 
-  try {
-    const emailResult = await sendResetEmail({ to: user.email, resetUrl });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true },
+    });
 
-    if (!emailResult.ok) {
-      console.error("[reset] Password reset email was not sent:", emailResult.reason);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, code: "EMAIL_NOT_FOUND", message: EMAIL_NOT_FOUND },
+        { status: 404 },
+      );
+    }
+
+    console.log("[reset] user found");
+
+    const rawToken = randomBytes(32).toString("hex");
+    const tokenHash = hashResetToken(rawToken);
+
+    await prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 30),
+      },
+    });
+
+    console.log("[reset] token row created");
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
+
+    if (!baseUrl) {
+      return NextResponse.json(
+        { success: false, message: "App URL is not configured." },
+        { status: 500 },
+      );
+    }
+
+    const appUrl = baseUrl.replace(/\/$/, "");
+    const resetLink = `${appUrl}/reset-password/confirm?token=${encodeURIComponent(rawToken)}`;
+    console.log("[reset] appUrl host:", new URL(appUrl).host);
+    const requestedAt = new Date();
+    const requestedAtLabel = requestedAt.toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "America/New_York",
+    });
+    const subjectTime = requestedAt.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "America/New_York",
+    });
+
+    const apiKey = process.env.RESEND_API_KEY;
+    const from = process.env.RESEND_FROM;
+
+    if (!apiKey || !from) {
+      console.error("[reset] resend failed");
       return NextResponse.json(
         { success: false, code: "EMAIL_SEND_FAILED", message: EMAIL_SEND_FAILED },
         { status: 500 },
       );
     }
-  } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown reset error";
-    console.error("[reset] Resend password reset email failed:", message);
+
+    try {
+      const resend = new Resend(apiKey);
+      const result = await resend.emails.send({
+        from,
+        to: user.email,
+        subject: `${RESET_EMAIL_SUBJECT_PREFIX} - ${subjectTime}`,
+        text:
+          `This reset link was requested at ${requestedAtLabel}.\n\n` +
+          `Use this link to reset your Gym Risk password:\n\n${resetLink}\n\n` +
+          "This link expires in 30 minutes. If you did not request this, you can ignore this email.",
+        html:
+          `<p>This reset link was requested at ${escapeHtml(requestedAtLabel)}.</p>` +
+          "<p>Use this link to reset your Gym Risk password:</p>" +
+          `<p><a href="${escapeHtml(resetLink)}">Reset your password</a></p>` +
+          "<p>This link expires in 30 minutes. If you did not request this, you can ignore this email.</p>",
+      });
+
+      if (result.error) {
+        console.error("[reset] resend failed");
+        return NextResponse.json(
+          { success: false, code: "EMAIL_SEND_FAILED", message: EMAIL_SEND_FAILED },
+          { status: 500 },
+        );
+      }
+    } catch {
+      console.error("[reset] resend failed");
+      return NextResponse.json(
+        { success: false, code: "EMAIL_SEND_FAILED", message: EMAIL_SEND_FAILED },
+        { status: 500 },
+      );
+    }
+
+    console.log("[reset] email sent");
+    return NextResponse.json({ success: true, message: RESET_EMAIL_SENT });
+  } catch {
+    console.error("[reset] unexpected error");
     return NextResponse.json(
-      { success: false, code: "EMAIL_SEND_FAILED", message: EMAIL_SEND_FAILED },
+      {
+        success: false,
+        code: "RESET_LINK_CREATE_FAILED",
+        message: RESET_LINK_CREATE_FAILED,
+      },
       { status: 500 },
     );
   }
-
-  return NextResponse.json({ success: true, message: RESET_EMAIL_SENT });
 }
