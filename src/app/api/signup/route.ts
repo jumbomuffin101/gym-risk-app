@@ -23,10 +23,13 @@ export async function POST(request: Request) {
     const nameRaw = typeof body?.name === "string" ? body.name.trim() : "";
     const email = typeof body?.email === "string" ? body.email.toLowerCase().trim() : "";
     const password = typeof body?.password === "string" ? body.password : "";
-    const name = nameRaw.length > 0 ? nameRaw : null;
 
     if (!email || !isValidEmail(email)) {
       return NextResponse.json({ ok: false, message: "Please enter a valid email." }, { status: 400 });
+    }
+
+    if (!nameRaw) {
+      return NextResponse.json({ ok: false, message: "Name is required." }, { status: 400 });
     }
 
     if (!password || password.length < 8) {
@@ -68,7 +71,7 @@ export async function POST(request: Request) {
     await prisma.pendingSignup.upsert({
       where: { email },
       update: {
-        name,
+        name: nameRaw,
         passwordHash,
         tokenHash,
         expiresAt,
@@ -76,7 +79,7 @@ export async function POST(request: Request) {
       },
       create: {
         email,
-        name,
+        name: nameRaw,
         passwordHash,
         tokenHash,
         expiresAt,

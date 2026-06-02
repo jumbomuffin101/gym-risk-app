@@ -53,7 +53,7 @@ function SigninInner() {
 
   return (
     <AuthShell title="Sign in" description="Track training load and recovery.">
-      <OAuthButtons />
+      <OAuthButtons callbackUrl={callbackUrl} />
 
       <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-white/35">
         <div className="h-px flex-1 bg-white/10" />

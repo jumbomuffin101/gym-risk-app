@@ -8,7 +8,28 @@ const OAUTH_PROVIDERS = [
   { id: "google", label: "Google" },
 ] as const;
 
-export function OAuthButtons() {
+type OAuthButtonsProps = {
+  callbackUrl?: string;
+  mode?: "signin" | "signup";
+  signupName?: string;
+  onValidationError?: (message: string) => void;
+};
+
+function setOAuthSignupCookie(name: string, value: string) {
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=600; Path=/; SameSite=Lax${secure}`;
+}
+
+function clearOAuthSignupCookie(name: string) {
+  document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+}
+
+export function OAuthButtons({
+  callbackUrl = "/dashboard",
+  mode = "signin",
+  signupName = "",
+  onValidationError,
+}: OAuthButtonsProps) {
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
 
   return (
@@ -22,8 +43,25 @@ export function OAuthButtons() {
             disabled={Boolean(loadingProvider)}
             key={provider.id}
             onClick={() => {
+              if (mode === "signup") {
+                const trimmedName = signupName.trim();
+
+                if (!trimmedName) {
+                  onValidationError?.("Name is required.");
+                  return;
+                }
+
+                setOAuthSignupCookie("gym-risk.oauth-mode", "signup");
+                setOAuthSignupCookie("gym-risk.oauth-signup-name", trimmedName);
+              } else {
+                clearOAuthSignupCookie("gym-risk.oauth-mode");
+                clearOAuthSignupCookie("gym-risk.oauth-signup-name");
+              }
+
               setLoadingProvider(provider.id);
-              void signIn(provider.id, { callbackUrl: "/dashboard" });
+              void signIn(provider.id, {
+                callbackUrl: mode === "signup" ? "/dashboard?authMode=signup" : callbackUrl,
+              });
             }}
             type="button"
           >

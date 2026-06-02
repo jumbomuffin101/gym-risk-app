@@ -308,6 +308,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? null;
   if (!email) redirect("/signin?callbackUrl=/dashboard");
+  const displayName = session?.user?.name?.trim() ?? "";
+  const firstName = displayName.split(/\s+/)[0] ?? "";
+  const greeting = firstName ? `Hey ${firstName}, ready to log?` : "Hey, ready to log?";
 
   const params = searchParams ? await searchParams : {};
   const rawWorkoutId = params.workoutId;
@@ -406,7 +409,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <div className="min-w-0">
             <SectionHeader
               eyebrow="Dashboard"
-              title="Training overview"
+              title={greeting}
               as="h1"
               subtitle={
                 <div className="flex flex-wrap items-center gap-3">

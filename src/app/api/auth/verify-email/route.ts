@@ -33,6 +33,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const name = typeof pendingSignup.name === "string" ? pendingSignup.name.trim() : "";
+
+    if (!name) {
+      return NextResponse.json({ ok: false, message: "Name is required." }, { status: 400 });
+    }
+
     const existing = await prisma.user.findUnique({
       where: { email: pendingSignup.email },
       select: { id: true },
@@ -54,7 +60,7 @@ export async function POST(request: Request) {
       prisma.user.create({
         data: {
           email: pendingSignup.email,
-          name: pendingSignup.name,
+          name,
           passwordHash: pendingSignup.passwordHash,
         },
       }),
