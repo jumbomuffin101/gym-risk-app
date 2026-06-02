@@ -1,49 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getProviders, signIn, type ClientSafeProvider } from "next-auth/react";
+import { useState } from "react";
+import { signIn } from "next-auth/react";
 
-const OAUTH_LABELS: Record<string, string> = {
-  google: "Google",
-  github: "GitHub",
-};
+const OAUTH_PROVIDERS = [
+  { id: "github", label: "GitHub" },
+  { id: "google", label: "Google" },
+] as const;
 
-type OAuthButtonsProps = {
-  callbackUrl?: string;
-};
-
-export function OAuthButtons({ callbackUrl = "/dashboard" }: OAuthButtonsProps) {
-  const [providers, setProviders] = useState<ClientSafeProvider[]>([]);
+export function OAuthButtons() {
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    void getProviders().then((providerMap) => {
-      if (!active) {
-        return;
-      }
-
-      const oauthProviders = Object.values(providerMap ?? {}).filter(
-        (provider) => provider.type === "oauth" && provider.id in OAUTH_LABELS,
-      );
-
-      setProviders(oauthProviders);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  if (providers.length === 0) {
-    return null;
-  }
 
   return (
     <div className="space-y-3">
-      {providers.map((provider) => {
-        const label = OAUTH_LABELS[provider.id] ?? provider.name;
+      {OAUTH_PROVIDERS.map((provider) => {
         const isLoading = loadingProvider === provider.id;
 
         return (
@@ -53,11 +23,13 @@ export function OAuthButtons({ callbackUrl = "/dashboard" }: OAuthButtonsProps) 
             key={provider.id}
             onClick={() => {
               setLoadingProvider(provider.id);
-              void signIn(provider.id, { callbackUrl });
+              void signIn(provider.id, { callbackUrl: "/dashboard" });
             }}
             type="button"
           >
-            {isLoading ? `Continuing with ${label}...` : `Continue with ${label}`}
+            {isLoading
+              ? `Continuing with ${provider.label}...`
+              : `Continue with ${provider.label}`}
           </button>
         );
       })}

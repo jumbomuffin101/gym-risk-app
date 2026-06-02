@@ -107,7 +107,7 @@ export default function SignupPage() {
 
   return (
     <AuthShell title="Create account" description="Use OAuth, or the demo email fallback.">
-      <OAuthButtons callbackUrl="/dashboard" />
+      <OAuthButtons />
 
       <div className="space-y-2">
         <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-white/35">

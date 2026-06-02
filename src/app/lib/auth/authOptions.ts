@@ -6,29 +6,17 @@ import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/app/lib/prisma";
 
-const providers: NextAuthOptions["providers"] = [];
-
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  providers.push(
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      allowDangerousEmailAccountLinking: true,
-    }),
-  );
-}
-
-if (process.env.GITHUB_ID && process.env.GITHUB_SECRET) {
-  providers.push(
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID,
-      clientSecret: process.env.GITHUB_SECRET,
-      allowDangerousEmailAccountLinking: true,
-    }),
-  );
-}
-
-providers.push(
+const providers: NextAuthOptions["providers"] = [
+  GitHubProvider({
+    clientId: process.env.GITHUB_ID!,
+    clientSecret: process.env.GITHUB_SECRET!,
+    allowDangerousEmailAccountLinking: true,
+  }),
+  GoogleProvider({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    allowDangerousEmailAccountLinking: true,
+  }),
   Credentials({
     name: "Credentials",
     credentials: {
@@ -57,7 +45,7 @@ providers.push(
       return { id: user.id, email: user.email, name: user.name ?? undefined };
     },
   }),
-);
+];
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
